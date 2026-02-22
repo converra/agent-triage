@@ -30,6 +30,7 @@ program
   .option("--langsmith <project>", "LangSmith project name")
   .option("--otel <path>", "Path to OTLP/JSON export file")
   .option("--policies <path>", "Path to policies.json", "policies.json")
+  .option("-p, --prompt <path>", "Path to system prompt file (for evaluation accuracy)")
   .option("--provider <provider>", "LLM provider")
   .option("--model <model>", "LLM model")
   .option("--api-key <key>", "LLM API key")
