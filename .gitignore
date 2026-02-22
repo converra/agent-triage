@@ -1,0 +1,8 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.converra-triage-progress.json
+.env
+.env.local
+*.log
+.DS_Store

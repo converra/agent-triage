@@ -1,0 +1,56 @@
+{
+  "name": "converra-triage",
+  "version": "0.1.0",
+  "description": "Triage your AI agents — extract policies from prompts, evaluate production conversations, and generate diagnostic reports.",
+  "type": "module",
+  "bin": {
+    "converra-triage": "./dist/cli/index.js"
+  },
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/cli/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "tsc --noEmit"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "evaluation",
+    "triage",
+    "llm",
+    "policy",
+    "diagnostics",
+    "conversation",
+    "quality"
+  ],
+  "author": "Converra <hello@converra.ai>",
+  "license": "FSL-1.1-Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/converra/converra-triage"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "dist",
+    "examples",
+    "LICENSE",
+    "README.md"
+  ],
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "commander": "^13.1.0",
+    "openai": "^4.82.0",
+    "yaml": "^2.7.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.12.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}
