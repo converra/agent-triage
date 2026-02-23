@@ -30,7 +30,7 @@ const program = new Command();
 program
   .name("converra-triage")
   .description(
-    "ESLint for AI agents — extract behavioral policies from your prompt, evaluate conversations against them, and generate diagnostic reports.",
+    "Diagnose your AI agents in production — extract behavioral policies from your prompt, evaluate traces against them, and generate diagnostic reports.",
   )
   .version(pkg.version);
 

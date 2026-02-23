@@ -4,11 +4,13 @@
 
 # converra-triage
 
-**ESLint for AI agents.** Extract testable policies from your agent's prompt, evaluate production conversations against them, and generate a diagnostic HTML report — in under 3 minutes.
+**Diagnose your AI agents in production.** Extract testable policies from your agent's system prompt, evaluate real traces against them, and generate a diagnostic report that pinpoints exactly what's failing, which agent caused it, and what to fix — in under 3 minutes.
 
 ## Why?
 
-Your agent's system prompt defines dozens of behavioral rules — but you have no way to know which ones are actually being followed in production. converra-triage extracts those rules as testable policies, evaluates real conversations against every one of them, and tells you exactly what's failing, why, and what to fix.
+Your agent's system prompt is a behavioral contract — dozens of rules about tone, routing, safety, escalation, and knowledge boundaries. But once agents are live, you're flying blind. Which rules are actually being followed? Where do handoffs break? When does the agent hallucinate instead of escalating?
+
+converra-triage turns that contract into testable policies, audits production traces against every one of them, and shows you exactly where things go wrong — down to the specific step, the specific agent, and the specific policy that was violated.
 
 ## Quick Start
 
@@ -56,7 +58,7 @@ export ANTHROPIC_API_KEY=sk-ant-...
 
 ## What It Does
 
-`converra-triage` evaluates real conversations against behavioral policies **extracted from your system prompt** and generates a **single, self-contained HTML diagnostic report**. It tells you what failed, where it started — **down to the exact conversation turn** — why it happened, what to change, and what that change might break.
+`converra-triage` evaluates production agent traces against behavioral policies **extracted from your system prompt** and generates a **single, self-contained HTML diagnostic report**. It tells you what failed, where it started — **down to the exact step and the responsible agent** — why it happened, what to change, and what that change might break.
 
 The report is designed for fast triage first, then deep forensics when you need it:
 
@@ -66,15 +68,15 @@ Get an at-a-glance pipeline summary (e.g., `15 policies extracted → 8 conversa
 
 #### 2. Patterns, Top Offenders, and Recommended Fixes
 
-See **where things break at scale**: failures grouped by type and subtype (e.g., `Tone Violation`, `Missing Escalation`, `Hallucination`) and attributed to root-cause categories (prompt issues, orchestration, model limitations, RAG failures). The report highlights the **most affected conversations** with summaries and severity badges, and provides a **ranked list of concrete recommendations** — each with a confidence level and the number of conversations impacted — so you can ship the highest-leverage change first.
+See **where things break at scale**: failures grouped by type and subtype (e.g., `Hallucination`, `Missing Handoff`, `Wrong Routing`, `Tone Violation`) and attributed to root-cause categories — prompt issues, orchestration failures, model limitations, or RAG gaps. The report highlights the **most affected conversations** with summaries and severity badges, and provides a **ranked list of concrete recommendations** — each with a confidence level and the number of conversations impacted — so you can ship the highest-leverage change first.
 
 #### 3. Step-by-Step Deep Dive
 
 For the most severe failure, the report drills all the way down:
 
-- **Exact root-cause turn:** a color-coded timeline that marks where the failure begins and tags the violated policies directly on the offending turns (e.g., `"No fabricated pricing ✕"`, `"Escalate billing ✕"`).
-- **Failure cascade:** how the initial mistake propagates into downstream issues across later turns — from fabrication to user pushback to the agent doubling down.
-- **What happened / Impact / Fix:** a structured narrative with turn references and a concrete recommended change with confidence score.
+- **Exact root-cause step:** a color-coded timeline that marks where the failure begins, tags the violated policies directly on the offending steps (e.g., `"No fabricated pricing ✕"`, `"Escalate billing ✕"`), and attributes the failure to the responsible agent in multi-agent setups.
+- **Failure cascade:** how the initial mistake propagates — from hallucination to user pushback to a missed handoff to the agent doubling down.
+- **What happened / Impact / Fix:** a structured narrative with step references and a concrete recommended change with confidence score.
 - **Blast-radius preview:** which other policies are likely to shift if you apply the fix, with estimated impact percentages — so you don't trade one problem for another.
 
 Every failing conversation gets its own expandable diagnosis card with the same structure. Every report includes the exact CLI command used to generate it for reproducibility.
