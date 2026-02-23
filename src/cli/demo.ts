@@ -62,8 +62,9 @@ export async function demoCommand(
   await cp(tracesSrc, tracesDst);
   await cp(policiesSrc, policiesDst);
 
+  const policiesData = JSON.parse(await readFile(policiesDst, "utf-8")) as unknown[];
   console.log(`  Copied demo files to ${outputDir}`);
-  console.log(`  Using pre-extracted policies (15 policies from customer-support prompt)\n`);
+  console.log(`  Using pre-extracted policies (${policiesData.length} policies from customer-support prompt)\n`);
 
   // Run the analyze pipeline
   await analyzeCommand({
