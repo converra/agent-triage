@@ -93,11 +93,12 @@ async function individualCheck(
           ? String(result.failureSubtype)
           : null,
       });
-    } catch {
+    } catch (error) {
+      console.warn(`  Warning: Could not evaluate policy "${policy.name}": ${error}`);
       results.push({
         policyId: policy.id,
-        passed: true,
-        evidence: "Error: Could not evaluate this policy.",
+        passed: false,
+        evidence: "Error: Could not evaluate this policy. Marked as failing to avoid false positives.",
         failingTurns: [],
         failureType: null,
         failureSubtype: null,

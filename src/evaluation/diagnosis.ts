@@ -1,7 +1,7 @@
 import { LlmClient } from "../llm/client.js";
 import { buildDiagnosisPrompt } from "../llm/prompts.js";
 import { parseJsonResponse } from "../llm/json.js";
-import type { Diagnosis, ConversationResult, MetricScores, METRIC_NAMES } from "./types.js";
+import type { Diagnosis, ConversationResult, MetricScores } from "./types.js";
 import type { NormalizedConversation } from "../ingestion/types.js";
 
 const TOP_N_WORST = 10;

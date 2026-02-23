@@ -48,7 +48,7 @@ export class LlmClient {
     } else {
       this.openai = new OpenAI({
         apiKey,
-        baseURL: baseUrl ?? (provider === "openai" ? undefined : baseUrl),
+        ...(baseUrl ? { baseURL: baseUrl } : {}),
       });
     }
   }
@@ -71,9 +71,9 @@ export class LlmClient {
         lastError = error instanceof Error ? error : new Error(String(error));
 
         if (isRateLimitError(error)) {
-          const backoff = INITIAL_BACKOFF_MS * Math.pow(2, attempt);
+          const backoff = backoffWithJitter(attempt);
           process.stderr.write(
-            `Rate limited. Retrying in ${backoff / 1000}s (attempt ${attempt + 1}/${MAX_RETRIES})...\n`,
+            `Rate limited. Retrying in ${(backoff / 1000).toFixed(1)}s (attempt ${attempt + 1}/${MAX_RETRIES})...\n`,
           );
           await sleep(backoff);
           continue;
@@ -81,8 +81,7 @@ export class LlmClient {
 
         if (!isRetryableError(error)) throw lastError;
 
-        const backoff = INITIAL_BACKOFF_MS * Math.pow(2, attempt);
-        await sleep(backoff);
+        await sleep(backoffWithJitter(attempt));
       }
     }
 
@@ -170,6 +169,12 @@ function isRetryableError(error: unknown): boolean {
     );
   }
   return false;
+}
+
+function backoffWithJitter(attempt: number): number {
+  const base = INITIAL_BACKOFF_MS * Math.pow(2, attempt);
+  const jitter = Math.random() * base * 0.3;
+  return base + jitter;
 }
 
 function sleep(ms: number): Promise<void> {

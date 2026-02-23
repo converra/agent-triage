@@ -71,10 +71,10 @@ export async function evaluateAll(
 
       completed++;
       onProgress?.(completed, total, conv.id);
-    }
 
-    // Save progress after each batch
-    await saveProgress(policiesHash, results);
+      // Save progress after each conversation for resilient resumption
+      await saveProgress(policiesHash, results);
+    }
   }
 
   return [...results.values()];

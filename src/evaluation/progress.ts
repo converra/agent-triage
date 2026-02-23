@@ -48,6 +48,8 @@ export async function loadProgress(
   }
 }
 
+let runStartedAt: string | null = null;
+
 export async function saveProgress(
   policiesHash: string,
   completed: Map<string, ConversationResult>,
@@ -55,10 +57,15 @@ export async function saveProgress(
   const progressPath = resolve(process.cwd(), PROGRESS_FILE);
   const tempPath = progressPath + TEMP_SUFFIX;
 
+  // Preserve startedAt from first save of this run
+  if (!runStartedAt) {
+    runStartedAt = new Date().toISOString();
+  }
+
   const data: ProgressData = {
     policiesHash,
     completedConversations: Object.fromEntries(completed),
-    startedAt: new Date().toISOString(),
+    startedAt: runStartedAt,
     lastUpdatedAt: new Date().toISOString(),
   };
 
