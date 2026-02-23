@@ -1,22 +1,44 @@
+[![CI](https://github.com/converra/converra-triage/actions/workflows/ci.yml/badge.svg)](https://github.com/converra/converra-triage/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/converra-triage.svg)](https://www.npmjs.com/package/converra-triage)
+[![License: FSL-1.1-Apache-2.0](https://img.shields.io/badge/license-FSL--1.1--Apache--2.0-blue.svg)](./LICENSE)
+
 # converra-triage
 
 **ESLint for AI agents.** Extract testable policies from your agent's prompt, evaluate production conversations against them, and generate a diagnostic HTML report — in under 3 minutes.
 
-```
+## Why?
+
+Your agent's system prompt defines dozens of behavioral rules — but you have no way to know which ones are actually being followed in production. converra-triage extracts those rules as testable policies, evaluates real conversations against every one of them, and tells you exactly what's failing, why, and what to fix.
+
+## Quick Start
+
+See it in action (requires an LLM API key):
+
+```bash
 npx converra-triage demo
 ```
 
-## Quick Start
+Use it on your own agent:
 
 ```bash
 # 1. Extract policies from your agent's system prompt
 npx converra-triage init --prompt system-prompt.txt
 
-# 2. Evaluate conversations against those policies
+# 2. Evaluate conversations (from JSON, LangSmith, or OpenTelemetry)
 npx converra-triage analyze --traces conversations.json --prompt system-prompt.txt
 
 # 3. Open the report in your browser
 npx converra-triage view
+```
+
+## Installation
+
+```bash
+# Run directly (no install needed)
+npx converra-triage demo
+
+# Or install as a project dependency
+npm install converra-triage
 ```
 
 ## Requirements
@@ -196,22 +218,26 @@ See [src/index.ts](src/index.ts) for all available exports.
 
 | Feature | converra-triage | IntellAgent | DeepEval | Promptfoo |
 |---------|:-:|:-:|:-:|:-:|
-| Production trace analysis | Yes | No | Partial | No |
+| Production trace analysis | Yes | No | Partial | Partial |
 | Policy extraction from prompts | Yes | No | No | No |
 | Multi-connector (JSON, LangSmith, OTel) | Yes | LangGraph only | Custom | Custom |
-| 12 quality metrics | Yes | Binary pass/fail | 6 metrics | Custom |
+| Quality metrics (12 built-in) | Yes | Binary pass/fail | Custom | Custom |
 | Self-contained HTML report | Yes | No | Dashboard | No |
 | Step-level diagnosis | Yes | No | No | No |
 | Blast-radius warnings | Yes | No | No | No |
 | Cross-run diff | Yes | No | No | Yes |
-| Free & open source | FSL | MIT | Apache 2.0 | MIT |
 | No infrastructure required | Yes | Yes | No (server) | Yes |
+| License | FSL-1.1 | MIT | Apache 2.0 | MIT |
 
-## What converra-triage diagnoses vs. what Converra treats
+> Comparison accurate as of February 2026. [Open an issue](https://github.com/converra/converra-triage/issues) if any entry needs updating.
 
-converra-triage finds the problems. [Converra](https://converra.ai) fixes them:
+## converra-triage vs. Converra
 
-- **Tested fix proposals** — not directional hints, but concrete prompt patches with confidence scores
+converra-triage is a standalone diagnostic tool. It gives you a complete picture of what's failing and why.
+
+[Converra](https://converra.ai) is an optional next step that automates the fix cycle:
+
+- **Tested fix proposals** — concrete prompt patches with confidence scores, not directional hints
 - **Simulation testing** — test fixes against personas, scenarios, and complexity levels before deploying
 - **Regression gating** — ensure fixes don't break other policies
 - **Continuous optimization** — automatic prompt improvement based on production performance
@@ -222,17 +248,15 @@ converra-triage finds the problems. [Converra](https://converra.ai) fixes them:
 
 ## Contributing
 
-We welcome contributions, especially new trace connectors. See the [NormalizedConversation interface](src/ingestion/types.ts) for the contract your connector needs to implement.
+We welcome contributions, especially new trace connectors. See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
 
 ```bash
 git clone https://github.com/converra/converra-triage
 cd converra-triage
 npm install
 npm run build
-npm test
+npm test          # 151 tests
 ```
-
-The test suite covers ingestion connectors, config loading, JSON parsing, aggregation, diff, report generation, and evaluation types. Run `npm test` to verify your changes pass all checks.
 
 ---
 

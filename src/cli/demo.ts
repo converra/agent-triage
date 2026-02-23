@@ -35,11 +35,13 @@ export async function demoCommand(
   console.log(`\nRunning demo: ${name}`);
   console.log(`  ${EXAMPLE_DESCRIPTIONS[name]}\n`);
 
-  // Resolve example files — they're bundled as test fixtures
-  const srcDir = resolve(dirname(fileURLToPath(import.meta.url)), "../../test/fixtures");
+  // Resolve example files — bundled in data/examples/
+  const srcDir = resolve(dirname(fileURLToPath(import.meta.url)), `../../data/examples/${name}`);
 
   if (!existsSync(srcDir)) {
-    console.error("Error: Demo fixtures not found. Run from the converra-triage repo root.");
+    console.error(`Error: Demo data not found for "${name}".`);
+    console.error("If installed via npm, please update to the latest version.");
+    console.error("If running from source, ensure data/examples/ exists.");
     process.exit(1);
   }
 
@@ -50,9 +52,9 @@ export async function demoCommand(
   }
 
   // Copy fixtures to output dir
-  const promptSrc = resolve(srcDir, "sample-prompt.txt");
-  const tracesSrc = resolve(srcDir, "sample-conversations.json");
-  const policiesSrc = resolve(srcDir, "test-policies.json");
+  const promptSrc = resolve(srcDir, "prompt.txt");
+  const tracesSrc = resolve(srcDir, "conversations.json");
+  const policiesSrc = resolve(srcDir, "policies.json");
 
   const promptDst = resolve(outputDir, "prompt.txt");
   const tracesDst = resolve(outputDir, "conversations.json");

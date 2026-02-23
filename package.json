@@ -1,29 +1,49 @@
 {
   "name": "converra-triage",
   "version": "0.1.0",
-  "description": "Triage your AI agents — extract policies from prompts, evaluate production conversations, and generate diagnostic reports.",
+  "description": "ESLint for AI agents — extract behavioral policies from prompts, evaluate conversations against them, and generate diagnostic reports.",
   "type": "module",
   "bin": {
     "converra-triage": "./dist/cli/index.js"
   },
   "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && chmod +x dist/cli/index.js",
+    "clean": "rm -rf dist",
     "dev": "tsx src/cli/index.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "prepublishOnly": "npm run clean && npm run build && npm test"
   },
   "keywords": [
     "ai",
-    "agent",
-    "evaluation",
-    "triage",
+    "ai-agent",
+    "ai-evaluation",
+    "agent-testing",
     "llm",
+    "llm-evaluation",
+    "llm-testing",
+    "prompt-engineering",
+    "prompt-testing",
     "policy",
-    "diagnostics",
-    "conversation",
-    "quality"
+    "policy-compliance",
+    "conversation-analysis",
+    "chatbot-testing",
+    "ai-quality",
+    "ai-diagnostics",
+    "opentelemetry",
+    "langsmith",
+    "ai-observability",
+    "evaluation-framework",
+    "triage"
   ],
   "author": "Converra <hello@converra.ai>",
   "license": "FSL-1.1-Apache-2.0",
@@ -31,12 +51,23 @@
     "type": "git",
     "url": "https://github.com/converra/converra-triage"
   },
+  "bugs": {
+    "url": "https://github.com/converra/converra-triage/issues"
+  },
+  "homepage": "https://github.com/converra/converra-triage#readme",
+  "funding": {
+    "type": "custom",
+    "url": "https://converra.ai"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
     "node": ">=18.0.0"
   },
-  "homepage": "https://github.com/converra/converra-triage#readme",
   "files": [
     "dist",
+    "data",
     "LICENSE",
     "README.md"
   ],
