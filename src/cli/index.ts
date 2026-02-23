@@ -1,11 +1,17 @@
 #!/usr/bin/env node
 
+import { readFileSync } from "node:fs";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { Command } from "commander";
 import { initCommand } from "./init.js";
 import { analyzeCommand } from "./analyze.js";
 import { viewCommand } from "./view.js";
 import { diffCommand } from "./diff.js";
 import { demoCommand } from "./demo.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const pkg = JSON.parse(readFileSync(resolve(__dirname, "../../package.json"), "utf-8")) as { version: string };
 
 function wrapAction<T extends (...args: never[]) => Promise<void>>(fn: T): T {
   return (async (...args: Parameters<T>) => {
@@ -24,9 +30,9 @@ const program = new Command();
 program
   .name("converra-triage")
   .description(
-    "Triage your AI agents — extract policies, evaluate conversations, generate diagnostic reports.",
+    "ESLint for AI agents — extract behavioral policies from your prompt, evaluate conversations against them, and generate diagnostic reports.",
   )
-  .version("0.1.0");
+  .version(pkg.version);
 
 program
   .command("init")
