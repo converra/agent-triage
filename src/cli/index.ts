@@ -28,7 +28,7 @@ function wrapAction<T extends (...args: never[]) => Promise<void>>(fn: T): T {
 const program = new Command();
 
 program
-  .name("converra-triage")
+  .name("agent-triage")
   .description(
     "Diagnose your AI agents in production — extract behavioral policies from your prompt, evaluate traces against them, and generate diagnostic reports.",
   )

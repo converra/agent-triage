@@ -1,8 +1,8 @@
-[![CI](https://github.com/converra/converra-triage/actions/workflows/ci.yml/badge.svg)](https://github.com/converra/converra-triage/actions/workflows/ci.yml)
-[![npm version](https://img.shields.io/npm/v/converra-triage.svg)](https://www.npmjs.com/package/converra-triage)
+[![CI](https://github.com/converra/agent-triage/actions/workflows/ci.yml/badge.svg)](https://github.com/converra/agent-triage/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/agent-triage.svg)](https://www.npmjs.com/package/agent-triage)
 [![License: FSL-1.1-Apache-2.0](https://img.shields.io/badge/license-FSL--1.1--Apache--2.0-blue.svg)](./LICENSE)
 
-# converra-triage
+# agent-triage
 
 **Diagnose your AI agents in production.** Extract testable policies from your agent's system prompt, evaluate real traces against them, and generate a diagnostic report that pinpoints exactly what's failing, which agent caused it, and what to fix — in minutes, not days.
 
@@ -10,37 +10,37 @@
 
 Your agent's system prompt is a behavioral contract — dozens of rules about tone, routing, safety, escalation, and knowledge boundaries. But once agents are live, you're flying blind. Which rules are actually being followed? Where do handoffs break? When does the agent hallucinate instead of escalating?
 
-converra-triage turns that contract into testable policies, audits production traces against every one of them, and shows you exactly where things go wrong — down to the specific step, the specific agent, and the specific policy that was violated.
+agent-triage turns that contract into testable policies, audits production traces against every one of them, and shows you exactly where things go wrong — down to the specific step, the specific agent, and the specific policy that was violated.
 
 ## Quick Start
 
 See it in action (requires an LLM API key):
 
 ```bash
-npx converra-triage demo
+npx agent-triage demo
 ```
 
 Use it on your own agent:
 
 ```bash
 # 1. Extract policies from your agent's system prompt
-npx converra-triage init --prompt system-prompt.txt
+npx agent-triage init --prompt system-prompt.txt
 
 # 2. Evaluate traces (from JSON, LangSmith, or OpenTelemetry)
-npx converra-triage analyze --traces conversations.json --prompt system-prompt.txt
+npx agent-triage analyze --traces conversations.json --prompt system-prompt.txt
 
 # 3. Open the report in your browser
-npx converra-triage view
+npx agent-triage view
 ```
 
 ## Installation
 
 ```bash
 # Run directly (no install needed)
-npx converra-triage demo
+npx agent-triage demo
 
 # Or install as a project dependency
-npm install converra-triage
+npm install agent-triage
 ```
 
 ## Requirements
@@ -58,7 +58,7 @@ export ANTHROPIC_API_KEY=sk-ant-...
 
 ## What It Does
 
-`converra-triage` evaluates production agent traces against behavioral policies **extracted from your system prompt** and generates a **single, self-contained HTML diagnostic report**. It tells you what failed, where it started — **down to the exact step and the responsible agent** — why it happened, what to change, and what that change might break.
+`agent-triage` evaluates production agent traces against behavioral policies **extracted from your system prompt** and generates a **single, self-contained HTML diagnostic report**. It tells you what failed, where it started — **down to the exact step and the responsible agent** — why it happened, what to change, and what that change might break.
 
 The report is designed for fast triage first, then deep forensics when you need it:
 
@@ -108,7 +108,7 @@ Every failing trace gets its own expandable diagnosis card with the same structu
 Extract testable policies from your agent's system prompt.
 
 ```bash
-npx converra-triage init --prompt system-prompt.txt
+npx agent-triage init --prompt system-prompt.txt
 ```
 
 Outputs `policies.json` — an editable file of behavioral rules your agent should follow. Review and adjust before running evaluation.
@@ -119,13 +119,13 @@ Evaluate traces against policies and generate a diagnostic report.
 
 ```bash
 # From a JSON file
-npx converra-triage analyze --traces conversations.json --prompt system-prompt.txt
+npx agent-triage analyze --traces conversations.json --prompt system-prompt.txt
 
 # From LangSmith
-npx converra-triage analyze --langsmith my-project --api-key $LANGSMITH_API_KEY
+npx agent-triage analyze --langsmith my-project --api-key $LANGSMITH_API_KEY
 
 # From OpenTelemetry export
-npx converra-triage analyze --otel traces.json
+npx agent-triage analyze --otel traces.json
 ```
 
 Options:
@@ -141,7 +141,7 @@ Options:
 Open the generated HTML report in your default browser.
 
 ```bash
-npx converra-triage view
+npx agent-triage view
 ```
 
 ### `diff`
@@ -149,7 +149,7 @@ npx converra-triage view
 Compare two reports to see what changed after prompt edits.
 
 ```bash
-npx converra-triage diff before/report.json after/report.json
+npx agent-triage diff before/report.json after/report.json
 ```
 
 ### `demo`
@@ -157,13 +157,13 @@ npx converra-triage diff before/report.json after/report.json
 Run a full demo with built-in example agents and traces.
 
 ```bash
-npx converra-triage demo                    # customer-support (default)
-npx converra-triage demo customer-support
+npx agent-triage demo                    # customer-support (default)
+npx agent-triage demo customer-support
 ```
 
 ## Trace Format
 
-converra-triage accepts traces in three formats:
+agent-triage accepts traces in three formats:
 
 ### JSON (recommended)
 
@@ -184,15 +184,15 @@ Flexible field mapping is supported — `role`/`sender`, `content`/`text`/`messa
 
 ### LangSmith
 
-Point to a LangSmith project and converra-triage will fetch traces automatically. Requires `LANGSMITH_API_KEY`.
+Point to a LangSmith project and agent-triage will fetch traces automatically. Requires `LANGSMITH_API_KEY`.
 
 ### OpenTelemetry
 
-Export OTLP/JSON traces from any OpenTelemetry-instrumented agent. converra-triage follows the [GenAI semantic conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/) (pinned to v1.36.0).
+Export OTLP/JSON traces from any OpenTelemetry-instrumented agent. agent-triage follows the [GenAI semantic conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/) (pinned to v1.36.0).
 
 ## Configuration
 
-Create `converra-triage.config.yaml` for persistent settings:
+Create `agent-triage.config.yaml` for persistent settings:
 
 ```yaml
 llm:
@@ -216,7 +216,7 @@ Environment variable references (`${VAR_NAME}`) are automatically resolved in co
 
 ## Programmatic API
 
-converra-triage can be used as a library:
+agent-triage can be used as a library:
 
 ```typescript
 import {
@@ -225,7 +225,7 @@ import {
   createLlmClient,
   evaluateAll,
   buildHtml,
-} from "converra-triage";
+} from "agent-triage";
 
 const llm = createLlmClient("openai", process.env.OPENAI_API_KEY!, "gpt-4o-mini");
 const conversations = await readJsonTraces("./conversations.json");
@@ -236,7 +236,7 @@ See [src/index.ts](src/index.ts) for all available exports.
 
 ## How It Compares
 
-| Feature | converra-triage | IntellAgent | DeepEval | Promptfoo |
+| Feature | agent-triage | IntellAgent | DeepEval | Promptfoo |
 |---------|:-:|:-:|:-:|:-:|
 | Production trace analysis | Yes | No | Partial | Partial |
 | Policy extraction from prompts | Yes | No | No | No |
@@ -249,11 +249,11 @@ See [src/index.ts](src/index.ts) for all available exports.
 | No infrastructure required | Yes | Yes | No (server) | Yes |
 | License | FSL-1.1 | MIT | Apache 2.0 | MIT |
 
-> Comparison accurate as of February 2026. [Open an issue](https://github.com/converra/converra-triage/issues) if any entry needs updating.
+> Comparison accurate as of February 2026. [Open an issue](https://github.com/converra/agent-triage/issues) if any entry needs updating.
 
-## converra-triage vs. Converra
+## agent-triage vs. Converra
 
-converra-triage is a standalone diagnostic tool. It gives you a complete picture of what's failing and why.
+agent-triage is a standalone diagnostic tool. It gives you a complete picture of what's failing and why.
 
 [Converra](https://converra.ai) is an optional next step that automates the fix cycle:
 
@@ -271,8 +271,8 @@ converra-triage is a standalone diagnostic tool. It gives you a complete picture
 We welcome contributions, especially new trace connectors. See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
 
 ```bash
-git clone https://github.com/converra/converra-triage
-cd converra-triage
+git clone https://github.com/converra/agent-triage
+cd agent-triage
 npm install
 npm run build
 npm test          # 151 tests

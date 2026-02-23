@@ -6,9 +6,9 @@ import { ConfigSchema, type Config } from "./schema.js";
 import { buildDefaultConfig } from "./defaults.js";
 
 const CONFIG_FILENAMES = [
-  "converra-triage.config.yaml",
-  "converra-triage.config.yml",
-  "converra-triage.config.json",
+  "agent-triage.config.yaml",
+  "agent-triage.config.yml",
+  "agent-triage.config.json",
 ];
 
 function resolveEnvVars(value: string): string {
@@ -63,7 +63,7 @@ export function resolveApiKey(config: Config): string {
   if (!key) {
     throw new Error(
       `No API key found. Set ${envVar ?? "API key"} environment variable ` +
-        `or add llm.apiKey to converra-triage.config.yaml`,
+        `or add llm.apiKey to agent-triage.config.yaml`,
     );
   }
 

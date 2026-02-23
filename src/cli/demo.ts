@@ -46,7 +46,7 @@ export async function demoCommand(
   }
 
   // Set up a temp output directory
-  const outputDir = resolve(process.cwd(), `.converra-triage-demo-${name}`);
+  const outputDir = resolve(process.cwd(), `.agent-triage-demo-${name}`);
   if (!existsSync(outputDir)) {
     await mkdir(outputDir, { recursive: true });
   }

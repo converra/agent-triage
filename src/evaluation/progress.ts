@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 import { createHash } from "node:crypto";
 import type { ConversationResult } from "./types.js";
 
-const PROGRESS_FILE = ".converra-triage-progress.json";
+const PROGRESS_FILE = ".agent-triage-progress.json";
 const TEMP_SUFFIX = ".tmp";
 
 interface ProgressData {

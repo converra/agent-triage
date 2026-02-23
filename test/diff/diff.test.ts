@@ -4,7 +4,7 @@ import type { Report } from "../../src/evaluation/types.js";
 
 function makeReport(overrides: Partial<Report> = {}): Report {
   return {
-    converraTriageVersion: "0.1.0",
+    agentTriageVersion: "0.1.0",
     llmProvider: "openai",
     llmModel: "gpt-4o-mini",
     policiesHash: "abc123",

@@ -82,7 +82,7 @@ export interface FailurePattern {
 }
 
 export interface Report {
-  converraTriageVersion: string;
+  agentTriageVersion: string;
   llmProvider: string;
   llmModel: string;
   policiesHash: string;

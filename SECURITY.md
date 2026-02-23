@@ -2,7 +2,7 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in converra-triage, please report it responsibly.
+If you discover a security vulnerability in agent-triage, please report it responsibly.
 
 **Email:** [hello@converra.ai](mailto:hello@converra.ai)
 

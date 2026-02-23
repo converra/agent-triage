@@ -19,14 +19,14 @@ export async function viewCommand(options: ViewOptions): Promise<void> {
   if (existsSync(jsonPath)) {
     console.error(
       "Error: report.html not found. Only report.json exists.\n" +
-        "Re-run `converra-triage analyze` to generate the HTML report.",
+        "Re-run `agent-triage analyze` to generate the HTML report.",
     );
     process.exit(1);
   }
 
   console.error(
     "Error: No report found in this directory.\n" +
-      "Run `converra-triage analyze` first.",
+      "Run `agent-triage analyze` first.",
   );
   process.exit(1);
 }
