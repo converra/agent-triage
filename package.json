@@ -1,7 +1,7 @@
 {
   "name": "converra-triage",
   "version": "0.1.0",
-  "description": "ESLint for AI agents — extract behavioral policies from prompts, evaluate conversations against them, and generate diagnostic reports.",
+  "description": "Diagnose your AI agents in production — extract behavioral policies from prompts, evaluate traces against them, and generate diagnostic reports.",
   "type": "module",
   "bin": {
     "converra-triage": "./dist/cli/index.js"
