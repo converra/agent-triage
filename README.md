@@ -4,7 +4,7 @@
 
 # converra-triage
 
-**Diagnose your AI agents in production.** Extract testable policies from your agent's system prompt, evaluate real traces against them, and generate a diagnostic report that pinpoints exactly what's failing, which agent caused it, and what to fix — in under 3 minutes.
+**Diagnose your AI agents in production.** Extract testable policies from your agent's system prompt, evaluate real traces against them, and generate a diagnostic report that pinpoints exactly what's failing, which agent caused it, and what to fix — in minutes, not days.
 
 ## Why?
 
@@ -26,7 +26,7 @@ Use it on your own agent:
 # 1. Extract policies from your agent's system prompt
 npx converra-triage init --prompt system-prompt.txt
 
-# 2. Evaluate conversations (from JSON, LangSmith, or OpenTelemetry)
+# 2. Evaluate traces (from JSON, LangSmith, or OpenTelemetry)
 npx converra-triage analyze --traces conversations.json --prompt system-prompt.txt
 
 # 3. Open the report in your browser
@@ -64,11 +64,11 @@ The report is designed for fast triage first, then deep forensics when you need 
 
 #### 1. Verdict & Metrics
 
-Get an at-a-glance pipeline summary (e.g., `15 policies extracted → 8 conversations evaluated → 10 failures found`) and a clear verdict (e.g., `"6 of 15 policies are failing"`). A metrics dashboard tracks 12 quality scores (Success, Relevancy, Hallucination, Sentiment, Context Retention, etc.) alongside policy compliance so you can spot regressions and trends quickly.
+Get an at-a-glance pipeline summary (e.g., `15 policies extracted → 8 traces evaluated → 10 failures found`) and a clear verdict (e.g., `"6 of 15 policies are failing"`). A metrics dashboard tracks 12 quality scores (Success, Relevancy, Hallucination, Sentiment, Context Retention, etc.) alongside policy compliance so you can spot regressions and trends quickly.
 
 #### 2. Patterns, Top Offenders, and Recommended Fixes
 
-See **where things break at scale**: failures grouped by type and subtype (e.g., `Hallucination`, `Missing Handoff`, `Wrong Routing`, `Tone Violation`) and attributed to root-cause categories — prompt issues, orchestration failures, model limitations, or RAG gaps. The report highlights the **most affected conversations** with summaries and severity badges, and provides a **ranked list of concrete recommendations** — each with a confidence level and the number of conversations impacted — so you can ship the highest-leverage change first.
+See **where things break at scale**: failures grouped by type and subtype (e.g., `Hallucination`, `Missing Handoff`, `Wrong Routing`, `Tone Violation`) and attributed to root-cause categories — prompt issues, orchestration failures, model limitations, or RAG gaps. The report highlights the **most affected traces** with summaries and severity badges, and provides a **ranked list of concrete recommendations** — each with a confidence level and the number of conversations impacted — so you can ship the highest-leverage change first.
 
 #### 3. Step-by-Step Deep Dive
 
@@ -79,7 +79,7 @@ For the most severe failure, the report drills all the way down:
 - **What happened / Impact / Fix:** a structured narrative with step references and a concrete recommended change with confidence score.
 - **Blast-radius preview:** which other policies are likely to shift if you apply the fix, with estimated impact percentages — so you don't trade one problem for another.
 
-Every failing conversation gets its own expandable diagnosis card with the same structure. Every report includes the exact CLI command used to generate it for reproducibility.
+Every failing trace gets its own expandable diagnosis card with the same structure. Every report includes the exact CLI command used to generate it for reproducibility.
 
 <details>
 <summary><strong>12 Quality Metrics</strong></summary>
@@ -115,7 +115,7 @@ Outputs `policies.json` — an editable file of behavioral rules your agent shou
 
 ### `analyze`
 
-Evaluate conversations against policies and generate a diagnostic report.
+Evaluate traces against policies and generate a diagnostic report.
 
 ```bash
 # From a JSON file
@@ -130,11 +130,11 @@ npx converra-triage analyze --otel traces.json
 
 Options:
 - `--dry-run` — show estimated cost without calling the LLM
-- `--max-conversations <n>` — limit evaluation to N conversations
+- `--max-conversations <n>` — limit evaluation to N traces
 - `--model <model>` — use a specific model (default: gpt-4o-mini)
 - `--provider <provider>` — openai, anthropic, or openai-compatible
 - `--include-prompt` — include the system prompt text in the report JSON
-- `--summary-only` — omit conversation transcripts from report
+- `--summary-only` — omit trace transcripts from report
 
 ### `view`
 
@@ -163,7 +163,7 @@ npx converra-triage demo customer-support
 
 ## Trace Format
 
-converra-triage accepts conversations in three formats:
+converra-triage accepts traces in three formats:
 
 ### JSON (recommended)
 

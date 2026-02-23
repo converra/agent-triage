@@ -46,8 +46,8 @@ program
 
 program
   .command("analyze")
-  .description("Evaluate conversations against policies and generate report")
-  .option("--traces <path>", "Path to JSON conversations file")
+  .description("Evaluate traces against policies and generate report")
+  .option("--traces <path>", "Path to JSON traces file")
   .option("--langsmith <project>", "LangSmith project name")
   .option("--otel <path>", "Path to OTLP/JSON export file")
   .option("--policies <path>", "Path to policies.json", "policies.json")
@@ -56,9 +56,9 @@ program
   .option("--model <model>", "LLM model")
   .option("--api-key <key>", "LLM API key")
   .option("--dry-run", "Show estimated cost without running evaluation")
-  .option("--max-conversations <n>", "Maximum conversations to evaluate")
+  .option("--max-conversations <n>", "Maximum traces to evaluate")
   .option("--include-prompt", "Include system prompt in report")
-  .option("--summary-only", "Generate summary report without transcripts")
+  .option("--summary-only", "Generate summary report without trace transcripts")
   .option("-o, --output <dir>", "Output directory", ".")
   .action(wrapAction(analyzeCommand));
 
