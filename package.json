@@ -34,9 +34,9 @@
   "engines": {
     "node": ">=18.0.0"
   },
+  "homepage": "https://github.com/converra/converra-triage#readme",
   "files": [
     "dist",
-    "test/fixtures",
     "LICENSE",
     "README.md"
   ],
