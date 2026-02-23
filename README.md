@@ -56,15 +56,31 @@ export ANTHROPIC_API_KEY=sk-ant-...
 
 ## What It Does
 
-converra-triage reads your agent's production conversations, scores them across 12 quality metrics, checks every conversation against behavioral policies extracted from your prompt, and generates a self-contained HTML report showing:
+`converra-triage` evaluates real conversations against behavioral policies **extracted from your system prompt** and generates a **single, self-contained HTML diagnostic report**. It tells you what failed, where it started — **down to the exact conversation turn** — why it happened, what to change, and what that change might break.
 
-- **Which policies are failing** — with compliance rates and trends
-- **Why they're failing** — 4 root cause categories (prompt issues, orchestration, model limitations, RAG failures)
-- **Directional fixes** — what to change in your prompt or config
-- **Blast-radius warnings** — which other policies might break if you edit
-- **Deep-dive diagnosis** — step-level attribution with cascade analysis for the worst failures
+The report is designed for fast triage first, then deep forensics when you need it:
 
-### 12 Quality Metrics
+#### 1. Verdict & Metrics
+
+Get an at-a-glance pipeline summary (e.g., `15 policies extracted → 8 conversations evaluated → 10 failures found`) and a clear verdict (e.g., `"6 of 15 policies are failing"`). A metrics dashboard tracks 12 quality scores (Success, Relevancy, Hallucination, Sentiment, Context Retention, etc.) alongside policy compliance so you can spot regressions and trends quickly.
+
+#### 2. Patterns, Top Offenders, and Recommended Fixes
+
+See **where things break at scale**: failures grouped by type and subtype (e.g., `Tone Violation`, `Missing Escalation`, `Hallucination`) and attributed to root-cause categories (prompt issues, orchestration, model limitations, RAG failures). The report highlights the **most affected conversations** with summaries and severity badges, and provides a **ranked list of concrete recommendations** — each with a confidence level and the number of conversations impacted — so you can ship the highest-leverage change first.
+
+#### 3. Turn-by-Turn Deep Dive
+
+For the most severe failure, the report drills all the way down:
+
+- **Exact root-cause turn:** a color-coded timeline that marks where the failure begins and tags the violated policies directly on the offending turns (e.g., `"No fabricated pricing ✕"`, `"Escalate billing ✕"`).
+- **Failure cascade:** how the initial mistake propagates into downstream issues across later turns — from fabrication to user pushback to the agent doubling down.
+- **What happened / Impact / Fix:** a structured narrative with turn references and a concrete recommended change with confidence score.
+- **Blast-radius preview:** which other policies are likely to shift if you apply the fix, with estimated impact percentages — so you don't trade one problem for another.
+
+Every failing conversation gets its own expandable diagnosis card with the same structure. Every report includes the exact CLI command used to generate it for reproducibility.
+
+<details>
+<summary><strong>12 Quality Metrics</strong></summary>
 
 | Metric | What It Measures |
 |--------|-----------------|
@@ -80,6 +96,8 @@ converra-triage reads your agent's production conversations, scores them across 
 | Task Completion | Were all user requests addressed? |
 | Clarity | Were responses clear and easy to understand? |
 | Truncation | Were responses cut off mid-sentence? |
+
+</details>
 
 ## Commands
 
@@ -223,7 +241,7 @@ See [src/index.ts](src/index.ts) for all available exports.
 | Multi-connector (JSON, LangSmith, OTel) | Yes | LangGraph only | Custom | Custom |
 | Quality metrics (12 built-in) | Yes | Binary pass/fail | Custom | Custom |
 | Self-contained HTML report | Yes | No | Dashboard | No |
-| Step-level diagnosis | Yes | No | No | No |
+| Turn-level root cause + cascade | Yes | No | No | No |
 | Blast-radius warnings | Yes | No | No | No |
 | Cross-run diff | Yes | No | No | Yes |
 | No infrastructure required | Yes | Yes | No (server) | Yes |
