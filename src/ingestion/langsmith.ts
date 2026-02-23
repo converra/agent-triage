@@ -3,6 +3,7 @@ import type { NormalizedConversation, Message } from "./types.js";
 const DEFAULT_BASE_URL = "https://api.smith.langchain.com";
 const PAGE_SIZE = 100;
 const RATE_LIMIT_DELAY_MS = 650;
+const MAX_RETRIES = 3;
 
 interface LangSmithConfig {
   apiKey: string;
@@ -15,28 +16,29 @@ interface LangSmithRun {
   id: string;
   name: string;
   run_type: string;
+  trace_id: string;
   inputs: Record<string, unknown>;
   outputs: Record<string, unknown> | null;
   start_time: string;
   end_time: string | null;
   extra: Record<string, unknown>;
-  child_run_ids: string[] | null;
   parent_run_id: string | null;
   total_tokens: number | null;
+  status: string;
 }
 
 export async function readLangSmithTraces(
   config: LangSmithConfig,
 ): Promise<NormalizedConversation[]> {
   const baseUrl = config.baseUrl ?? DEFAULT_BASE_URL;
-  const headers = {
+  const headers: Record<string, string> = {
     "x-api-key": config.apiKey,
     "Content-Type": "application/json",
   };
 
   // Get project ID from name
-  const projectRes = await fetch(
-    `${baseUrl}/api/v1/sessions?name=${encodeURIComponent(config.project)}`,
+  const projectRes = await fetchWithRetry(
+    `${baseUrl}/api/v1/sessions?limit=100`,
     { headers },
   );
 
@@ -51,34 +53,59 @@ export async function readLangSmithTraces(
     );
   }
 
-  const projects = (await projectRes.json()) as Array<{ id: string }>;
-  if (projects.length === 0) {
+  const projectData = (await projectRes.json()) as
+    | Array<{ id: string; name: string }>
+    | { sessions: Array<{ id: string; name: string }> };
+  // LangSmith returns array or {sessions: [...]}
+  const projects = Array.isArray(projectData)
+    ? projectData
+    : (projectData.sessions ?? []);
+
+  const project = projects.find(
+    (p: { name: string }) => p.name === config.project,
+  );
+  if (!project) {
+    const available = projects.map((p: { name: string }) => p.name).slice(0, 5).join(", ");
     throw new Error(
-      `LangSmith project "${config.project}" not found. Check the project name.`,
+      `LangSmith project "${config.project}" not found. ` +
+        `Available: ${available || "(none)"}`,
     );
   }
 
-  const projectId = projects[0]!.id;
+  const projectId = project.id;
 
-  // Fetch runs with pagination
+  // Fetch runs using POST /api/v1/runs/query (cursor-based pagination)
   const conversations: NormalizedConversation[] = [];
-  let offset = 0;
   const limit = config.limit ?? 500;
+  let cursor: string | undefined;
 
   while (conversations.length < limit) {
-    const runsRes = await fetch(
-      `${baseUrl}/api/v1/runs?session_id=${projectId}` +
-        `&run_type=chain&is_root=true` +
-        `&offset=${offset}&limit=${PAGE_SIZE}` +
-        `&select=["id","name","run_type","inputs","outputs","start_time","end_time","extra","total_tokens","parent_run_id"]`,
-      { headers },
-    );
+    const body: Record<string, unknown> = {
+      session: [projectId],
+      is_root: true,
+      limit: PAGE_SIZE,
+    };
+    if (cursor) {
+      body.cursor = cursor;
+    }
+
+    const runsRes = await fetchWithRetry(`${baseUrl}/api/v1/runs/query`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+    });
 
     if (!runsRes.ok) {
       throw new Error(`LangSmith runs API error: ${runsRes.status}`);
     }
 
-    const runs = (await runsRes.json()) as LangSmithRun[];
+    const data = (await runsRes.json()) as {
+      runs?: LangSmithRun[];
+      cursors?: { next?: string };
+    };
+    const runs = data.runs ?? [];
+    cursor = data.cursors?.next;
+
     if (runs.length === 0) break;
 
     for (const run of runs) {
@@ -89,13 +116,39 @@ export async function readLangSmithTraces(
       }
     }
 
-    offset += PAGE_SIZE;
+    if (!cursor) break;
 
     // Rate limiting
     await new Promise((r) => setTimeout(r, RATE_LIMIT_DELAY_MS));
   }
 
   return conversations;
+}
+
+async function fetchWithRetry(
+  url: string,
+  init: RequestInit,
+  retries = MAX_RETRIES,
+): Promise<Response> {
+  for (let attempt = 0; attempt < retries; attempt++) {
+    const res = await fetch(url, init);
+
+    if (res.status === 429) {
+      const retryAfter = res.headers.get("retry-after");
+      const delayMs = retryAfter
+        ? parseInt(retryAfter, 10) * 1000
+        : RATE_LIMIT_DELAY_MS * Math.pow(2, attempt);
+      console.warn(
+        `LangSmith rate limited. Retrying in ${(delayMs / 1000).toFixed(1)}s...`,
+      );
+      await new Promise((r) => setTimeout(r, delayMs));
+      continue;
+    }
+
+    return res;
+  }
+
+  return fetch(url, init);
 }
 
 function normalizeRun(run: LangSmithRun): NormalizedConversation | null {
