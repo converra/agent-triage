@@ -167,4 +167,99 @@ describe("buildHtml", () => {
     expect(html).toContain("<style>");
     expect(html).toContain("<script>");
   });
+
+  describe("deep dive timeline", () => {
+    function makeDeepDiveReport(): Report {
+      return makeReport({
+        conversations: [
+          {
+            id: "conv-fail",
+            metrics: {
+              successScore: 20,
+              aiRelevancy: 30,
+              sentiment: 15,
+              hallucinationScore: 10,
+              repetitionScore: 50,
+              consistencyScore: 40,
+              naturalLanguageScore: 60,
+              contextRetentionScore: 10,
+              verbosityScore: 50,
+              taskCompletion: 20,
+              clarity: 40,
+              truncationScore: 0,
+            },
+            policyResults: [
+              {
+                policyId: "greet",
+                passed: false,
+                evidence: "Turn 3: Agent lost context",
+                failingTurns: [3],
+                failureType: "prompt_issue",
+                failureSubtype: "context_loss",
+              },
+            ],
+            diagnosis: {
+              rootCauseTurn: 3,
+              rootCauseAgent: "Orchestrator Agent",
+              summary: "The agent lost context at turn 3.",
+              impact: "Affected turns 4, 5. User became frustrated.",
+              cascadeChain: [
+                "Turn 3: Agent lost context and ignored user input",
+                "Turn 4: User expressed confusion about the loop",
+                "Turn 5: Agent continued down incorrect path",
+              ],
+              fix: "Add context retention instructions.",
+              severity: "critical",
+              confidence: "high",
+              failureType: "prompt_issue",
+              failureSubtype: "context_loss",
+              blastRadius: ["other-policy"],
+            },
+            messages: [
+              { role: "user", content: "Hi there" },
+              { role: "assistant", content: "Hello! How can I help?" },
+              { role: "user", content: "I need help with billing" },
+              { role: "assistant", content: "Raw message content for turn 4" },
+              { role: "user", content: "That is not what I asked" },
+            ],
+          },
+        ],
+      });
+    }
+
+    it("renders red dot for root cause turn", () => {
+      const html = buildHtml(makeDeepDiveReport());
+      // Turn 3 is root cause — should have red dot class "f"
+      expect(html).toContain("Turn 3 — root cause");
+      expect(html).toMatch(/tdot f/);
+    });
+
+    it("renders yellow dot for cascade turns after root cause", () => {
+      const html = buildHtml(makeDeepDiveReport());
+      // Turns 4 and 5 are after root cause but not direct policy failures — should get amber "w"
+      expect(html).toMatch(/tdot w/);
+    });
+
+    it("renders green dot for passing turns before root cause", () => {
+      const html = buildHtml(makeDeepDiveReport());
+      // Turns 1 and 2 are before root cause — should get green "p"
+      expect(html).toMatch(/tdot p/);
+    });
+
+    it("uses cascadeChain descriptions instead of raw message content", () => {
+      const html = buildHtml(makeDeepDiveReport());
+      // CascadeChain description for turn 3 should appear
+      expect(html).toContain("Agent lost context and ignored user input");
+      // CascadeChain description for turn 4 should appear instead of raw content
+      expect(html).toContain("User expressed confusion about the loop");
+      expect(html).not.toContain("Raw message content for turn 4");
+    });
+
+    it("falls back to raw content when no cascadeChain entry for a turn", () => {
+      const html = buildHtml(makeDeepDiveReport());
+      // Turns 1 and 2 have no cascadeChain entry — should show raw message
+      expect(html).toContain("Hi there");
+      expect(html).toContain("Hello! How can I help?");
+    });
+  });
 });

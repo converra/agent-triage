@@ -308,6 +308,15 @@ function renderDeepDive(
         ? "orch"
         : "model";
 
+  // Build cascade description map from cascadeChain entries (format: "Turn N: description")
+  const cascadeMap = new Map<number, string>();
+  for (const entry of d.cascadeChain) {
+    const match = entry.match(/^Turn\s+(\d+)\s*:\s*(.+)$/i);
+    if (match) {
+      cascadeMap.set(Number(match[1]), match[2]!.trim());
+    }
+  }
+
   // Build turn timeline
   const turns = conv.messages
     .filter((m) => m.role === "user" || m.role === "assistant")
@@ -317,7 +326,8 @@ function renderDeepDive(
       const isFailing = conv.policyResults.some(
         (pr) => !pr.passed && pr.failingTurns?.includes(turnNum),
       );
-      const dotClass = isFailing ? "f" : isRoot ? "f" : "p";
+      const isCascade = !isRoot && !isFailing && turnNum > d.rootCauseTurn;
+      const dotClass = isRoot || isFailing ? "f" : isCascade ? "w" : "p";
 
       const failBadges = conv.policyResults
         .filter(
@@ -330,7 +340,8 @@ function renderDeepDive(
         .join("");
 
       const label = isRoot ? `Turn ${turnNum} — root cause` : `Turn ${turnNum}`;
-      const content = msg.content.length > 200 ? msg.content.slice(0, 200) + "..." : msg.content;
+      const cascadeDesc = cascadeMap.get(turnNum);
+      const content = cascadeDesc ?? (msg.content.length > 200 ? msg.content.slice(0, 200) + "..." : msg.content);
 
       return `<div class="turn"><div class="tdot ${dotClass}"></div><div class="tc"><div class="tc-label">${label}</div><div class="tc-text">${esc(content)}</div>${failBadges ? `<div class="tc-badges">${failBadges}</div>` : ""}</div></div>`;
     });
