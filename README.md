@@ -1,6 +1,6 @@
 # converra-triage
 
-**eslint for AI agents.** Extract testable policies from your agent's prompt, evaluate production conversations against them, and generate a diagnostic HTML report — in under 3 minutes.
+**ESLint for AI agents.** Extract testable policies from your agent's prompt, evaluate production conversations against them, and generate a diagnostic HTML report — in under 3 minutes.
 
 ```
 npx converra-triage demo
@@ -17,6 +17,19 @@ npx converra-triage analyze --traces conversations.json --prompt system-prompt.t
 
 # 3. Open the report in your browser
 npx converra-triage view
+```
+
+## Requirements
+
+- **Node.js** >= 18
+- An **LLM API key** — [OpenAI](https://platform.openai.com/api-keys) (default) or [Anthropic](https://console.anthropic.com/)
+
+Set your API key as an environment variable:
+
+```bash
+export OPENAI_API_KEY=sk-...
+# or
+export ANTHROPIC_API_KEY=sk-ant-...
 ```
 
 ## What It Does
@@ -78,6 +91,7 @@ Options:
 - `--max-conversations <n>` — limit evaluation to N conversations
 - `--model <model>` — use a specific model (default: gpt-4o-mini)
 - `--provider <provider>` — openai, anthropic, or openai-compatible
+- `--include-prompt` — include the system prompt text in the report JSON
 - `--summary-only` — omit conversation transcripts from report
 
 ### `view`
@@ -124,13 +138,15 @@ converra-triage accepts conversations in three formats:
 ]
 ```
 
+Flexible field mapping is supported — `role`/`sender`, `content`/`text`/`message`, `human`/`ai`/`bot`/`agent` role variants are all accepted. JSONL format (one conversation per line) also works.
+
 ### LangSmith
 
-Point to a LangSmith project and converra-triage will fetch traces automatically.
+Point to a LangSmith project and converra-triage will fetch traces automatically. Requires `LANGSMITH_API_KEY`.
 
 ### OpenTelemetry
 
-Export OTLP/JSON traces from any OpenTelemetry-instrumented agent. converra-triage follows the [GenAI semantic conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/).
+Export OTLP/JSON traces from any OpenTelemetry-instrumented agent. converra-triage follows the [GenAI semantic conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/) (pinned to v1.36.0).
 
 ## Configuration
 
@@ -140,13 +156,41 @@ Create `converra-triage.config.yaml` for persistent settings:
 llm:
   provider: openai
   model: gpt-4o-mini
-  # apiKey: ${OPENAI_API_KEY}  # or set env var
+  # apiKey: ${OPENAI_API_KEY}  # resolved from env vars
+  maxConcurrency: 5
+
+prompt:
+  path: system-prompt.txt
 
 agent:
   name: "My Support Agent"
+
+output:
+  dir: .
+  maxConversations: 500
 ```
 
-Or pass everything via CLI flags and environment variables.
+Environment variable references (`${VAR_NAME}`) are automatically resolved in config values. CLI flags take precedence over config file values.
+
+## Programmatic API
+
+converra-triage can be used as a library:
+
+```typescript
+import {
+  readJsonTraces,
+  extractPolicies,
+  createLlmClient,
+  evaluateAll,
+  buildHtml,
+} from "converra-triage";
+
+const llm = createLlmClient("openai", process.env.OPENAI_API_KEY!, "gpt-4o-mini");
+const conversations = await readJsonTraces("./conversations.json");
+// ... evaluate, aggregate, generate report
+```
+
+See [src/index.ts](src/index.ts) for all available exports.
 
 ## How It Compares
 
@@ -187,6 +231,8 @@ npm install
 npm run build
 npm test
 ```
+
+The test suite covers ingestion connectors, config loading, JSON parsing, aggregation, diff, report generation, and evaluation types. Run `npm test` to verify your changes pass all checks.
 
 ---
 
