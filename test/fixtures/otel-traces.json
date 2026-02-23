@@ -1,0 +1,94 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          {"key": "service.name", "value": {"stringValue": "my-ai-agent"}},
+          {"key": "service.version", "value": {"stringValue": "1.0.0"}}
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {"name": "opentelemetry.instrumentation.openai", "version": "0.40.0"},
+          "spans": [
+            {
+              "traceId": "abc123def456",
+              "spanId": "span001",
+              "name": "chat gpt-4o-mini",
+              "startTimeUnixNano": "1708430400000000000",
+              "endTimeUnixNano": "1708430402000000000",
+              "attributes": [
+                {"key": "gen_ai.system", "value": {"stringValue": "openai"}},
+                {"key": "gen_ai.request.model", "value": {"stringValue": "gpt-4o-mini"}},
+                {"key": "gen_ai.usage.prompt_tokens", "value": {"intValue": "150"}},
+                {"key": "gen_ai.usage.completion_tokens", "value": {"intValue": "45"}}
+              ],
+              "events": [
+                {
+                  "name": "gen_ai.content.prompt",
+                  "timeUnixNano": "1708430400000000000",
+                  "attributes": [
+                    {"key": "gen_ai.prompt", "value": {"stringValue": "[{\"role\":\"system\",\"content\":\"You are a helpful assistant.\"},{\"role\":\"user\",\"content\":\"What is the weather in Paris?\"}]"}}
+                  ]
+                },
+                {
+                  "name": "gen_ai.content.completion",
+                  "timeUnixNano": "1708430402000000000",
+                  "attributes": [
+                    {"key": "gen_ai.completion", "value": {"stringValue": "I don't have access to real-time weather data, but you can check weather.com for current conditions in Paris."}}
+                  ]
+                }
+              ]
+            },
+            {
+              "traceId": "abc123def456",
+              "spanId": "span002",
+              "parentSpanId": "span001",
+              "name": "tool call: get_weather",
+              "startTimeUnixNano": "1708430401000000000",
+              "endTimeUnixNano": "1708430401500000000",
+              "attributes": [
+                {"key": "gen_ai.system", "value": {"stringValue": "openai"}}
+              ],
+              "events": []
+            }
+          ]
+        },
+        {
+          "scope": {"name": "opentelemetry.instrumentation.openai", "version": "0.40.0"},
+          "spans": [
+            {
+              "traceId": "xyz789abc012",
+              "spanId": "span003",
+              "name": "chat gpt-4o-mini",
+              "startTimeUnixNano": "1708430500000000000",
+              "endTimeUnixNano": "1708430503000000000",
+              "attributes": [
+                {"key": "gen_ai.system", "value": {"stringValue": "openai"}},
+                {"key": "gen_ai.request.model", "value": {"stringValue": "gpt-4o-mini"}},
+                {"key": "gen_ai.usage.prompt_tokens", "value": {"intValue": 200}},
+                {"key": "gen_ai.usage.completion_tokens", "value": {"intValue": 80}}
+              ],
+              "events": [
+                {
+                  "name": "gen_ai.content.prompt",
+                  "timeUnixNano": "1708430500000000000",
+                  "attributes": [
+                    {"key": "gen_ai.prompt", "value": {"stringValue": "Translate 'hello world' to French"}}
+                  ]
+                },
+                {
+                  "name": "gen_ai.content.completion",
+                  "timeUnixNano": "1708430503000000000",
+                  "attributes": [
+                    {"key": "gen_ai.completion", "value": {"stringValue": "The French translation of 'hello world' is 'bonjour le monde'."}}
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
