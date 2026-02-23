@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { exec } from "node:child_process";
+import { execFile } from "node:child_process";
 
 interface ViewOptions {
   report?: string;
@@ -32,15 +32,15 @@ export async function viewCommand(options: ViewOptions): Promise<void> {
 }
 
 function openInBrowser(path: string): void {
-  const cmd =
+  const [cmd, args] =
     process.platform === "darwin"
-      ? `open "${path}"`
+      ? ["open", [path]]
       : process.platform === "win32"
-        ? `start "" "${path}"`
-        : `xdg-open "${path}"`;
+        ? ["cmd", ["/c", "start", "", path]]
+        : ["xdg-open", [path]];
 
   console.log(`Opening ${path}...`);
-  exec(cmd, (err) => {
+  execFile(cmd, args, (err) => {
     if (err) {
       console.log(`Could not open browser automatically. Open manually:\n  ${path}`);
     }
