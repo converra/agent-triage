@@ -68,7 +68,7 @@ Get an at-a-glance pipeline summary (e.g., `15 policies extracted → 8 conversa
 
 See **where things break at scale**: failures grouped by type and subtype (e.g., `Tone Violation`, `Missing Escalation`, `Hallucination`) and attributed to root-cause categories (prompt issues, orchestration, model limitations, RAG failures). The report highlights the **most affected conversations** with summaries and severity badges, and provides a **ranked list of concrete recommendations** — each with a confidence level and the number of conversations impacted — so you can ship the highest-leverage change first.
 
-#### 3. Turn-by-Turn Deep Dive
+#### 3. Step-by-Step Deep Dive
 
 For the most severe failure, the report drills all the way down:
 
@@ -241,7 +241,7 @@ See [src/index.ts](src/index.ts) for all available exports.
 | Multi-connector (JSON, LangSmith, OTel) | Yes | LangGraph only | Custom | Custom |
 | Quality metrics (12 built-in) | Yes | Binary pass/fail | Custom | Custom |
 | Self-contained HTML report | Yes | No | Dashboard | No |
-| Turn-level root cause + cascade | Yes | No | No | No |
+| Step-level root cause + cascade | Yes | No | No | No |
 | Blast-radius warnings | Yes | No | No | No |
 | Cross-run diff | Yes | No | No | Yes |
 | No infrastructure required | Yes | Yes | No (server) | Yes |
