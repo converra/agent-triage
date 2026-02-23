@@ -53,7 +53,7 @@ export async function analyzeCommand(options: AnalyzeOptions): Promise<void> {
   if (!existsSync(policiesPath)) {
     console.error(
       "Error: No policies.json found.\n" +
-        "Run `converra-triage init --prompt <path>` first to extract policies.",
+        "Run `agent-triage init --prompt <path>` first to extract policies.",
     );
     process.exit(1);
   }
@@ -228,7 +228,7 @@ export async function analyzeCommand(options: AnalyzeOptions): Promise<void> {
   const runDuration = (Date.now() - startTime) / 1000;
 
   const report: Report = {
-    converraTriageVersion: "0.1.0",
+    agentTriageVersion: "0.1.0",
     llmProvider: config.llm.provider,
     llmModel: config.llm.model,
     policiesHash,
@@ -277,7 +277,7 @@ export async function analyzeCommand(options: AnalyzeOptions): Promise<void> {
 
   // Print summary
   console.log(`\n${"═".repeat(60)}`);
-  console.log(`  converra-triage Report`);
+  console.log(`  agent-triage Report`);
   console.log(`${"═".repeat(60)}`);
   console.log(`  Conversations: ${results.length}`);
   console.log(`  Policies: ${policies.length}`);
@@ -326,7 +326,7 @@ export async function analyzeCommand(options: AnalyzeOptions): Promise<void> {
 
   console.log(`\n  Report written to ${reportPath}`);
   console.log(`  HTML report: ${htmlPath}`);
-  console.log(`  Run \`converra-triage view\` to open in browser.\n`);
+  console.log(`  Run \`agent-triage view\` to open in browser.\n`);
 }
 
 async function ingestTraces(

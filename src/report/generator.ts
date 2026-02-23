@@ -62,7 +62,7 @@ export function buildHtml(report: Report): string {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Converra Triage — ${esc(report.agent.name)}</title>
+<title>Agent Triage — ${esc(report.agent.name)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -95,7 +95,7 @@ function renderHeader(report: Report, date: string, duration: string): string {
   return `<div class="hdr">
     <div class="hdr-top">
       <div class="logo">${ICONS.check}</div>
-      <div class="tool-name"><b>converra</b>-triage</div>
+      <div class="tool-name"><b>agent</b>-triage</div>
     </div>
     <h1>${esc(report.agent.name)}</h1>
     <div class="hdr-desc">Analyzed ${report.totalConversations} production conversations against ${report.policies.length} behavioral policies extracted from your system prompt.</div>
@@ -145,7 +145,7 @@ function renderVerdict(
   const parts = [];
   if (promptFixable > 0)
     parts.push(
-      `${promptFixable} failures (${Math.round((promptFixable / (promptFixable + needsCode)) * 100)}%) are prompt &amp; config issues Converra can fix automatically`,
+      `${promptFixable} failures (${Math.round((promptFixable / (promptFixable + needsCode)) * 100)}%) are prompt &amp; config issues that can be fixed automatically`,
     );
   if (needsCode > 0)
     parts.push(`${needsCode} need code changes to routing logic`);
@@ -191,7 +191,7 @@ function renderFailurePatterns(report: Report): string {
   let html = `<div class="patterns"><div class="stitle">Where things break</div>`;
 
   if (fixable.length > 0) {
-    html += `<div class="group-label fixable">${ICONS.checkCircleSm} Fixable by Converra — prompt &amp; config <span class="gl-line"></span></div>`;
+    html += `<div class="group-label fixable">${ICONS.checkCircleSm} Fixable — prompt &amp; config <span class="gl-line"></span></div>`;
     for (const pattern of fixable) {
       html += renderPatternDetail(pattern, report);
     }
@@ -204,7 +204,7 @@ function renderFailurePatterns(report: Report): string {
     }
   }
 
-  html += `<div class="trust-note">${ICONS.lock} This report is local-only. No data was uploaded. Converra import is optional.</div>`;
+  html += `<div class="trust-note">${ICONS.lock} This report is local-only. No data was uploaded.</div>`;
   html += `</div>`;
   return html;
 }
@@ -256,7 +256,7 @@ function renderPatternDetail(
       <span class="type-badge ${typeClass}">${label}</span>
       <span class="pattern-count">${pattern.count}</span>
       ${criticalTag}
-      <a href="https://converra.ai" class="fix-btn" style="margin-left:auto;">Test fixes in Converra ${ICONS.externalSm}</a>
+      <a href="https://converra.ai" class="fix-btn" style="margin-left:auto;">Test fixes ${ICONS.externalSm}</a>
       ${ICONS.chevDown}
     </summary>
     <div class="pattern-body">
@@ -385,21 +385,21 @@ function renderDeepDive(
     ${blastHtml}
 
     <div class="diag-cta">
-      <a href="https://converra.ai" class="diag-link">Generate patch + simulate in Converra ${ICONS.externalSm}</a>
+      <a href="https://converra.ai" class="diag-link">Generate patch + simulate ${ICONS.externalSm}</a>
     </div>
   </details>`;
 }
 
 function renderNextStep(report: Report): string {
   return `<div class="next-step">
-    <div class="next-step-header">${ICONS.external} What Converra does with this report</div>
+    <div class="next-step-header">${ICONS.external} What Converra can do with this report</div>
     <div class="next-step-body">
       <div class="next-step-item">${ICONS.fileSm} <strong>Generate prompt patches</strong> for all ${report.failurePatterns.topRecommendations.length} recommendations</div>
       <div class="next-step-item">${ICONS.checkCircleSm2} <strong>Simulate against all ${report.policies.length} policies</strong> with 50 conversations</div>
       <div class="next-step-item">${ICONS.checkAll} <strong>Deploy the winning variant</strong> without regressions</div>
     </div>
     <div class="next-step-footer">
-      <a class="cta" href="https://converra.ai">Import report into Converra (free) ${ICONS.externalSm}</a>
+      <a class="cta" href="https://converra.ai">Import report into Converra ${ICONS.externalSm}</a>
     </div>
   </div>`;
 }
@@ -450,7 +450,7 @@ function renderAllConversations(
 
   const moreText =
     failing.length > 50
-      ? `<div class="show-all">Showing 50 of ${failing.length} failing conversations · <a href="https://converra.ai">View all in Converra</a></div>`
+      ? `<div class="show-all">Showing 50 of ${failing.length} failing conversations</div>`
       : "";
 
   return `<div class="convs">
@@ -464,10 +464,10 @@ function renderReproducibility(report: Report): string {
   return `<div class="repro">
     <div class="repro-header">${ICONS.terminal} How this report was generated</div>
     <div class="repro-body">
-      <code class="repro-cmd">converra-triage analyze --traces [source] --model ${esc(report.llmModel)}</code>
+      <code class="repro-cmd">agent-triage analyze --traces [source] --model ${esc(report.llmModel)}</code>
       <button class="repro-copy" onclick="navigator.clipboard.writeText(this.previousElementSibling.textContent)">${ICONS.copy} Copy</button>
     </div>
-    <div class="repro-meta">converra-triage v${report.converraTriageVersion} · ${report.policies.length} policies · ${report.totalConversations} conversations</div>
+    <div class="repro-meta">agent-triage v${report.agentTriageVersion} · ${report.policies.length} policies · ${report.totalConversations} conversations</div>
   </div>`;
 }
 

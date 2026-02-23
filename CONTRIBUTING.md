@@ -1,12 +1,12 @@
-# Contributing to converra-triage
+# Contributing to agent-triage
 
 We welcome contributions! Whether it's a bug fix, new trace connector, or documentation improvement, we appreciate your help.
 
 ## Development Setup
 
 ```bash
-git clone https://github.com/converra/converra-triage
-cd converra-triage
+git clone https://github.com/converra/agent-triage
+cd agent-triage
 npm install
 npm run build
 npm test
@@ -41,7 +41,7 @@ See [`src/ingestion/types.ts`](src/ingestion/types.ts) for the `NormalizedConver
 
 ## Reporting Bugs
 
-[Open an issue](https://github.com/converra/converra-triage/issues/new?template=bug_report.yml) with:
+[Open an issue](https://github.com/converra/agent-triage/issues/new?template=bug_report.yml) with:
 - What you expected to happen
 - What actually happened
 - Steps to reproduce

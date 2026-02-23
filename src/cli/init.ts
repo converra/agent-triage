@@ -19,7 +19,7 @@ export async function initCommand(options: InitOptions): Promise<void> {
   if (!promptPath) {
     console.error(
       "Error: No prompt file specified.\n" +
-        "Usage: converra-triage init --prompt ./system-prompt.txt",
+        "Usage: agent-triage init --prompt ./system-prompt.txt",
     );
     process.exit(1);
   }

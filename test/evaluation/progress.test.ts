@@ -10,7 +10,7 @@ import {
 } from "../../src/evaluation/progress.js";
 import type { ConversationResult } from "../../src/evaluation/types.js";
 
-const PROGRESS_FILE = resolve(process.cwd(), ".converra-triage-progress.json");
+const PROGRESS_FILE = resolve(process.cwd(), ".agent-triage-progress.json");
 
 afterEach(async () => {
   await cleanupProgress();
