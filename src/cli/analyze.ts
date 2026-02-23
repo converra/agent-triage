@@ -24,6 +24,7 @@ import {
   cleanupProgress,
 } from "../evaluation/progress.js";
 import type { Report } from "../evaluation/types.js";
+import { buildHtml } from "../report/generator.js";
 
 interface AnalyzeOptions {
   traces?: string;
@@ -266,6 +267,11 @@ export async function analyzeCommand(options: AnalyzeOptions): Promise<void> {
   const reportPath = resolve(outputDir, "report.json");
   await writeFile(reportPath, JSON.stringify(report, null, 2), "utf-8");
 
+  // Generate HTML report
+  const htmlPath = resolve(outputDir, "report.html");
+  const html = buildHtml(report);
+  await writeFile(htmlPath, html, "utf-8");
+
   // Clean up progress file on success
   await cleanupProgress();
 
@@ -319,6 +325,7 @@ export async function analyzeCommand(options: AnalyzeOptions): Promise<void> {
   }
 
   console.log(`\n  Report written to ${reportPath}`);
+  console.log(`  HTML report: ${htmlPath}`);
   console.log(`  Run \`converra-triage view\` to open in browser.\n`);
 }
 

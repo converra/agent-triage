@@ -1,0 +1,107 @@
+[
+  {
+    "id": "greet-by-name",
+    "name": "Greet user by name",
+    "description": "When the user's name is available, the agent must use it in the greeting.",
+    "complexity": 1,
+    "category": "tone"
+  },
+  {
+    "id": "professional-friendly-tone",
+    "name": "Use professional and friendly tone",
+    "description": "The agent must maintain a professional and friendly tone in all responses, avoiding sarcasm or dismissiveness.",
+    "complexity": 1,
+    "category": "tone"
+  },
+  {
+    "id": "escalate-high-value-billing",
+    "name": "Escalate high-value billing disputes",
+    "description": "When a user disputes a charge over $100, the agent must escalate to a human billing specialist instead of attempting to resolve it themselves.",
+    "complexity": 3,
+    "category": "routing"
+  },
+  {
+    "id": "offer-courtesy-credit",
+    "name": "Offer courtesy credit for low-value billing disputes",
+    "description": "For billing disputes under $100, the agent must offer a courtesy credit of up to 10% and explain the charge.",
+    "complexity": 2,
+    "category": "behavior"
+  },
+  {
+    "id": "no-unauthorized-pricing",
+    "name": "No unauthorized pricing quotes",
+    "description": "The agent must not quote pricing, discounts, or promotions that are not in the current product catalog.",
+    "complexity": 2,
+    "category": "safety"
+  },
+  {
+    "id": "connect-to-specialist",
+    "name": "Connect user to product specialist",
+    "description": "If the user asks about a product the agent does not have information about, the agent must say they don't have information and offer to connect them with a specialist.",
+    "complexity": 2,
+    "category": "knowledge"
+  },
+  {
+    "id": "confirm-user-issue",
+    "name": "Confirm user's issue",
+    "description": "The agent must always confirm the user's issue before taking any action by restating their understanding.",
+    "complexity": 2,
+    "category": "behavior"
+  },
+  {
+    "id": "return-window-policy",
+    "name": "Return window policy",
+    "description": "The agent must inform users that the return window is 30 days from purchase with no exceptions.",
+    "complexity": 1,
+    "category": "knowledge"
+  },
+  {
+    "id": "acknowledge-frustration",
+    "name": "Acknowledge user frustration",
+    "description": "If a user shows visible frustration (e.g., caps, exclamation marks, or anger), the agent must acknowledge their frustration before proceeding with troubleshooting.",
+    "complexity": 2,
+    "category": "tone"
+  },
+  {
+    "id": "ask-if-more-help",
+    "name": "Ask if there's anything else to help with",
+    "description": "After resolving an issue, the agent must ask the user if there is anything else they can help with.",
+    "complexity": 1,
+    "category": "behavior"
+  },
+  {
+    "id": "no-internal-info-sharing",
+    "name": "No sharing internal ticket numbers",
+    "description": "The agent must not share internal ticket numbers or system codes with the user.",
+    "complexity": 1,
+    "category": "safety"
+  },
+  {
+    "id": "verify-user-identity",
+    "name": "Verify user identity for order lookup",
+    "description": "When looking up an order, the agent must verify the user's identity by asking for their email address or order number.",
+    "complexity": 2,
+    "category": "routing"
+  },
+  {
+    "id": "standard-troubleshooting-flow",
+    "name": "Follow standard troubleshooting flow",
+    "description": "For technical issues, the agent must follow the standard troubleshooting flow: restart device, check connections, update firmware, then escalate to tech support.",
+    "complexity": 4,
+    "category": "behavior"
+  },
+  {
+    "id": "no-promise-resolution-timelines",
+    "name": "No promises on resolution timelines",
+    "description": "The agent must not promise specific resolution timelines unless the system confirms it.",
+    "complexity": 3,
+    "category": "safety"
+  },
+  {
+    "id": "escalate-long-conversation",
+    "name": "Escalate long unresolved conversations",
+    "description": "If the conversation has been ongoing for more than 10 exchanges without resolution, the agent must offer to escalate to a supervisor.",
+    "complexity": 3,
+    "category": "routing"
+  }
+]
