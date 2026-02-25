@@ -222,14 +222,13 @@ async function ingestSessionBased(
     }
   }
 
-  // Bulk-fetch all LLM runs for these traces in one sweep (not per-trace)
-  console.log(`Bulk-fetching LLM runs for ${traceIds.size} traces...`);
-  const llmRunsByTrace = await bulkFetchLlmRunsByTrace(
+  // Pre-fetch all LLM runs for these traces (bounded by limit, not full project)
+  console.log(`Fetching LLM runs for ${traceIds.size} traces...`);
+  const llmRunsByTrace = await prefetchLlmRunsByTrace(
     baseUrl,
     headers,
     projectId,
     traceIds,
-    timeFilters,
   );
   console.log(`Fetched LLM runs for ${llmRunsByTrace.size} traces.`);
 
@@ -313,16 +312,15 @@ async function ingestSessionBased(
 }
 
 /**
- * Fetch LLM runs for a set of trace IDs, grouped by trace.
- * Uses per-trace queries with the `trace_id` parameter (single string per call).
+ * Pre-fetch LLM runs for a bounded set of trace IDs, grouped by trace.
+ * Uses per-trace queries with `trace_id` (single string per call).
  * Only called after capping sessions at `limit`, so trace count is bounded.
  */
-async function bulkFetchLlmRunsByTrace(
+async function prefetchLlmRunsByTrace(
   baseUrl: string,
   headers: Record<string, string>,
   projectId: string,
   traceIds: Set<string>,
-  _timeFilters: Record<string, unknown> = {},
 ): Promise<Map<string, LangSmithRun[]>> {
   const runsByTrace = new Map<string, LangSmithRun[]>();
   if (traceIds.size === 0) return runsByTrace;
@@ -336,6 +334,10 @@ async function bulkFetchLlmRunsByTrace(
     fetched++;
     if (fetched % 10 === 0) {
       console.log(`  Fetched LLM runs for ${fetched}/${traceIds.size} traces...`);
+    }
+    // Throttle to avoid rate limiting on large trace sets
+    if (fetched < traceIds.size) {
+      await new Promise((r) => setTimeout(r, RATE_LIMIT_DELAY_MS / 2));
     }
   }
 
