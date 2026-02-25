@@ -27,6 +27,8 @@ export interface LangSmithConfig {
   project: string;
   baseUrl?: string;
   limit?: number;
+  startTime?: string;  // ISO 8601 — filter traces after this time
+  endTime?: string;    // ISO 8601 — filter traces before this time
 }
 
 export interface LangSmithRun {
@@ -68,10 +70,14 @@ export async function readLangSmithTraces(
     `Detected ${strategy} agent architecture`,
   );
 
+  const timeFilters: Record<string, unknown> = {};
+  if (config.startTime) timeFilters.start_time = config.startTime;
+  if (config.endTime) timeFilters.end_time = config.endTime;
+
   if (strategy === "session-based") {
-    return ingestSessionBased(baseUrl, headers, projectId, config.limit ?? 500);
+    return ingestSessionBased(baseUrl, headers, projectId, config.limit ?? 500, timeFilters);
   }
-  return ingestTraceBased(baseUrl, headers, projectId, config.limit ?? 500);
+  return ingestTraceBased(baseUrl, headers, projectId, config.limit ?? 500, timeFilters);
 }
 
 // ─── Strategy Detection ──────────────────────────────────────────────
@@ -119,9 +125,11 @@ async function ingestTraceBased(
   headers: Record<string, string>,
   projectId: string,
   limit: number,
+  timeFilters: Record<string, unknown> = {},
 ): Promise<NormalizedConversation[]> {
   // Fetch LLM runs (not root runs) — these have actual messages
   const llmRuns = await fetchAllRuns(baseUrl, headers, projectId, {
+    ...timeFilters,
     run_type: "llm",
   }, limit * 3); // fetch more since we'll filter
 
@@ -183,9 +191,11 @@ async function ingestSessionBased(
   headers: Record<string, string>,
   projectId: string,
   limit: number,
+  timeFilters: Record<string, unknown> = {},
 ): Promise<NormalizedConversation[]> {
   // Fetch root chain runs
   const rootRuns = await fetchAllRuns(baseUrl, headers, projectId, {
+    ...timeFilters,
     is_root: true,
   }, limit * 2);
 
