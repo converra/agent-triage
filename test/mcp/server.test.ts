@@ -147,7 +147,7 @@ describe("MCP Server", () => {
   });
 
   describe("tool registration", () => {
-    it("registers all 7 tools", async () => {
+    it("registers all 8 tools", async () => {
       const client = await createTestClient();
       const result = await client.listTools();
       const names = result.tools.map((t) => t.name).sort();
@@ -158,6 +158,7 @@ describe("MCP Server", () => {
         "triage_explain",
         "triage_init",
         "triage_list_policies",
+        "triage_sample",
         "triage_status",
       ]);
     });
@@ -196,6 +197,8 @@ describe("MCP Server", () => {
       expect(parsed.age).toBe("just now");
       expect(parsed.stale).toBe(false);
       expect((parsed.worstPolicies as unknown[]).length).toBe(1);
+      expect(parsed.nextStep).toBeTruthy();
+      expect(typeof parsed.nextStep).toBe("string");
     });
 
     it("shows stale=true for old reports", async () => {
@@ -267,6 +270,110 @@ describe("MCP Server", () => {
       expect(result.isError).toBeFalsy();
       const parsed = parseResult(result) as { count: number };
       expect(parsed.count).toBe(2);
+    });
+  });
+
+  describe("triage_sample", () => {
+    it("returns error when no trace source specified", async () => {
+      const client = await createTestClient();
+      const result = await client.callTool({
+        name: "triage_sample",
+        arguments: {},
+      });
+      expect(result.isError).toBe(true);
+    });
+
+    it("samples conversations from JSON traces", async () => {
+      const traces = [
+        {
+          id: "conv-1",
+          messages: [
+            { role: "user", content: "I need a refund for my order" },
+            { role: "assistant", content: "I can help with that refund." },
+          ],
+        },
+        {
+          id: "conv-2",
+          messages: [
+            { role: "user", content: "What are your hours?" },
+            { role: "assistant", content: "We are open 9-5." },
+          ],
+        },
+        {
+          id: "conv-3",
+          messages: [
+            { role: "user", content: "I want a refund please" },
+            { role: "assistant", content: "Sure, processing your refund now." },
+          ],
+        },
+      ];
+      writeFileSync(join(tmpDir, "traces.json"), JSON.stringify(traces));
+
+      const client = await createTestClient();
+      const result = await client.callTool({
+        name: "triage_sample",
+        arguments: { traces: "traces.json", sample_size: 2 },
+      });
+      expect(result.isError).toBeFalsy();
+
+      const parsed = parseResult(result) as { totalMatching: number; returned: number; conversations: unknown[] };
+      expect(parsed.totalMatching).toBe(3);
+      expect(parsed.returned).toBe(2);
+      expect(parsed.conversations).toHaveLength(2);
+    });
+
+    it("filters by keyword query", async () => {
+      const traces = [
+        { id: "c1", messages: [{ role: "user", content: "refund my order" }, { role: "assistant", content: "OK" }] },
+        { id: "c2", messages: [{ role: "user", content: "what are hours?" }, { role: "assistant", content: "9-5" }] },
+        { id: "c3", messages: [{ role: "user", content: "refund please" }, { role: "assistant", content: "done" }] },
+      ];
+      writeFileSync(join(tmpDir, "traces.json"), JSON.stringify(traces));
+
+      const client = await createTestClient();
+      const result = await client.callTool({
+        name: "triage_sample",
+        arguments: { traces: "traces.json", query: "refund" },
+      });
+
+      const parsed = parseResult(result) as { totalMatching: number; conversations: Array<{ id: string }> };
+      expect(parsed.totalMatching).toBe(2);
+      expect(parsed.conversations.map((c) => c.id).sort()).toEqual(["c1", "c3"]);
+    });
+
+    it("fetches specific conversation IDs", async () => {
+      const traces = [
+        { id: "c1", messages: [{ role: "user", content: "hello" }, { role: "assistant", content: "hi" }] },
+        { id: "c2", messages: [{ role: "user", content: "bye" }, { role: "assistant", content: "bye" }] },
+      ];
+      writeFileSync(join(tmpDir, "traces.json"), JSON.stringify(traces));
+
+      const client = await createTestClient();
+      const result = await client.callTool({
+        name: "triage_sample",
+        arguments: { traces: "traces.json", conversation_ids: ["c2"] },
+      });
+
+      const parsed = parseResult(result) as { conversations: Array<{ id: string }> };
+      expect(parsed.conversations).toHaveLength(1);
+      expect(parsed.conversations[0].id).toBe("c2");
+    });
+
+    it("truncates long messages", async () => {
+      const longContent = "A".repeat(1000);
+      const traces = [
+        { id: "c1", messages: [{ role: "user", content: longContent }, { role: "assistant", content: "ok" }] },
+      ];
+      writeFileSync(join(tmpDir, "traces.json"), JSON.stringify(traces));
+
+      const client = await createTestClient();
+      const result = await client.callTool({
+        name: "triage_sample",
+        arguments: { traces: "traces.json" },
+      });
+
+      const parsed = parseResult(result) as { conversations: Array<{ messages: Array<{ content: string }> }> };
+      expect(parsed.conversations[0].messages[0].content.length).toBeLessThanOrEqual(504); // 500 + "..."
     });
   });
 
