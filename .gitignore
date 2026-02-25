@@ -10,3 +10,4 @@ report.json
 report.html
 diff.json
 .agent-triage-demo-*
+.triage-history.jsonl

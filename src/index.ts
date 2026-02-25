@@ -46,3 +46,6 @@ export { parseJsonResponse } from "./llm/json.js";
 
 export { applyFilters, parseDuration, createLogger } from "./cli/filters.js";
 export type { FilterSpec } from "./cli/filters.js";
+
+export { appendHistory, readHistory, extractHistoryEntry } from "./history.js";
+export type { HistoryEntry } from "./history.js";

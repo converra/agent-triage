@@ -28,6 +28,7 @@ import { buildHtml } from "../report/generator.js";
 import { autoExtractPolicies } from "../ingestion/auto-discovery.js";
 import type { LlmClient } from "../llm/client.js";
 import { applyFilters, parseDuration, createLogger } from "./filters.js";
+import { appendHistory } from "../history.js";
 
 export interface AnalyzeOptions {
   traces?: string;
@@ -352,6 +353,7 @@ export async function analyzeCommand(options: AnalyzeOptions): Promise<void> {
   await writeFile(htmlPath, html, "utf-8");
 
   await cleanupProgress();
+  await appendHistory(report, outputDir);
 
   // Print terminal summary
   printSummary(report, aggregated, metricSummary, reportPath, htmlPath, promptPath);

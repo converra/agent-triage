@@ -12,6 +12,7 @@ import { demoCommand } from "./demo.js";
 import { explainCommand } from "./explain.js";
 import { checkCommand } from "./check.js";
 import { statusCommand } from "./status.js";
+import { historyCommand } from "./history.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(resolve(__dirname, "../../package.json"), "utf-8")) as { version: string };
@@ -113,6 +114,14 @@ program
   .option("-r, --report <dir>", "Directory containing report.json", ".")
   .option("--format <format>", "Output format: terminal (default), json")
   .action(wrapAction(statusCommand));
+
+program
+  .command("history")
+  .description("Show run history — compliance trends across analyze runs")
+  .option("-r, --report <dir>", "Directory containing .triage-history.jsonl", ".")
+  .option("--last <n>", "Show only the last N runs")
+  .option("--format <format>", "Output format: terminal (default), json")
+  .action(wrapAction(historyCommand));
 
 program
   .command("view")
