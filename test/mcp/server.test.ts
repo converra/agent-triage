@@ -156,6 +156,7 @@ describe("MCP Server", () => {
         "triage_check",
         "triage_diff",
         "triage_explain",
+        "triage_history",
         "triage_init",
         "triage_list_policies",
         "triage_sample",

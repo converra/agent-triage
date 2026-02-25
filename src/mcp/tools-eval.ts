@@ -568,6 +568,9 @@ export function registerEvalTools(server: McpServer): void {
       await writeFile(htmlPath, buildHtml(report), "utf-8");
       await cleanupProgress();
 
+      const { appendHistory } = await import("../history.js");
+      await appendHistory(report, outputDir);
+
       return jsonResult({
         totalConversations: results.length,
         overallCompliance,

@@ -260,4 +260,61 @@ export function registerReadTools(server: McpServer): void {
       return errorResult(error instanceof Error ? error.message : String(error));
     }
   });
+
+  // -------------------------------------------------------------------------
+  // triage_history — Show run history
+  // -------------------------------------------------------------------------
+  server.registerTool("triage_history", {
+    title: "Agent Triage: Run History",
+    description:
+      "Show compliance trends across analyze runs. Zero LLM cost — reads .triage-history.jsonl from disk. " +
+      "Returns timestamped entries with compliance, failures, costs, and deltas from previous runs. " +
+      "Use this to see if agent quality is improving or degrading over time.",
+    inputSchema: {
+      report_dir: z
+        .string()
+        .optional()
+        .describe("Directory containing .triage-history.jsonl (default: current directory)"),
+      last: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe("Return only the last N entries"),
+    },
+  }, async ({ report_dir, last }) => {
+    try {
+      const { readHistory } = await import("../history.js");
+      const dir = resolve(process.cwd(), report_dir ?? ".");
+      const entries = await readHistory(dir);
+
+      if (entries.length === 0) {
+        return jsonResult({
+          message: "No history found. Run triage_analyze to start tracking.",
+          entries: [],
+        });
+      }
+
+      const shown = last ? entries.slice(-last) : entries;
+
+      return jsonResult({
+        totalRuns: entries.length,
+        returned: shown.length,
+        entries: shown.map((entry, i) => {
+          const prev = i > 0 ? shown[i - 1] : null;
+          return {
+            ...entry,
+            complianceDelta: prev
+              ? +(entry.overallCompliance - prev.overallCompliance).toFixed(1)
+              : null,
+            failureDelta: prev
+              ? entry.totalFailures - prev.totalFailures
+              : null,
+          };
+        }),
+      });
+    } catch (error) {
+      return errorResult(error instanceof Error ? error.message : String(error));
+    }
+  });
 }
