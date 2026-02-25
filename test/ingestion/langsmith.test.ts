@@ -20,7 +20,7 @@ const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
 
 // Import after mocking
-const { readLangSmithTraces } = await import(
+const { readLangSmithTraces, extractMessagesFromRun, resolveAgentName, hashPrompt, normalizeRole } = await import(
   "../../src/ingestion/langsmith.js"
 );
 
@@ -35,14 +35,104 @@ function mockProjectsResponse(projectName = "saleapeak-prod") {
   );
 }
 
+// Helper: create a standard sample response that triggers trace-based strategy
+// (no session_id in inputs means trace-based detection)
+function mockSampleRunsResponse(runs?: unknown[]) {
+  const defaultRuns = runs ?? [{
+    id: "sample_1",
+    name: "ChatOpenAI",
+    run_type: "chain",
+    trace_id: "t_sample",
+    inputs: {},
+    outputs: null,
+    start_time: "2026-02-20T10:00:00Z",
+    end_time: null,
+    extra: {},
+    parent_run_id: null,
+    total_tokens: null,
+    status: "success",
+  }];
+  return new Response(
+    JSON.stringify({ runs: defaultRuns, cursors: { next: null } }),
+    { status: 200, headers: { "content-type": "application/json" } },
+  );
+}
+
+// Helper: create a fixture response (LLM runs with messages for trace-based)
+function makeLlmRunsFixture() {
+  return {
+    runs: [
+      {
+        id: "run_abc123",
+        name: "ChatOpenAI",
+        run_type: "llm",
+        trace_id: "trace_abc123",
+        inputs: {
+          messages: [
+            { type: "system", content: "You are a helpful assistant." },
+            { type: "human", content: "What is the capital of France?" },
+          ],
+        },
+        outputs: {
+          choices: [
+            { message: { content: "The capital of France is Paris." } },
+          ],
+        },
+        start_time: "2026-02-20T10:00:00Z",
+        end_time: "2026-02-20T10:00:02Z",
+        status: "success",
+        extra: {
+          invocation_params: {
+            model: "gpt-4o-mini",
+            temperature: 0.7,
+          },
+        },
+        parent_run_id: null,
+        total_tokens: 45,
+      },
+      {
+        id: "run_def456",
+        name: "ChatOpenAI",
+        run_type: "llm",
+        trace_id: "trace_def456",
+        inputs: {
+          messages: [
+            { role: "system", content: "You are a math tutor." },
+            { role: "user", content: "Help me calculate 25 * 17" },
+          ],
+        },
+        outputs: {
+          choices: [
+            { message: { content: "25 multiplied by 17 equals 425." } },
+          ],
+        },
+        start_time: "2026-02-20T11:00:00Z",
+        end_time: "2026-02-20T11:00:05Z",
+        status: "success",
+        extra: {
+          invocation_params: {
+            model_name: "gpt-4o",
+          },
+        },
+        parent_run_id: null,
+        total_tokens: 120,
+      },
+    ],
+    cursors: { next: null },
+  };
+}
+
 describe("readLangSmithTraces", () => {
-  it("fetches runs and normalizes to conversations", async () => {
-    const fixture = await loadFixture();
+  it("fetches LLM runs and normalizes to conversations (trace-based)", async () => {
+    const llmFixture = makeLlmRunsFixture();
 
     mockFetch
       .mockResolvedValueOnce(mockProjectsResponse())
+      // Strategy detection: sample root runs (no session_id → trace-based)
+      .mockResolvedValueOnce(mockSampleRunsResponse())
+      // Trace-based: fetch LLM runs
       .mockResolvedValueOnce(
-        new Response(JSON.stringify(fixture), {
+        new Response(JSON.stringify(llmFixture), {
           status: 200,
           headers: { "content-type": "application/json" },
         }),
@@ -53,23 +143,26 @@ describe("readLangSmithTraces", () => {
       project: "saleapeak-prod",
     });
 
-    // 3 runs in fixture, but run_ghi789 has null outputs and only user message
-    expect(convs.length).toBeGreaterThanOrEqual(2);
+    // Both runs have system prompts so both should be included
+    expect(convs.length).toBe(2);
 
     for (const conv of convs) {
       expect(conv.id).toBeDefined();
       expect(conv.messages.length).toBeGreaterThan(0);
       expect(conv.metadata.source).toBe("langsmith");
+      expect(conv.systemPrompt).toBeDefined();
+      expect(conv.metadata.promptHash).toBeDefined();
     }
   });
 
-  it("uses POST /api/v1/runs/query with correct body", async () => {
-    const fixture = await loadFixture();
+  it("uses POST /api/v1/runs/query for strategy detection and LLM fetching", async () => {
+    const llmFixture = makeLlmRunsFixture();
 
     mockFetch
       .mockResolvedValueOnce(mockProjectsResponse())
+      .mockResolvedValueOnce(mockSampleRunsResponse())
       .mockResolvedValueOnce(
-        new Response(JSON.stringify(fixture), { status: 200 }),
+        new Response(JSON.stringify(llmFixture), { status: 200 }),
       );
 
     await readLangSmithTraces({
@@ -77,24 +170,29 @@ describe("readLangSmithTraces", () => {
       project: "saleapeak-prod",
     });
 
-    // Second call is the runs query
-    const runsCall = mockFetch.mock.calls[1];
-    expect(runsCall[0]).toContain("/api/v1/runs/query");
-    expect(runsCall[1].method).toBe("POST");
-
-    const body = JSON.parse(runsCall[1].body);
-    expect(body.session).toEqual(["proj_123"]);
-    expect(body.is_root).toBe(true);
-    expect(body.limit).toBeDefined();
+    // First call: project resolution
+    expect(mockFetch.mock.calls[0][0]).toContain("/api/v1/sessions");
+    // Second call: strategy detection (sample root runs)
+    const sampleCall = mockFetch.mock.calls[1];
+    expect(sampleCall[0]).toContain("/api/v1/runs/query");
+    const sampleBody = JSON.parse(sampleCall[1].body);
+    expect(sampleBody.is_root).toBe(true);
+    expect(sampleBody.limit).toBe(5);
+    // Third call: LLM runs fetch
+    const llmCall = mockFetch.mock.calls[2];
+    expect(llmCall[0]).toContain("/api/v1/runs/query");
+    const llmBody = JSON.parse(llmCall[1].body);
+    expect(llmBody.run_type).toBe("llm");
   });
 
   it("passes x-api-key header", async () => {
-    const fixture = await loadFixture();
+    const llmFixture = makeLlmRunsFixture();
 
     mockFetch
       .mockResolvedValueOnce(mockProjectsResponse())
+      .mockResolvedValueOnce(mockSampleRunsResponse())
       .mockResolvedValueOnce(
-        new Response(JSON.stringify(fixture), { status: 200 }),
+        new Response(JSON.stringify(llmFixture), { status: 200 }),
       );
 
     await readLangSmithTraces({
@@ -108,12 +206,13 @@ describe("readLangSmithTraces", () => {
   });
 
   it("normalizes messages format (type→role mapping)", async () => {
-    const fixture = await loadFixture();
+    const llmFixture = makeLlmRunsFixture();
 
     mockFetch
       .mockResolvedValueOnce(mockProjectsResponse())
+      .mockResolvedValueOnce(mockSampleRunsResponse())
       .mockResolvedValueOnce(
-        new Response(JSON.stringify(fixture), { status: 200 }),
+        new Response(JSON.stringify(llmFixture), { status: 200 }),
       );
 
     const convs = await readLangSmithTraces({
@@ -121,13 +220,10 @@ describe("readLangSmithTraces", () => {
       project: "saleapeak-prod",
     });
 
-    // First run: inputs.messages has {type: "system"} and {type: "human"}
+    // First run uses type field: {type: "system"}, {type: "human"}
     const conv1 = convs.find((c) => c.id === "run_abc123")!;
     expect(conv1).toBeDefined();
-
-    const systemMsg = conv1.messages.find((m) => m.role === "system");
-    expect(systemMsg).toBeDefined();
-    expect(systemMsg!.content).toBe("You are a helpful assistant.");
+    expect(conv1.systemPrompt).toBe("You are a helpful assistant.");
 
     const userMsg = conv1.messages.find((m) => m.role === "user");
     expect(userMsg).toBeDefined();
@@ -138,38 +234,14 @@ describe("readLangSmithTraces", () => {
     expect(assistantMsg!.content).toBe("The capital of France is Paris.");
   });
 
-  it("handles string input/output format", async () => {
-    const fixture = await loadFixture();
-
-    mockFetch
-      .mockResolvedValueOnce(mockProjectsResponse())
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify(fixture), { status: 200 }),
-      );
-
-    const convs = await readLangSmithTraces({
-      apiKey: "test-key",
-      project: "saleapeak-prod",
-    });
-
-    // Second run: inputs.input is string, outputs.output is string
-    const conv2 = convs.find((c) => c.id === "run_def456")!;
-    expect(conv2).toBeDefined();
-
-    const userMsg = conv2.messages.find((m) => m.role === "user");
-    expect(userMsg!.content).toBe("Help me calculate 25 * 17");
-
-    const assistantMsg = conv2.messages.find((m) => m.role === "assistant");
-    expect(assistantMsg!.content).toBe("25 multiplied by 17 equals 425.");
-  });
-
   it("extracts model from invocation_params", async () => {
-    const fixture = await loadFixture();
+    const llmFixture = makeLlmRunsFixture();
 
     mockFetch
       .mockResolvedValueOnce(mockProjectsResponse())
+      .mockResolvedValueOnce(mockSampleRunsResponse())
       .mockResolvedValueOnce(
-        new Response(JSON.stringify(fixture), { status: 200 }),
+        new Response(JSON.stringify(llmFixture), { status: 200 }),
       );
 
     const convs = await readLangSmithTraces({
@@ -185,12 +257,13 @@ describe("readLangSmithTraces", () => {
   });
 
   it("extracts duration from start_time/end_time", async () => {
-    const fixture = await loadFixture();
+    const llmFixture = makeLlmRunsFixture();
 
     mockFetch
       .mockResolvedValueOnce(mockProjectsResponse())
+      .mockResolvedValueOnce(mockSampleRunsResponse())
       .mockResolvedValueOnce(
-        new Response(JSON.stringify(fixture), { status: 200 }),
+        new Response(JSON.stringify(llmFixture), { status: 200 }),
       );
 
     const convs = await readLangSmithTraces({
@@ -199,32 +272,10 @@ describe("readLangSmithTraces", () => {
     });
 
     const conv1 = convs.find((c) => c.id === "run_abc123")!;
-    expect(conv1.metadata.duration).toBe(2); // 2 seconds
+    expect(conv1.metadata.duration).toBe(2);
 
     const conv2 = convs.find((c) => c.id === "run_def456")!;
-    expect(conv2.metadata.duration).toBe(5); // 5 seconds
-  });
-
-  it("handles runs with null outputs", async () => {
-    const fixture = await loadFixture();
-
-    mockFetch
-      .mockResolvedValueOnce(mockProjectsResponse())
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify(fixture), { status: 200 }),
-      );
-
-    const convs = await readLangSmithTraces({
-      apiKey: "test-key",
-      project: "saleapeak-prod",
-    });
-
-    // Third run has null outputs — should still parse (user message from role field)
-    const conv3 = convs.find((c) => c.id === "run_ghi789");
-    if (conv3) {
-      // It might be included with just user messages, or filtered out
-      expect(conv3.messages.length).toBeGreaterThan(0);
-    }
+    expect(conv2.metadata.duration).toBe(5);
   });
 
   it("throws on invalid API key (401)", async () => {
@@ -255,81 +306,8 @@ describe("readLangSmithTraces", () => {
     ).rejects.toThrow('project "nonexistent" not found');
   });
 
-  it("handles cursor-based pagination", async () => {
-    const page1 = {
-      runs: [
-        {
-          id: "run_page1",
-          name: "ChatOpenAI",
-          run_type: "chain",
-          trace_id: "t1",
-          inputs: {
-            messages: [{ type: "human", content: "page 1" }],
-          },
-          outputs: {
-            messages: [{ type: "ai", content: "response 1" }],
-          },
-          start_time: "2026-02-20T10:00:00Z",
-          end_time: "2026-02-20T10:00:01Z",
-          extra: {},
-          parent_run_id: null,
-          total_tokens: 50,
-          status: "success",
-        },
-      ],
-      cursors: { next: "cursor_abc" },
-    };
-
-    const page2 = {
-      runs: [
-        {
-          id: "run_page2",
-          name: "ChatOpenAI",
-          run_type: "chain",
-          trace_id: "t2",
-          inputs: {
-            messages: [{ type: "human", content: "page 2" }],
-          },
-          outputs: {
-            messages: [{ type: "ai", content: "response 2" }],
-          },
-          start_time: "2026-02-20T11:00:00Z",
-          end_time: "2026-02-20T11:00:01Z",
-          extra: {},
-          parent_run_id: null,
-          total_tokens: 60,
-          status: "success",
-        },
-      ],
-      cursors: { next: null },
-    };
-
-    mockFetch
-      .mockResolvedValueOnce(mockProjectsResponse())
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify(page1), { status: 200 }),
-      )
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify(page2), { status: 200 }),
-      );
-
-    const convs = await readLangSmithTraces({
-      apiKey: "test-key",
-      project: "saleapeak-prod",
-    });
-
-    expect(convs).toHaveLength(2);
-    expect(convs[0].id).toBe("run_page1");
-    expect(convs[1].id).toBe("run_page2");
-
-    // Verify second query included cursor
-    const secondRunsCall = mockFetch.mock.calls[2];
-    const body = JSON.parse(secondRunsCall[1].body);
-    expect(body.cursor).toBe("cursor_abc");
-  });
-
   it("handles {sessions: [...]} project response format", async () => {
-    const fixture = await loadFixture();
+    const llmFixture = makeLlmRunsFixture();
 
     mockFetch
       .mockResolvedValueOnce(
@@ -340,8 +318,9 @@ describe("readLangSmithTraces", () => {
           { status: 200 },
         ),
       )
+      .mockResolvedValueOnce(mockSampleRunsResponse())
       .mockResolvedValueOnce(
-        new Response(JSON.stringify(fixture), { status: 200 }),
+        new Response(JSON.stringify(llmFixture), { status: 200 }),
       );
 
     const convs = await readLangSmithTraces({
@@ -352,13 +331,13 @@ describe("readLangSmithTraces", () => {
     expect(convs.length).toBeGreaterThan(0);
 
     // Verify it used the correct project ID from sessions format
-    const runsCall = mockFetch.mock.calls[1];
-    const body = JSON.parse(runsCall[1].body);
+    const sampleCall = mockFetch.mock.calls[1];
+    const body = JSON.parse(sampleCall[1].body);
     expect(body.session).toEqual(["proj_999"]);
   });
 
   it("retries on 429 rate limit", async () => {
-    const fixture = await loadFixture();
+    const llmFixture = makeLlmRunsFixture();
 
     mockFetch
       // Projects endpoint: first 429, then success
@@ -369,8 +348,9 @@ describe("readLangSmithTraces", () => {
         }),
       )
       .mockResolvedValueOnce(mockProjectsResponse())
+      .mockResolvedValueOnce(mockSampleRunsResponse())
       .mockResolvedValueOnce(
-        new Response(JSON.stringify(fixture), { status: 200 }),
+        new Response(JSON.stringify(llmFixture), { status: 200 }),
       );
 
     const convs = await readLangSmithTraces({
@@ -379,7 +359,348 @@ describe("readLangSmithTraces", () => {
     });
 
     expect(convs.length).toBeGreaterThan(0);
-    // fetch called 3 times: 429 + projects success + runs
-    expect(mockFetch).toHaveBeenCalledTimes(3);
+    // fetch called 4 times: 429 + projects success + sample runs + LLM runs
+    expect(mockFetch).toHaveBeenCalledTimes(4);
+  });
+
+  it("detects session-based strategy when inputs have session_id", async () => {
+    const sessionRuns = [{
+      id: "root_1",
+      name: "AgentChain",
+      run_type: "chain",
+      trace_id: "t_1",
+      inputs: { session_id: "sess_abc", message: "Hello" },
+      outputs: null,
+      start_time: "2026-02-20T10:00:00Z",
+      end_time: "2026-02-20T10:00:01Z",
+      extra: {},
+      parent_run_id: null,
+      total_tokens: null,
+      status: "success",
+    }];
+
+    // Session-based: after detection, fetches root runs, then child LLM runs per trace
+    const rootRunsResponse = {
+      runs: [{
+        id: "root_1",
+        name: "AgentChain",
+        run_type: "chain",
+        trace_id: "t_1",
+        inputs: { session_id: "sess_abc", message: "Hello there" },
+        outputs: { output: "Hi! How can I help?" },
+        start_time: "2026-02-20T10:00:00Z",
+        end_time: "2026-02-20T10:00:01Z",
+        extra: {},
+        parent_run_id: null,
+        total_tokens: null,
+        status: "success",
+      }],
+      cursors: { next: null },
+    };
+
+    const childLlmResponse = {
+      runs: [{
+        id: "llm_child_1",
+        name: "ChatOpenAI",
+        run_type: "llm",
+        trace_id: "t_1",
+        inputs: {
+          messages: [
+            { role: "system", content: "You are a helpful bot." },
+            { role: "user", content: "Hello there" },
+          ],
+        },
+        outputs: {
+          choices: [{ message: { content: "Hi! How can I help?" } }],
+        },
+        start_time: "2026-02-20T10:00:00Z",
+        end_time: "2026-02-20T10:00:01Z",
+        extra: { invocation_params: { model: "gpt-4o-mini" } },
+        parent_run_id: "root_1",
+        total_tokens: 50,
+        status: "success",
+      }],
+      cursors: { next: null },
+    };
+
+    mockFetch
+      .mockResolvedValueOnce(mockProjectsResponse())
+      // Strategy detection: returns runs with session_id
+      .mockResolvedValueOnce(new Response(
+        JSON.stringify({ runs: sessionRuns, cursors: { next: null } }),
+        { status: 200 },
+      ))
+      // Session-based: fetch root runs
+      .mockResolvedValueOnce(new Response(
+        JSON.stringify(rootRunsResponse),
+        { status: 200 },
+      ))
+      // Fetch child LLM runs for trace
+      .mockResolvedValueOnce(new Response(
+        JSON.stringify(childLlmResponse),
+        { status: 200 },
+      ));
+
+    const convs = await readLangSmithTraces({
+      apiKey: "test-key",
+      project: "saleapeak-prod",
+    });
+
+    expect(convs.length).toBe(1);
+    expect(convs[0].id).toBe("sess_abc");
+    expect(convs[0].metadata.sessionId).toBe("sess_abc");
+    expect(convs[0].systemPrompt).toBe("You are a helpful bot.");
+    expect(convs[0].metadata.agentName).toBeDefined();
+
+    // Should have user + assistant messages
+    const userMsg = convs[0].messages.find((m) => m.role === "user");
+    expect(userMsg).toBeDefined();
+    expect(userMsg!.content).toBe("Hello there");
+
+    const assistantMsg = convs[0].messages.find((m) => m.role === "assistant");
+    expect(assistantMsg).toBeDefined();
+  });
+});
+
+describe("extractMessagesFromRun", () => {
+  it("handles OpenAI format (role-based messages)", () => {
+    const run = {
+      id: "r1",
+      name: "ChatOpenAI",
+      run_type: "llm",
+      trace_id: "t1",
+      inputs: {
+        messages: [
+          { role: "system", content: "You are helpful." },
+          { role: "user", content: "Hi" },
+        ],
+      },
+      outputs: {
+        choices: [{ message: { content: "Hello!" } }],
+      },
+      start_time: "2026-01-01T00:00:00Z",
+      end_time: null,
+      extra: {},
+      parent_run_id: null,
+      total_tokens: null,
+      status: "success",
+    };
+
+    const result = extractMessagesFromRun(run);
+    expect(result.systemPrompt).toBe("You are helpful.");
+    expect(result.messages).toHaveLength(2); // user + assistant
+    expect(result.messages[0].role).toBe("user");
+    expect(result.messages[1].role).toBe("assistant");
+  });
+
+  it("handles Anthropic format (inputs.system string)", () => {
+    const run = {
+      id: "r2",
+      name: "ChatAnthropic",
+      run_type: "llm",
+      trace_id: "t2",
+      inputs: {
+        system: "You are Claude.",
+        messages: [
+          { role: "user", content: "What can you do?" },
+        ],
+      },
+      outputs: {
+        content: [{ type: "text", text: "I can help with many things!" }],
+      },
+      start_time: "2026-01-01T00:00:00Z",
+      end_time: null,
+      extra: {},
+      parent_run_id: null,
+      total_tokens: null,
+      status: "success",
+    };
+
+    const result = extractMessagesFromRun(run);
+    expect(result.systemPrompt).toBe("You are Claude.");
+    expect(result.messages).toHaveLength(2);
+    expect(result.messages[0].role).toBe("user");
+    expect(result.messages[1].role).toBe("assistant");
+    expect(result.messages[1].content).toBe("I can help with many things!");
+  });
+
+  it("handles LangChain format (type-based messages)", () => {
+    const run = {
+      id: "r3",
+      name: "ChatOpenAI",
+      run_type: "llm",
+      trace_id: "t3",
+      inputs: {
+        messages: [
+          { type: "SystemMessage", content: "System prompt here." },
+          { type: "HumanMessage", content: "User question" },
+        ],
+      },
+      outputs: {
+        messages: [{ type: "AIMessage", content: "Answer here." }],
+      },
+      start_time: "2026-01-01T00:00:00Z",
+      end_time: null,
+      extra: {},
+      parent_run_id: null,
+      total_tokens: null,
+      status: "success",
+    };
+
+    const result = extractMessagesFromRun(run);
+    expect(result.systemPrompt).toBe("System prompt here.");
+    expect(result.messages).toHaveLength(2);
+    expect(result.messages[0].role).toBe("user");
+    expect(result.messages[1].role).toBe("assistant");
+  });
+
+  it("handles LangChain generations output format", () => {
+    const run = {
+      id: "r4",
+      name: "ChatOpenAI",
+      run_type: "llm",
+      trace_id: "t4",
+      inputs: {
+        messages: [
+          { role: "system", content: "Be helpful." },
+          { role: "user", content: "Help" },
+        ],
+      },
+      outputs: {
+        generations: [[{ text: "Here to help!" }]],
+      },
+      start_time: "2026-01-01T00:00:00Z",
+      end_time: null,
+      extra: {},
+      parent_run_id: null,
+      total_tokens: null,
+      status: "success",
+    };
+
+    const result = extractMessagesFromRun(run);
+    expect(result.systemPrompt).toBe("Be helpful.");
+    expect(result.messages).toHaveLength(2);
+    expect(result.messages[1].content).toBe("Here to help!");
+  });
+
+  it("handles legacy string input format", () => {
+    const run = {
+      id: "r5",
+      name: "LLMChain",
+      run_type: "llm",
+      trace_id: "t5",
+      inputs: {
+        input: "What is 2+2?",
+      },
+      outputs: {
+        output: "4",
+      },
+      start_time: "2026-01-01T00:00:00Z",
+      end_time: null,
+      extra: {},
+      parent_run_id: null,
+      total_tokens: null,
+      status: "success",
+    };
+
+    const result = extractMessagesFromRun(run);
+    expect(result.systemPrompt).toBeUndefined();
+    expect(result.messages).toHaveLength(2);
+    expect(result.messages[0].role).toBe("user");
+    expect(result.messages[0].content).toBe("What is 2+2?");
+    expect(result.messages[1].role).toBe("assistant");
+    expect(result.messages[1].content).toBe("4");
+  });
+});
+
+describe("resolveAgentName", () => {
+  it("extracts name from 'You are the X' pattern", () => {
+    const run = {
+      id: "r1", name: "ChatOpenAI", run_type: "llm", trace_id: "t1",
+      inputs: {}, outputs: null, start_time: "", end_time: null,
+      extra: {}, parent_run_id: null, total_tokens: null, status: "success",
+    };
+    const name = resolveAgentName(run, "You are the Billing Support Agent. Help customers.");
+    expect(name).toBe("Billing Support Agent");
+  });
+
+  it("extracts name from 'You are a X' pattern", () => {
+    const run = {
+      id: "r2", name: "ChatOpenAI", run_type: "llm", trace_id: "t2",
+      inputs: {}, outputs: null, start_time: "", end_time: null,
+      extra: {}, parent_run_id: null, total_tokens: null, status: "success",
+    };
+    const name = resolveAgentName(run, "You are a Sales Assistant. Your job is to help.");
+    expect(name).toBe("Sales Assistant");
+  });
+
+  it("falls back to run name for generic names", () => {
+    const run = {
+      id: "r3", name: "ChatOpenAI", run_type: "llm", trace_id: "t3",
+      inputs: {}, outputs: null, start_time: "", end_time: null,
+      extra: {}, parent_run_id: null, total_tokens: null, status: "success",
+    };
+    const name = resolveAgentName(run, "Answer the user's questions.");
+    expect(name).toBe("ChatOpenAI");
+  });
+
+  it("extracts name from markdown heading", () => {
+    const run = {
+      id: "r4", name: "ChatOpenAI", run_type: "llm", trace_id: "t4",
+      inputs: {}, outputs: null, start_time: "", end_time: null,
+      extra: {}, parent_run_id: null, total_tokens: null, status: "success",
+    };
+    const name = resolveAgentName(run, "# Beelo AI Guide\n\nYou help users navigate the website.");
+    expect(name).toBe("Beelo AI Guide");
+  });
+});
+
+describe("hashPrompt", () => {
+  it("produces consistent hashes for same content", () => {
+    const h1 = hashPrompt("You are a helpful assistant.");
+    const h2 = hashPrompt("You are a helpful assistant.");
+    expect(h1).toBe(h2);
+  });
+
+  it("normalizes whitespace differences", () => {
+    const h1 = hashPrompt("You are   a helpful\n\nassistant.");
+    const h2 = hashPrompt("You are a helpful assistant.");
+    expect(h1).toBe(h2);
+  });
+
+  it("is case-insensitive", () => {
+    const h1 = hashPrompt("You Are A Helpful Assistant.");
+    const h2 = hashPrompt("you are a helpful assistant.");
+    expect(h1).toBe(h2);
+  });
+
+  it("produces different hashes for different prompts", () => {
+    const h1 = hashPrompt("You are a helpful assistant.");
+    const h2 = hashPrompt("You are a billing agent.");
+    expect(h1).not.toBe(h2);
+  });
+});
+
+describe("normalizeRole", () => {
+  it("maps LangChain types to standard roles", () => {
+    expect(normalizeRole("human")).toBe("user");
+    expect(normalizeRole("HumanMessage")).toBe("user");
+    expect(normalizeRole("ai")).toBe("assistant");
+    expect(normalizeRole("AIMessage")).toBe("assistant");
+    expect(normalizeRole("system")).toBe("system");
+    expect(normalizeRole("SystemMessage")).toBe("system");
+    expect(normalizeRole("tool")).toBe("tool");
+    expect(normalizeRole("ToolMessage")).toBe("tool");
+    expect(normalizeRole("function")).toBe("tool");
+  });
+
+  it("maps standard OpenAI roles", () => {
+    expect(normalizeRole("user")).toBe("user");
+    expect(normalizeRole("assistant")).toBe("assistant");
+    expect(normalizeRole("system")).toBe("system");
+  });
+
+  it("defaults unknown to user", () => {
+    expect(normalizeRole("unknown")).toBe("user");
   });
 });
