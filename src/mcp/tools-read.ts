@@ -34,6 +34,7 @@ export function registerReadTools(server: McpServer): void {
         .describe("Directory containing report.json (default: current directory)"),
     },
   }, async ({ report_dir }) => {
+    try {
     const reportDir = resolve(process.cwd(), report_dir ?? ".");
     const reportPath = resolve(reportDir, "report.json");
 
@@ -87,10 +88,13 @@ export function registerReadTools(server: McpServer): void {
       criticalIssues: criticalCount,
       worstPolicies,
       metricSummary: report.metricSummary,
-      topRecommendation: report.failurePatterns.topRecommendations[0] ?? null,
-      totalFailures: report.failurePatterns.totalFailures,
+      topRecommendation: report.failurePatterns?.topRecommendations?.[0] ?? null,
+      totalFailures: report.failurePatterns?.totalFailures ?? 0,
       nextStep,
     });
+    } catch (error) {
+      return errorResult(error instanceof Error ? error.message : String(error));
+    }
   });
 
   // -------------------------------------------------------------------------

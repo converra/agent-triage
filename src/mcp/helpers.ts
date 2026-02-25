@@ -225,7 +225,8 @@ export async function generateDiagnosisForResult(
       failureSubtype: String(parsed.failureSubtype ?? ""),
       blastRadius: Array.isArray(parsed.blastRadius) ? parsed.blastRadius.map(String) : [],
     };
-  } catch {
+  } catch (error) {
+    console.error(`[agent-triage] Diagnosis generation failed: ${error}`);
     return undefined;
   }
 }

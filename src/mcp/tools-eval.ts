@@ -130,8 +130,15 @@ export function registerEvalTools(server: McpServer): void {
       const reportPath = resolve(reportDir, "report.json");
       const hasReport = existsSync(reportPath);
 
-      // --worst or no conversation_id: find worst from report
-      if (params.worst || !params.conversation_id) {
+      // Require explicit worst=true or a conversation_id
+      if (!params.worst && !params.conversation_id) {
+        return errorResult(
+          "Provide a conversation_id to explain, or use worst=true to diagnose the worst failing conversation.",
+        );
+      }
+
+      // --worst: find worst from report
+      if (params.worst) {
         if (!hasReport) {
           return errorResult(
             "No report.json found. Run triage_analyze first, or provide a conversation_id.",
@@ -282,7 +289,7 @@ export function registerEvalTools(server: McpServer): void {
         .optional()
         .describe("Compliance threshold percentage for pass/fail"),
     },
-    annotations: { readOnlyHint: true },
+    annotations: { readOnlyHint: false },
   }, async (params) => {
     try {
       let policies = loadPoliciesFromFile(params.policies_path);
@@ -450,6 +457,11 @@ export function registerEvalTools(server: McpServer): void {
         return errorResult("No conversations found matching filters.");
       }
 
+      // Resolve LLM — single client for both auto-discovery and evaluation
+      const config = await loadConfig({ prompt: { path: params.prompt_path ?? "." } });
+      const apiKey = resolveApiKey(config);
+      const llm = createLlmClient(config.llm.provider, apiKey, config.llm.model, config.llm.baseUrl);
+
       // Resolve policies
       const policiesPath = resolve(process.cwd(), params.policies_path ?? "policies.json");
       const hasPoliciesFile = existsSync(policiesPath);
@@ -463,7 +475,6 @@ export function registerEvalTools(server: McpServer): void {
         policies = PoliciesFileSchema.parse(JSON.parse(policiesRaw));
         policiesHash = computePoliciesHash(policiesRaw);
       } else {
-        const llm = await resolveLlm();
         const discovery = await autoExtractPolicies(llm, limited);
         policies = discovery.policies;
         systemPrompt = discovery.systemPrompt;
@@ -481,11 +492,6 @@ export function registerEvalTools(server: McpServer): void {
       if (params.prompt_path) {
         systemPrompt = await readFile(resolve(process.cwd(), params.prompt_path), "utf-8");
       }
-
-      // Resolve LLM
-      const config = await loadConfig({ prompt: { path: params.prompt_path ?? "." } });
-      const apiKey = resolveApiKey(config);
-      const llm = createLlmClient(config.llm.provider, apiKey, config.llm.model, config.llm.baseUrl);
 
       if (!systemPrompt) {
         for (const conv of limited) {
