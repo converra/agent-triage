@@ -2,6 +2,8 @@
 export { readJsonTraces } from "./ingestion/json.js";
 export { readLangSmithTraces } from "./ingestion/langsmith.js";
 export { readOtelTraces, OTEL_SEMCONV_VERSION } from "./ingestion/otel.js";
+export { autoExtractPolicies, discoverAgents } from "./ingestion/auto-discovery.js";
+export type { DiscoveredAgent, DiscoveryResult } from "./ingestion/auto-discovery.js";
 export type { NormalizedConversation, Message } from "./ingestion/types.js";
 
 export { extractPolicies } from "./policy/extractor.js";
