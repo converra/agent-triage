@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { parse as parseYaml } from "yaml";
 import { ConfigSchema, type Config } from "./schema.js";
-import { buildDefaultConfig } from "./defaults.js";
+import { buildDefaultConfig, getDefaultModel } from "./defaults.js";
 
 const CONFIG_FILENAMES = [
   "agent-triage.config.yaml",
@@ -44,6 +44,12 @@ export async function loadConfig(overrides?: Record<string, unknown>): Promise<C
 
   const resolved = resolveEnvVarsDeep(fileConfig) as Record<string, unknown>;
   const merged = deepMerge(resolved, overrides ?? {});
+
+  // If provider is set but model is not, use provider-specific default
+  const llm = merged.llm as Record<string, unknown> | undefined;
+  if (llm?.provider && !llm.model) {
+    llm.model = getDefaultModel(llm.provider as string);
+  }
 
   return ConfigSchema.parse(merged);
 }

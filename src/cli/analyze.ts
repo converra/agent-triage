@@ -1,4 +1,4 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { loadConfig, resolveApiKey } from "../config/loader.js";
@@ -162,8 +162,9 @@ export async function analyzeCommand(options: AnalyzeOptions): Promise<void> {
       console.log(`Policies: ${policies.length}`);
       console.log(`Mode: ${options.quick ? "quick (policy checks only)" : "full (metrics + policies + diagnosis + fixes)"}`);
       console.log(`Estimated LLM calls: ~${totalCalls}`);
+      const modelLabel = options.model ?? options.provider ?? "gpt-4o-mini";
       console.log(
-        `Estimated cost with gpt-4o-mini: ~$${(limited.length * (options.quick ? 0.006 : 0.012) + (options.quick ? 0 : 0.15)).toFixed(2)}`,
+        `Estimated cost with ${modelLabel}: ~$${(limited.length * (options.quick ? 0.006 : 0.012) + (options.quick ? 0 : 0.15)).toFixed(2)}`,
       );
       console.log(`\nRun without --dry-run to proceed.`);
     }
@@ -345,6 +346,9 @@ export async function analyzeCommand(options: AnalyzeOptions): Promise<void> {
 
   // Write report files
   const outputDir = resolve(process.cwd(), options.output ?? ".");
+  if (!existsSync(outputDir)) {
+    await mkdir(outputDir, { recursive: true });
+  }
   const reportPath = resolve(outputDir, "report.json");
   await writeFile(reportPath, JSON.stringify(report, null, 2), "utf-8");
 
