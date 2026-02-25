@@ -24,6 +24,7 @@ interface ExplainOptions {
   provider?: string;
   model?: string;
   apiKey?: string;
+  langsmithApiKey?: string;
   worst?: boolean;
   since?: string;
   agent?: string;
@@ -216,7 +217,7 @@ async function fetchConversation(
 
   if (options.langsmith) {
     const config = await loadConfig({ prompt: { path: "." } });
-    const apiKey = options.apiKey ?? process.env.LANGSMITH_API_KEY ?? config.traces?.apiKey;
+    const apiKey = options.langsmithApiKey ?? process.env.LANGSMITH_API_KEY ?? config.traces?.apiKey;
     if (!apiKey) {
       console.error("Error: No LangSmith API key found.");
       process.exit(1);
