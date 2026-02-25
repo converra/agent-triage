@@ -1,4 +1,5 @@
 import type { Policy } from "../policy/types.js";
+import type { NormalizedConversation } from "../ingestion/types.js";
 
 /**
  * Prompt 1: Policy Extraction
@@ -298,4 +299,55 @@ Return ONLY valid JSON:
     }
   ]
 }`;
+}
+
+/**
+ * Prompt 7: Behavioral Policy Inference
+ * Input: sample conversations (when no system prompt is available)
+ * Output: JSON array of inferred policies
+ */
+export function buildBehavioralInferencePrompt(
+  conversations: NormalizedConversation[],
+): string {
+  const formatted = conversations
+    .map((conv, i) => {
+      const turns = conv.messages
+        .map((m) => `  ${m.role}: ${m.content.slice(0, 500)}`)
+        .join("\n");
+      return `Conversation ${i + 1} (${conv.id}):\n${turns}`;
+    })
+    .join("\n\n---\n\n");
+
+  return `You are an expert AI agent auditor. You are analyzing ${conversations.length} conversations from an AI agent, but NO system prompt is available.
+
+Your job is to INFER the behavioral policies and rules this agent appears to follow by observing its behavior patterns across these conversations.
+
+CONVERSATIONS:
+<conversations>
+${formatted}
+</conversations>
+
+Analyze the agent's behavior patterns and extract testable policies. Look for:
+- Consistent greeting or sign-off patterns
+- Topics the agent handles vs. deflects
+- Escalation patterns (when does it hand off to humans?)
+- Tone and formality level
+- Knowledge boundaries (what does it claim to know vs. not know?)
+- Safety behaviors (what does it refuse to do?)
+- Formatting conventions (lists, links, markdown usage)
+- Multi-turn behaviors (context retention, follow-up handling)
+
+For each policy, provide:
+- id: a short kebab-case slug
+- name: human-readable name
+- description: what the policy requires — specific enough to test
+- complexity: 1-5
+- category: one of "routing", "tone", "safety", "knowledge", "behavior", "formatting"
+
+Return ONLY a JSON array of policy objects. No additional text.
+
+[
+  {"id": "...", "name": "...", "description": "...", "complexity": 1, "category": "..."},
+  ...
+]`;
 }

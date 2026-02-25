@@ -9,6 +9,9 @@ import { analyzeCommand } from "./analyze.js";
 import { viewCommand } from "./view.js";
 import { diffCommand } from "./diff.js";
 import { demoCommand } from "./demo.js";
+import { explainCommand } from "./explain.js";
+import { checkCommand } from "./check.js";
+import { statusCommand } from "./status.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(resolve(__dirname, "../../package.json"), "utf-8")) as { version: string };
@@ -60,7 +63,56 @@ program
   .option("--include-prompt", "Include system prompt in report")
   .option("--summary-only", "Generate summary report without trace transcripts")
   .option("-o, --output <dir>", "Output directory", ".")
+  .option("--since <duration>", "Only include traces after this time (e.g. 2h, 24h, 7d)")
+  .option("--until <duration>", "Only include traces before this time")
+  .option("--agent <name>", "Filter to a specific agent by name")
+  .option("--quick", "Skip diagnosis and fix generation (faster, cheaper)")
+  .option("--format <format>", "Output format: terminal (default), json")
   .action(wrapAction(analyzeCommand));
+
+program
+  .command("explain [conversation-id]")
+  .description("Deep-dive diagnosis of a single conversation")
+  .option("--worst", "Explain the worst conversation from the last report")
+  .option("--langsmith <project>", "LangSmith project name (to fetch conversation)")
+  .option("--traces <path>", "Path to JSON traces file")
+  .option("--otel <path>", "Path to OTLP/JSON export file")
+  .option("--policies <path>", "Path to policies.json", "policies.json")
+  .option("-p, --prompt <path>", "Path to system prompt file")
+  .option("--provider <provider>", "LLM provider")
+  .option("--model <model>", "LLM model")
+  .option("--api-key <key>", "LLM API key")
+  .option("--since <duration>", "Time filter for trace source")
+  .option("--agent <name>", "Agent filter")
+  .option("--format <format>", "Output format: terminal (default), json")
+  .action(wrapAction(explainCommand));
+
+program
+  .command("check")
+  .description("Targeted policy compliance check (no metrics, faster than analyze)")
+  .option("--traces <path>", "Path to JSON traces file")
+  .option("--langsmith <project>", "LangSmith project name")
+  .option("--otel <path>", "Path to OTLP/JSON export file")
+  .option("--policies <path>", "Path to policies.json", "policies.json")
+  .option("--policy <id>", "Check specific policy (repeatable)", (val: string, prev: string[]) => [...prev, val], [] as string[])
+  .option("-p, --prompt <path>", "Path to system prompt file")
+  .option("--provider <provider>", "LLM provider")
+  .option("--model <model>", "LLM model")
+  .option("--api-key <key>", "LLM API key")
+  .option("--since <duration>", "Only include traces after this time (e.g. 2h, 24h, 7d)")
+  .option("--until <duration>", "Only include traces before this time")
+  .option("--agent <name>", "Filter to a specific agent by name")
+  .option("--max-conversations <n>", "Maximum traces to check")
+  .option("--threshold <n>", "Exit with code 1 if compliance below this % (for CI)")
+  .option("--format <format>", "Output format: terminal (default), json")
+  .action(wrapAction(checkCommand));
+
+program
+  .command("status")
+  .description("Quick health check from the last report (zero LLM cost)")
+  .option("-r, --report <dir>", "Directory containing report.json", ".")
+  .option("--format <format>", "Output format: terminal (default), json")
+  .action(wrapAction(statusCommand));
 
 program
   .command("view")

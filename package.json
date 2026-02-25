@@ -4,7 +4,8 @@
   "description": "Diagnose your AI agents in production — extract behavioral policies from prompts, evaluate traces against them, and generate diagnostic reports.",
   "type": "module",
   "bin": {
-    "agent-triage": "./dist/cli/index.js"
+    "agent-triage": "./dist/cli/index.js",
+    "agent-triage-mcp": "./dist/mcp/index.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -15,7 +16,7 @@
     }
   },
   "scripts": {
-    "build": "tsc && chmod +x dist/cli/index.js",
+    "build": "tsc && chmod +x dist/cli/index.js dist/mcp/index.js",
     "clean": "rm -rf dist",
     "dev": "tsx src/cli/index.ts",
     "test": "vitest run",
@@ -73,6 +74,7 @@
   ],
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
+    "@modelcontextprotocol/sdk": "1.27.1",
     "commander": "^13.1.0",
     "openai": "^4.82.0",
     "yaml": "^2.7.0",

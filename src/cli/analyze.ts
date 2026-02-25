@@ -25,8 +25,11 @@ import {
 } from "../evaluation/progress.js";
 import type { Report } from "../evaluation/types.js";
 import { buildHtml } from "../report/generator.js";
+import { autoExtractPolicies } from "../ingestion/auto-discovery.js";
+import type { LlmClient } from "../llm/client.js";
+import { applyFilters, parseDuration, createLogger } from "./filters.js";
 
-interface AnalyzeOptions {
+export interface AnalyzeOptions {
   traces?: string;
   langsmith?: string;
   otel?: string;
@@ -40,65 +43,129 @@ interface AnalyzeOptions {
   includePrompt?: boolean;
   summaryOnly?: boolean;
   output?: string;
+  since?: string;
+  until?: string;
+  agent?: string;
+  quick?: boolean;
+  format?: string;
 }
 
 export async function analyzeCommand(options: AnalyzeOptions): Promise<void> {
   const startTime = Date.now();
+  const jsonMode = options.format === "json";
+  const log = createLogger(jsonMode);
 
-  // Load policies
+  // Ingest traces (with time filters pushed to API for LangSmith)
+  const conversations = await ingestTraces(options, log);
+
+  // Apply post-ingestion filters (agent name, time for non-LangSmith sources)
+  const filtered = applyFilters(conversations, {
+    since: options.langsmith ? undefined : options.since, // LangSmith handles time server-side
+    until: options.langsmith ? undefined : options.until,
+    agent: options.agent,
+  });
+
+  if (options.agent && filtered.length < conversations.length) {
+    log.log(`Filtered to agent "${options.agent}": ${filtered.length} conversations.`);
+  }
+
+  const maxConvs = options.maxConversations
+    ? (() => {
+        const n = parseInt(options.maxConversations, 10);
+        if (isNaN(n) || n <= 0) {
+          console.error(`Error: --max-conversations must be a positive number, got "${options.maxConversations}".`);
+          process.exit(1);
+        }
+        return n;
+      })()
+    : DEFAULT_MAX_CONVERSATIONS;
+
+  if (filtered.length > maxConvs) {
+    log.warn(
+      `\nWarning: ${filtered.length} conversations found, limit is ${maxConvs}. Truncating.\n`,
+    );
+  }
+
+  const limited = filtered.slice(0, maxConvs);
+  log.log(`\nLoaded ${limited.length} conversations.`);
+
+  // Resolve policies: from file, or auto-discover
   const policiesPath = resolve(
     process.cwd(),
     options.policies ?? "policies.json",
   );
-  if (!existsSync(policiesPath)) {
-    console.error(
-      "Error: No policies.json found.\n" +
-        "Run `agent-triage init --prompt <path>` first to extract policies.",
+  const hasPoliciesFile = existsSync(policiesPath);
+
+  let policies: Policy[];
+  let systemPrompt = "";
+  let policiesHash: string;
+
+  if (hasPoliciesFile) {
+    const policiesRaw = await readFile(policiesPath, "utf-8");
+    policies = PoliciesFileSchema.parse(JSON.parse(policiesRaw));
+    policiesHash = computePoliciesHash(policiesRaw);
+    log.log(`Loaded ${policies.length} policies from ${policiesPath}`);
+  } else {
+    log.log(`No policies.json found. Starting auto-discovery...\n`);
+
+    const llm = await createLlmForOptions(options);
+    const discovery = await autoExtractPolicies(llm, limited);
+    policies = discovery.policies;
+    systemPrompt = discovery.systemPrompt;
+
+    if (policies.length === 0) {
+      console.error(
+        "Error: Auto-discovery could not extract any policies.\n" +
+          "Provide policies manually: run `agent-triage init --prompt <path>` first.",
+      );
+      process.exit(1);
+    }
+
+    const outputPoliciesPath = resolve(process.cwd(), "policies.json");
+    await writeFile(
+      outputPoliciesPath,
+      JSON.stringify(policies, null, 2),
+      "utf-8",
     );
-    process.exit(1);
+    log.log(`Saved to ${outputPoliciesPath}.`);
+
+    const policiesRaw = JSON.stringify(policies);
+    policiesHash = computePoliciesHash(policiesRaw);
   }
 
-  const policiesRaw = await readFile(policiesPath, "utf-8");
-  const policies: Policy[] = PoliciesFileSchema.parse(JSON.parse(policiesRaw));
-  const policiesHash = computePoliciesHash(policiesRaw);
-  console.log(`Loaded ${policies.length} policies from ${policiesPath}`);
-
-  // Load system prompt (needed for evaluation ground truth)
-  let systemPrompt = "";
+  // Load system prompt from flag if provided
   const promptPath = options.prompt;
   if (promptPath) {
     systemPrompt = await readFile(resolve(process.cwd(), promptPath), "utf-8");
   }
 
-  // Ingest traces
-  const conversations = await ingestTraces(options);
-  const maxConvs = options.maxConversations
-    ? parseInt(options.maxConversations, 10)
-    : DEFAULT_MAX_CONVERSATIONS;
-
-  if (conversations.length > maxConvs) {
-    console.warn(
-      `\nWarning: ${conversations.length} conversations found, limit is ${maxConvs}. Truncating.\n`,
-    );
-  }
-
-  const limited = conversations.slice(0, maxConvs);
-  console.log(`\nLoaded ${limited.length} conversations.`);
-
   // Dry run — estimate cost and exit
   if (options.dryRun) {
-    const evalCalls = limited.length * 2;
-    const diagCalls = Math.min(10, limited.length);
-    const fixCalls = policies.length + 1;
+    const evalCalls = limited.length * (options.quick ? 1 : 2);
+    const diagCalls = options.quick ? 0 : Math.min(10, limited.length);
+    const fixCalls = options.quick ? 0 : policies.length + 1;
     const totalCalls = evalCalls + diagCalls + fixCalls;
-    console.log(`\n--- Dry Run ---`);
-    console.log(`Conversations: ${limited.length}`);
-    console.log(`Policies: ${policies.length}`);
-    console.log(`Estimated LLM calls: ~${totalCalls}`);
-    console.log(
-      `Estimated cost with gpt-4o-mini: ~$${(limited.length * 0.012 + 0.15).toFixed(2)}`,
-    );
-    console.log(`\nRun without --dry-run to proceed.`);
+
+    if (jsonMode) {
+      console.log(JSON.stringify({
+        dryRun: true,
+        conversations: limited.length,
+        policies: policies.length,
+        estimatedCalls: totalCalls,
+        estimatedCost: limited.length * (options.quick ? 0.006 : 0.012) + (options.quick ? 0 : 0.15),
+        quick: options.quick ?? false,
+      }));
+    } else {
+      console.log(`\n--- Dry Run ---`);
+      console.log(`Conversations: ${limited.length}`);
+      console.log(`Policies: ${policies.length}`);
+      console.log(`Mode: ${options.quick ? "quick (policy checks only)" : "full (metrics + policies + diagnosis + fixes)"}`);
+      console.log(`Estimated LLM calls: ~${totalCalls}`);
+      console.log(
+        `Estimated cost with gpt-4o-mini: ~$${(limited.length * (options.quick ? 0.006 : 0.012) + (options.quick ? 0 : 0.15)).toFixed(2)}`,
+      );
+      console.log(`\nRun without --dry-run to proceed.`);
+    }
     return;
   }
 
@@ -124,20 +191,20 @@ export async function analyzeCommand(options: AnalyzeOptions): Promise<void> {
     config.llm.baseUrl,
   );
 
-  console.log(`\nUsing ${config.llm.provider}/${config.llm.model}`);
+  log.log(`\nUsing ${config.llm.provider}/${config.llm.model}`);
 
   // Check for previous progress
   const previousResults = await loadProgress(policiesHash);
   if (previousResults && previousResults.size > 0) {
     const remaining = limited.length - previousResults.size;
     const estCost = (remaining * 0.012).toFixed(2);
-    console.log(
+    log.log(
       `\nFound partial results: ${previousResults.size}/${limited.length} evaluated.` +
         ` Remaining cost: ~$${estCost}. Resuming...\n`,
     );
   }
 
-  // If no system prompt from flag, try to get from first conversation
+  // If no system prompt from flag or auto-discovery, try to get from first conversation
   if (!systemPrompt) {
     for (const conv of limited) {
       if (conv.systemPrompt) {
@@ -148,64 +215,71 @@ export async function analyzeCommand(options: AnalyzeOptions): Promise<void> {
   }
 
   if (!systemPrompt) {
-    console.warn(
+    log.warn(
       "Warning: No system prompt found. Evaluation may be less accurate.\n" +
         "Use --prompt <path> to provide the agent's system prompt.\n",
     );
   }
 
   // Step 1: Evaluate all conversations (metrics + policy checks)
-  console.log("Evaluating conversations...");
+  log.log("Evaluating conversations...");
   const results = await evaluateAll(llm, limited, policies, systemPrompt, {
     concurrency: config.llm.maxConcurrency,
     policiesHash,
     previousResults: previousResults ?? undefined,
-    onProgress: (completed, total, id) => {
-      const pct = Math.round((completed / total) * 100);
-      process.stdout.write(
-        `\r  Progress: ${completed}/${total} (${pct}%) — ${id}    `,
-      );
-    },
+    onProgress: jsonMode
+      ? undefined
+      : (completed, total, id) => {
+          const pct = Math.round((completed / total) * 100);
+          process.stdout.write(
+            `\r  Progress: ${completed}/${total} (${pct}%) — ${id}    `,
+          );
+        },
   });
-  process.stdout.write("\n");
+  if (!jsonMode) process.stdout.write("\n");
 
   // Step 2: Aggregate failure patterns (no LLM needed)
   const failurePatterns = aggregateFailurePatterns(results);
   const totalFailures = failurePatterns.reduce((s, p) => s + p.count, 0);
-  console.log(`\nFailure patterns: ${failurePatterns.length} types, ${totalFailures} total failures.`);
+  log.log(`\nFailure patterns: ${failurePatterns.length} types, ${totalFailures} total failures.`);
 
-  // Step 3: Generate step-level diagnoses for worst conversations
-  console.log("Generating diagnoses for worst conversations...");
-  await generateDiagnoses(llm, results, limited, systemPrompt, (cur, total) => {
-    process.stdout.write(`\r  Diagnosing: ${cur}/${total}    `);
-  });
-  process.stdout.write("\n");
-
-  // Step 4: Generate fixes for failing policies
-  console.log("Generating directional fixes...");
-  const fixes = await generateFixes(
-    llm,
-    policies,
-    results,
-    failurePatterns,
-    (cur, total) => {
-      process.stdout.write(`\r  Fixes: ${cur}/${total}    `);
-    },
-  );
-  process.stdout.write("\n");
-
-  // Step 5: Generate top recommendations
-  console.log("Generating top recommendations...");
+  // Steps 3-5: Skip in quick mode
+  let fixes = new Map<string, { fix: string; blastRadius: string[] }>();
   let recommendations: Report["failurePatterns"]["topRecommendations"] = [];
-  try {
-    recommendations = await generateRecommendations(
+
+  if (!options.quick) {
+    // Step 3: Generate step-level diagnoses for worst conversations
+    log.log("Generating diagnoses for worst conversations...");
+    await generateDiagnoses(llm, results, limited, systemPrompt, jsonMode ? undefined : (cur, total) => {
+      process.stdout.write(`\r  Diagnosing: ${cur}/${total}    `);
+    });
+    if (!jsonMode) process.stdout.write("\n");
+
+    // Step 4: Generate fixes for failing policies
+    log.log("Generating directional fixes...");
+    fixes = await generateFixes(
       llm,
-      failurePatterns,
       policies,
       results,
+      failurePatterns,
+      jsonMode ? undefined : (cur, total) => {
+        process.stdout.write(`\r  Fixes: ${cur}/${total}    `);
+      },
     );
-  } catch (error) {
-    console.warn(`  Warning: Could not generate recommendations: ${error}`);
+    if (!jsonMode) process.stdout.write("\n");
+
+    // Step 5: Generate top recommendations
+    log.log("Generating top recommendations...");
+    try {
+      recommendations = await generateRecommendations(
+        llm,
+        failurePatterns,
+        policies,
+        results,
+      );
+    } catch (error) {
+      log.warn(`  Warning: Could not generate recommendations: ${error}`);
+    }
   }
 
   // Step 6: Aggregate and build report
@@ -213,7 +287,6 @@ export async function analyzeCommand(options: AnalyzeOptions): Promise<void> {
   const metricSummary = calculateMetricSummary(results);
   const overallCompliance = calculateOverallCompliance(results);
 
-  // Attach fixes to aggregated policies
   for (const policy of aggregated) {
     const fixResult = fixes.get(policy.id);
     if (fixResult) {
@@ -262,33 +335,48 @@ export async function analyzeCommand(options: AnalyzeOptions): Promise<void> {
     },
   };
 
-  // Write report
+  // JSON output mode: write to stdout and exit
+  if (jsonMode) {
+    console.log(JSON.stringify(report));
+    await cleanupProgress();
+    return;
+  }
+
+  // Write report files
   const outputDir = resolve(process.cwd(), options.output ?? ".");
   const reportPath = resolve(outputDir, "report.json");
   await writeFile(reportPath, JSON.stringify(report, null, 2), "utf-8");
 
-  // Generate HTML report
   const htmlPath = resolve(outputDir, "report.html");
   const html = buildHtml(report);
   await writeFile(htmlPath, html, "utf-8");
 
-  // Clean up progress file on success
   await cleanupProgress();
 
-  // Print summary
+  // Print terminal summary
+  printSummary(report, aggregated, metricSummary, reportPath, htmlPath, promptPath);
+}
+
+function printSummary(
+  report: Report,
+  aggregated: Array<{ id: string; name: string; complianceRate: number; failing: number; total: number }>,
+  metricSummary: Record<string, number>,
+  reportPath: string,
+  htmlPath: string,
+  promptPath?: string,
+): void {
   console.log(`\n${"═".repeat(60)}`);
   console.log(`  agent-triage Report`);
   console.log(`${"═".repeat(60)}`);
-  console.log(`  Conversations: ${results.length}`);
-  console.log(`  Policies: ${policies.length}`);
-  console.log(`  Overall Compliance: ${overallCompliance}%`);
-  console.log(`  Total Failures: ${totalFailures}`);
+  console.log(`  Conversations: ${report.totalConversations}`);
+  console.log(`  Policies: ${report.policies.length}`);
+  console.log(`  Overall Compliance: ${report.overallCompliance}%`);
+  console.log(`  Total Failures: ${report.failurePatterns.totalFailures}`);
   console.log(
-    `  Duration: ${Math.round(runDuration)}s | Cost: ~$${cost.toFixed(4)} (${totalTokens} tokens)`,
+    `  Duration: ${Math.round(report.runDuration)}s | Cost: ~$${report.cost.estimatedCost.toFixed(4)} (${report.cost.totalTokens} tokens)`,
   );
   console.log(`${"═".repeat(60)}`);
 
-  // Top failing policies
   const failing = aggregated
     .filter((p) => p.failing > 0)
     .sort((a, b) => a.complianceRate - b.complianceRate);
@@ -303,7 +391,6 @@ export async function analyzeCommand(options: AnalyzeOptions): Promise<void> {
     }
   }
 
-  // Metric summary
   console.log(`\n  Metrics:`);
   const keyMetrics = [
     "successScore",
@@ -329,11 +416,35 @@ export async function analyzeCommand(options: AnalyzeOptions): Promise<void> {
   console.log(`  Run \`agent-triage view\` to open in browser.\n`);
 }
 
+async function createLlmForOptions(options: AnalyzeOptions): Promise<LlmClient> {
+  const config = await loadConfig({
+    prompt: { path: options.prompt ?? "." },
+    ...(options.provider || options.model || options.apiKey
+      ? {
+          llm: {
+            ...(options.provider ? { provider: options.provider } : {}),
+            ...(options.model ? { model: options.model } : {}),
+            ...(options.apiKey ? { apiKey: options.apiKey } : {}),
+          },
+        }
+      : {}),
+  });
+
+  const apiKey = resolveApiKey(config);
+  return createLlmClient(
+    config.llm.provider,
+    apiKey,
+    config.llm.model,
+    config.llm.baseUrl,
+  );
+}
+
 async function ingestTraces(
   options: AnalyzeOptions,
+  log: ReturnType<typeof createLogger>,
 ): Promise<NormalizedConversation[]> {
   if (options.traces) {
-    console.log(`Reading traces from ${options.traces}...`);
+    log.log(`Reading traces from ${options.traces}...`);
     return readJsonTraces(options.traces);
   }
 
@@ -350,18 +461,22 @@ async function ingestTraces(
       );
       process.exit(1);
     }
-    console.log(
+
+    log.log(
       `Reading traces from LangSmith project: ${options.langsmith}...`,
     );
+
     return readLangSmithTraces({
       apiKey,
       project: options.langsmith,
       baseUrl: config.traces?.baseUrl,
+      startTime: options.since ? parseDuration(options.since) : undefined,
+      endTime: options.until ? parseDuration(options.until) : undefined,
     });
   }
 
   if (options.otel) {
-    console.log(`Reading OTLP/JSON traces from ${options.otel}...`);
+    log.log(`Reading OTLP/JSON traces from ${options.otel}...`);
     return readOtelTraces(options.otel);
   }
 
