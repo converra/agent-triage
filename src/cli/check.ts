@@ -23,6 +23,7 @@ interface CheckOptions {
   provider?: string;
   model?: string;
   apiKey?: string;
+  langsmithApiKey?: string;
   since?: string;
   until?: string;
   agent?: string;
@@ -267,13 +268,13 @@ async function ingestTraces(
   if (options.langsmith) {
     const config = await loadConfig({ prompt: { path: "." } });
     const apiKey =
-      options.apiKey ??
+      options.langsmithApiKey ??
       process.env.LANGSMITH_API_KEY ??
       config.traces?.apiKey;
     if (!apiKey) {
       console.error(
         "Error: No LangSmith API key found.\n" +
-          "Set LANGSMITH_API_KEY environment variable or pass --api-key.",
+          "Set LANGSMITH_API_KEY environment variable or pass --langsmith-api-key.",
       );
       process.exit(1);
     }
