@@ -478,6 +478,7 @@ async function ingestTraces(
       baseUrl: config.traces?.baseUrl,
       startTime: options.since ? parseDuration(options.since) : undefined,
       endTime: options.until ? parseDuration(options.until) : undefined,
+      limit: options.maxConversations ? parseInt(options.maxConversations, 10) || undefined : undefined,
     });
   }
 

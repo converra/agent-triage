@@ -193,11 +193,12 @@ async function ingestSessionBased(
   limit: number,
   timeFilters: Record<string, unknown> = {},
 ): Promise<NormalizedConversation[]> {
-  // Fetch root chain runs
+  // Fetch root chain runs — fetch enough to fill `limit` sessions
+  // Each session may have multiple root runs, so over-fetch
   const rootRuns = await fetchAllRuns(baseUrl, headers, projectId, {
     ...timeFilters,
     is_root: true,
-  }, limit * 2);
+  }, limit * 5);
 
   // Group by session_id
   const sessionMap = new Map<string, LangSmithRun[]>();
@@ -209,6 +210,27 @@ async function ingestSessionBased(
   }
 
   console.log(`Fetching sessions... found ${sessionMap.size} sessions.`);
+
+  // Collect unique trace IDs only for sessions we'll actually process (capped at limit)
+  const traceIds = new Set<string>();
+  let sessionsCollected = 0;
+  for (const runs of sessionMap.values()) {
+    if (sessionsCollected >= limit) break;
+    sessionsCollected++;
+    for (const run of runs) {
+      traceIds.add(run.trace_id);
+    }
+  }
+
+  // Pre-fetch all LLM runs for these traces (bounded by limit, not full project)
+  console.log(`Fetching LLM runs for ${traceIds.size} traces...`);
+  const llmRunsByTrace = await prefetchLlmRunsByTrace(
+    baseUrl,
+    headers,
+    projectId,
+    traceIds,
+  );
+  console.log(`Fetched LLM runs for ${llmRunsByTrace.size} traces.`);
 
   const conversations: NormalizedConversation[] = [];
 
@@ -228,13 +250,8 @@ async function ingestSessionBased(
     let agentName: string | undefined;
 
     for (const rootRun of runs) {
-      // Fetch child LLM runs for this trace
-      const childRuns = await fetchChildLlmRuns(
-        baseUrl,
-        headers,
-        projectId,
-        rootRun.trace_id,
-      );
+      // Use pre-fetched child LLM runs (cache hit, no API call)
+      const childRuns = llmRunsByTrace.get(rootRun.trace_id) ?? [];
 
       // Extract system prompt from first child LLM run that has one
       for (const child of childRuns) {
@@ -292,6 +309,39 @@ async function ingestSessionBased(
   }
 
   return conversations;
+}
+
+/**
+ * Pre-fetch LLM runs for a bounded set of trace IDs, grouped by trace.
+ * Uses per-trace queries with `trace_id` (single string per call).
+ * Only called after capping sessions at `limit`, so trace count is bounded.
+ */
+async function prefetchLlmRunsByTrace(
+  baseUrl: string,
+  headers: Record<string, string>,
+  projectId: string,
+  traceIds: Set<string>,
+): Promise<Map<string, LangSmithRun[]>> {
+  const runsByTrace = new Map<string, LangSmithRun[]>();
+  if (traceIds.size === 0) return runsByTrace;
+
+  let fetched = 0;
+  for (const traceId of traceIds) {
+    const runs = await fetchChildLlmRuns(baseUrl, headers, projectId, traceId);
+    if (runs.length > 0) {
+      runsByTrace.set(traceId, runs);
+    }
+    fetched++;
+    if (fetched % 10 === 0) {
+      console.log(`  Fetched LLM runs for ${fetched}/${traceIds.size} traces...`);
+    }
+    // Throttle to avoid rate limiting on large trace sets
+    if (fetched < traceIds.size) {
+      await new Promise((r) => setTimeout(r, RATE_LIMIT_DELAY_MS / 2));
+    }
+  }
+
+  return runsByTrace;
 }
 
 // ─── Message Extraction (multi-format) ───────────────────────────────
