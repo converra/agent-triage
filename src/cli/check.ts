@@ -90,7 +90,14 @@ export async function checkCommand(options: CheckOptions): Promise<void> {
   });
 
   const maxConvs = options.maxConversations
-    ? parseInt(options.maxConversations, 10)
+    ? (() => {
+        const n = parseInt(options.maxConversations, 10);
+        if (isNaN(n) || n <= 0) {
+          console.error(`Error: --max-conversations must be a positive number, got "${options.maxConversations}".`);
+          process.exit(1);
+        }
+        return n;
+      })()
     : DEFAULT_MAX_CONVERSATIONS;
 
   const limited = filtered.slice(0, maxConvs);
@@ -186,7 +193,16 @@ export async function checkCommand(options: CheckOptions): Promise<void> {
   const results = Array.from(allResults.values());
   const overallCompliance =
     results.reduce((sum, r) => sum + r.compliance, 0) / results.length;
-  const threshold = options.threshold ? parseInt(options.threshold, 10) : undefined;
+  const threshold = options.threshold
+    ? (() => {
+        const n = parseInt(options.threshold, 10);
+        if (isNaN(n) || n < 0 || n > 100) {
+          console.error(`Error: --threshold must be a number between 0 and 100, got "${options.threshold}".`);
+          process.exit(1);
+        }
+        return n;
+      })()
+    : undefined;
   const passed = threshold === undefined || overallCompliance >= threshold;
 
   // Output

@@ -69,6 +69,14 @@ export async function explainCommand(
   }
 
   // Not in report — fetch from trace source, evaluate, diagnose
+  if (!options.langsmith && !options.traces && !options.otel) {
+    console.error(
+      `Error: Conversation "${conversationId}" not found in report.json.\n` +
+        "Provide a trace source to fetch it: --langsmith, --traces, or --otel.",
+    );
+    process.exit(1);
+  }
+
   log.log(`Conversation not in report. Fetching and evaluating...\n`);
   const conv = await fetchConversation(conversationId, options, log);
   if (!conv) {
@@ -104,7 +112,7 @@ async function explainWorst(
       avgScore: averageMetrics(c.metrics),
     }))
     .filter((s) => s.failCount > 0)
-    .sort((a, b) => a.avgScore - b.avgScore);
+    .sort((a, b) => b.failCount - a.failCount || a.avgScore - b.avgScore);
 
   if (scored.length === 0) {
     log.log("No failing conversations found. All policies passing.");
@@ -396,6 +404,7 @@ function outputExplanation(
 
 function averageMetrics(metrics: Record<string, number>): number {
   const values = Object.values(metrics);
+  if (values.length === 0) return 0;
   return values.reduce((sum, v) => sum + v, 0) / values.length;
 }
 

@@ -70,7 +70,14 @@ export async function analyzeCommand(options: AnalyzeOptions): Promise<void> {
   }
 
   const maxConvs = options.maxConversations
-    ? parseInt(options.maxConversations, 10)
+    ? (() => {
+        const n = parseInt(options.maxConversations, 10);
+        if (isNaN(n) || n <= 0) {
+          console.error(`Error: --max-conversations must be a positive number, got "${options.maxConversations}".`);
+          process.exit(1);
+        }
+        return n;
+      })()
     : DEFAULT_MAX_CONVERSATIONS;
 
   if (filtered.length > maxConvs) {

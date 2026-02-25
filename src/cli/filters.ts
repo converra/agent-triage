@@ -15,7 +15,13 @@ export interface FilterSpec {
 export function parseDuration(input: string): string {
   // If it looks like an ISO date already, return as-is
   if (input.includes("T") || input.includes("-")) {
-    return new Date(input).toISOString();
+    const date = new Date(input);
+    if (isNaN(date.getTime())) {
+      throw new Error(
+        `Invalid duration: "${input}". Use format like "2h", "24h", "7d", or a valid ISO date.`,
+      );
+    }
+    return date.toISOString();
   }
 
   const match = input.match(/^(\d+)(m|h|d|w)$/);

@@ -52,8 +52,8 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
 
   // Check staleness
   const reportAge = Date.now() - new Date(report.generatedAt).getTime();
-  const ageHours = Math.round(reportAge / 3_600_000);
-  const ageDays = Math.round(reportAge / 86_400_000);
+  const ageHours = Math.floor(reportAge / 3_600_000);
+  const ageDays = Math.floor(reportAge / 86_400_000);
   const ageStr =
     ageDays > 0
       ? `${ageDays}d ago`

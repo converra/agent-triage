@@ -48,6 +48,11 @@ describe("parseDuration", () => {
     expect(() => parseDuration("invalid")).toThrow("Invalid duration");
     expect(() => parseDuration("2x")).toThrow("Invalid duration");
   });
+
+  it("throws on invalid date-like strings", () => {
+    expect(() => parseDuration("not-a-date")).toThrow("Invalid duration");
+    expect(() => parseDuration("foo-bar-baz")).toThrow("Invalid duration");
+  });
 });
 
 describe("applyFilters", () => {
