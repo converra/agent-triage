@@ -33,6 +33,13 @@ npx agent-triage analyze --traces conversations.json --prompt system-prompt.txt
 npx agent-triage view
 ```
 
+Or skip the setup entirely — agent-triage can auto-discover agents and extract policies directly from LangSmith traces:
+
+```bash
+# Zero-config: auto-discovers agents, extracts policies, evaluates everything
+npx agent-triage analyze --langsmith my-project
+```
+
 ## Installation
 
 ```bash
@@ -55,6 +62,39 @@ export OPENAI_API_KEY=sk-...
 # or
 export ANTHROPIC_API_KEY=sk-ant-...
 ```
+
+## The Debugging Workflow
+
+agent-triage is built around a debugging funnel — start cheap and broad, narrow to expensive and deep:
+
+```
+SIGNAL → SCOPE → ISOLATE → DIAGNOSE → FIX → VERIFY
+```
+
+Here's what that looks like in practice:
+
+```bash
+# 1. Signal: is something wrong? (instant, reads from disk)
+agent-triage status
+
+# 2. Scope: what kind of conversations are failing? (zero LLM cost)
+agent-triage analyze --langsmith my-project --since 24h --quick
+
+# 3. Isolate: find the worst failure
+agent-triage explain --worst
+
+# 4. Diagnose: deep-dive into a specific conversation
+agent-triage explain conv_abc123
+
+# 5. Fix the prompt, then verify
+agent-triage analyze --langsmith my-project
+agent-triage diff before/report.json after/report.json
+
+# 6. Track progress over time
+agent-triage history
+```
+
+Every command in this flow builds on the previous one. `status` tells you if there's a problem. `explain --worst` tells you what the problem is. `diff` tells you if your fix worked.
 
 ## What It Does
 
@@ -103,53 +143,116 @@ Every failing trace gets its own expandable diagnosis card with the same structu
 
 ## Commands
 
-### `init`
-
-Extract testable policies from your agent's system prompt.
-
-```bash
-npx agent-triage init --prompt system-prompt.txt
-```
-
-Outputs `policies.json` — an editable file of behavioral rules your agent should follow. Review and adjust before running evaluation.
-
 ### `analyze`
 
 Evaluate traces against policies and generate a diagnostic report.
 
 ```bash
 # From a JSON file
-npx agent-triage analyze --traces conversations.json --prompt system-prompt.txt
+agent-triage analyze --traces conversations.json --prompt system-prompt.txt
 
-# From LangSmith
-npx agent-triage analyze --langsmith my-project --api-key $LANGSMITH_API_KEY
+# From LangSmith (zero-config — auto-discovers agents and policies)
+agent-triage analyze --langsmith my-project
 
 # From OpenTelemetry export
-npx agent-triage analyze --otel traces.json
+agent-triage analyze --otel traces.json
+
+# Quick mode: skip diagnosis/fixes, ~60% cheaper
+agent-triage analyze --langsmith my-project --quick
+
+# Filter by time and agent
+agent-triage analyze --langsmith my-project --since 24h --agent "billing-agent"
 ```
 
 Options:
+- `--quick` — skip diagnosis and fix generation (faster, ~60% cheaper)
+- `--since <duration>` / `--until <duration>` — time window (e.g. `2h`, `24h`, `7d`)
+- `--agent <name>` — filter to a specific agent
 - `--dry-run` — show estimated cost without calling the LLM
 - `--max-conversations <n>` — limit evaluation to N traces
+- `--format json` — output JSON to stdout instead of terminal summary
 - `--model <model>` — use a specific model (default: gpt-4o-mini)
 - `--provider <provider>` — openai, anthropic, or openai-compatible
 - `--include-prompt` — include the system prompt text in the report JSON
 - `--summary-only` — omit trace transcripts from report
 
-### `view`
+### `explain`
 
-Open the generated HTML report in your default browser.
+Deep-dive diagnosis of a single conversation — root cause, cascade chain, blast radius, and suggested fix.
 
 ```bash
-npx agent-triage view
+# Explain the worst failing conversation from the last report
+agent-triage explain --worst
+
+# Explain a specific conversation
+agent-triage explain conv_abc123
+
+# Explain from a trace source (if no report exists yet)
+agent-triage explain conv_abc123 --langsmith my-project
 ```
+
+### `check`
+
+Targeted policy compliance check — faster and cheaper than full analyze (no metrics, no diagnosis).
+
+```bash
+# Check all policies
+agent-triage check --langsmith my-project --since 24h
+
+# Check specific policies
+agent-triage check --langsmith my-project --policy escalation-policy --policy tone-policy
+
+# CI gate: exit code 1 if compliance below threshold
+agent-triage check --traces conversations.json --threshold 90
+```
+
+### `status`
+
+Instant health check from the last report. Zero LLM cost — reads from disk.
+
+```bash
+agent-triage status
+```
+
+### `history`
+
+Show compliance trends across analyze runs. Zero LLM cost.
+
+```bash
+# Show all runs
+agent-triage history
+
+# Show last 5 runs
+agent-triage history --last 5
+
+# JSON output
+agent-triage history --format json
+```
+
+### `init`
+
+Extract testable policies from your agent's system prompt.
+
+```bash
+agent-triage init --prompt system-prompt.txt
+```
+
+Outputs `policies.json` — an editable file of behavioral rules your agent should follow. Review and adjust before running evaluation.
 
 ### `diff`
 
 Compare two reports to see what changed after prompt edits.
 
 ```bash
-npx agent-triage diff before/report.json after/report.json
+agent-triage diff before/report.json after/report.json
+```
+
+### `view`
+
+Open the generated HTML report in your default browser.
+
+```bash
+agent-triage view
 ```
 
 ### `demo`
@@ -157,9 +260,39 @@ npx agent-triage diff before/report.json after/report.json
 Run a full demo with built-in example agents and traces.
 
 ```bash
-npx agent-triage demo                    # customer-support (default)
-npx agent-triage demo customer-support
+agent-triage demo
 ```
+
+## MCP Server
+
+agent-triage includes an MCP (Model Context Protocol) server, so AI assistants like Claude and Cursor can debug your agents programmatically.
+
+```json
+{
+  "mcpServers": {
+    "agent-triage": {
+      "command": "npx",
+      "args": ["-y", "agent-triage-mcp"]
+    }
+  }
+}
+```
+
+The MCP server exposes 9 tools that follow the same debugging funnel:
+
+| Tool | Cost | Purpose |
+|------|------|---------|
+| `triage_status` | Zero | Health check from last report |
+| `triage_sample` | Zero | Browse conversations with keyword search |
+| `triage_list_policies` | Zero | List loaded policies |
+| `triage_history` | Zero | Compliance trends across runs |
+| `triage_diff` | Zero | Compare two reports |
+| `triage_check` | Moderate | Targeted policy compliance |
+| `triage_explain` | Moderate | Root cause diagnosis |
+| `triage_init` | Moderate | Extract policies from prompt |
+| `triage_analyze` | High | Full evaluation pipeline |
+
+An AI assistant using these tools would naturally: check `triage_status` to see if there's a problem, use `triage_sample` with keyword search to find relevant conversations, then `triage_explain` to diagnose the root cause.
 
 ## Trace Format
 
@@ -184,7 +317,7 @@ Flexible field mapping is supported — `role`/`sender`, `content`/`text`/`messa
 
 ### LangSmith
 
-Point to a LangSmith project and agent-triage will fetch traces automatically. Requires `LANGSMITH_API_KEY`.
+Point to a LangSmith project and agent-triage will fetch traces automatically. Auto-detects trace-based vs session-based architectures, discovers agents by system prompt, and pushes time filters server-side for efficiency. Requires `LANGSMITH_API_KEY`.
 
 ### OpenTelemetry
 
@@ -246,6 +379,9 @@ See [src/index.ts](src/index.ts) for all available exports.
 | Step-level root cause + cascade | Yes | No | No | No |
 | Blast-radius warnings | Yes | No | No | No |
 | Cross-run diff | Yes | No | No | Yes |
+| MCP server for AI assistants | Yes | No | No | No |
+| Zero-config LangSmith | Yes | No | No | No |
+| CI compliance gates | Yes | No | Yes | Yes |
 | No infrastructure required | Yes | Yes | No (server) | Yes |
 | License | FSL-1.1 | MIT | Apache 2.0 | MIT |
 
@@ -260,7 +396,8 @@ agent-triage is a standalone diagnostic tool. It gives you a complete picture of
 - **Tested fix proposals** — concrete prompt patches with confidence scores, not directional hints
 - **Simulation testing** — test fixes against personas, scenarios, and complexity levels before deploying
 - **Regression gating** — ensure fixes don't break other policies
-- **Continuous optimization** — automatic prompt improvement based on production performance
+- **Continuous monitoring** — alerts and dashboards for agent health over time
+- **Team collaboration** — shared workspace for reviewing and deploying fixes
 
 ## License
 
@@ -275,7 +412,7 @@ git clone https://github.com/converra/agent-triage
 cd agent-triage
 npm install
 npm run build
-npm test          # 151 tests
+npm test
 ```
 
 ---
