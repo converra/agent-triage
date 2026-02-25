@@ -25,6 +25,8 @@ import {
 } from "../evaluation/progress.js";
 import type { Report } from "../evaluation/types.js";
 import { buildHtml } from "../report/generator.js";
+import { autoExtractPolicies } from "../ingestion/auto-discovery.js";
+import type { LlmClient } from "../llm/client.js";
 
 interface AnalyzeOptions {
   traces?: string;
@@ -45,32 +47,7 @@ interface AnalyzeOptions {
 export async function analyzeCommand(options: AnalyzeOptions): Promise<void> {
   const startTime = Date.now();
 
-  // Load policies
-  const policiesPath = resolve(
-    process.cwd(),
-    options.policies ?? "policies.json",
-  );
-  if (!existsSync(policiesPath)) {
-    console.error(
-      "Error: No policies.json found.\n" +
-        "Run `agent-triage init --prompt <path>` first to extract policies.",
-    );
-    process.exit(1);
-  }
-
-  const policiesRaw = await readFile(policiesPath, "utf-8");
-  const policies: Policy[] = PoliciesFileSchema.parse(JSON.parse(policiesRaw));
-  const policiesHash = computePoliciesHash(policiesRaw);
-  console.log(`Loaded ${policies.length} policies from ${policiesPath}`);
-
-  // Load system prompt (needed for evaluation ground truth)
-  let systemPrompt = "";
-  const promptPath = options.prompt;
-  if (promptPath) {
-    systemPrompt = await readFile(resolve(process.cwd(), promptPath), "utf-8");
-  }
-
-  // Ingest traces
+  // Ingest traces first (needed for auto-discovery)
   const conversations = await ingestTraces(options);
   const maxConvs = options.maxConversations
     ? parseInt(options.maxConversations, 10)
@@ -84,6 +61,61 @@ export async function analyzeCommand(options: AnalyzeOptions): Promise<void> {
 
   const limited = conversations.slice(0, maxConvs);
   console.log(`\nLoaded ${limited.length} conversations.`);
+
+  // Resolve policies: from file, or auto-discover
+  const policiesPath = resolve(
+    process.cwd(),
+    options.policies ?? "policies.json",
+  );
+  const hasPoliciesFile = existsSync(policiesPath);
+
+  let policies: Policy[];
+  let systemPrompt = "";
+  let policiesHash: string;
+
+  if (hasPoliciesFile) {
+    // Existing flow: load policies from file
+    const policiesRaw = await readFile(policiesPath, "utf-8");
+    policies = PoliciesFileSchema.parse(JSON.parse(policiesRaw));
+    policiesHash = computePoliciesHash(policiesRaw);
+    console.log(`Loaded ${policies.length} policies from ${policiesPath}`);
+  } else {
+    // Auto-discovery flow: extract policies from traces
+    console.log(`No policies.json found. Starting auto-discovery...\n`);
+
+    // Need an LLM client for auto-discovery
+    const llm = await createLlmForOptions(options);
+
+    const discovery = await autoExtractPolicies(llm, limited);
+    policies = discovery.policies;
+    systemPrompt = discovery.systemPrompt;
+
+    if (policies.length === 0) {
+      console.error(
+        "Error: Auto-discovery could not extract any policies.\n" +
+          "Provide policies manually: run `agent-triage init --prompt <path>` first.",
+      );
+      process.exit(1);
+    }
+
+    // Save discovered policies
+    const outputPoliciesPath = resolve(process.cwd(), "policies.json");
+    await writeFile(
+      outputPoliciesPath,
+      JSON.stringify(policies, null, 2),
+      "utf-8",
+    );
+    console.log(`Saved to ${outputPoliciesPath}.`);
+
+    const policiesRaw = JSON.stringify(policies);
+    policiesHash = computePoliciesHash(policiesRaw);
+  }
+
+  // Load system prompt from flag if provided
+  const promptPath = options.prompt;
+  if (promptPath) {
+    systemPrompt = await readFile(resolve(process.cwd(), promptPath), "utf-8");
+  }
 
   // Dry run — estimate cost and exit
   if (options.dryRun) {
@@ -137,7 +169,7 @@ export async function analyzeCommand(options: AnalyzeOptions): Promise<void> {
     );
   }
 
-  // If no system prompt from flag, try to get from first conversation
+  // If no system prompt from flag or auto-discovery, try to get from first conversation
   if (!systemPrompt) {
     for (const conv of limited) {
       if (conv.systemPrompt) {
@@ -327,6 +359,29 @@ export async function analyzeCommand(options: AnalyzeOptions): Promise<void> {
   console.log(`\n  Report written to ${reportPath}`);
   console.log(`  HTML report: ${htmlPath}`);
   console.log(`  Run \`agent-triage view\` to open in browser.\n`);
+}
+
+async function createLlmForOptions(options: AnalyzeOptions): Promise<LlmClient> {
+  const config = await loadConfig({
+    prompt: { path: options.prompt ?? "." },
+    ...(options.provider || options.model || options.apiKey
+      ? {
+          llm: {
+            ...(options.provider ? { provider: options.provider } : {}),
+            ...(options.model ? { model: options.model } : {}),
+            ...(options.apiKey ? { apiKey: options.apiKey } : {}),
+          },
+        }
+      : {}),
+  });
+
+  const apiKey = resolveApiKey(config);
+  return createLlmClient(
+    config.llm.provider,
+    apiKey,
+    config.llm.model,
+    config.llm.baseUrl,
+  );
 }
 
 async function ingestTraces(
