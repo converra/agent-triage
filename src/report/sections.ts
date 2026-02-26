@@ -228,7 +228,7 @@ export function renderAllConversations(
           <span class="cid">${esc(c.id.slice(0, 10))}</span>
           ${agentBadge}
           <span class="conv-score ${healthClass}">${avg}</span>
-          <span class="conv-cause">${esc(cause)}</span>
+          <span class="conv-cause">${escBold(cause)}</span>
           <span class="conv-pills">${pills}</span>
           <span class="sev-badge ${healthClass}">${health === "critical" ? "critical" : "attention"}</span>
           ${ICONS.chevDownSm}
@@ -356,7 +356,7 @@ function renderPatternDetail(
       const severity = c.diagnosis?.severity ?? "major";
       const sevClass = severity === "critical" ? "crit" : "major";
       const cause = c.diagnosis?.summary ?? "Quality issue detected";
-      return `<div class="mini-row"><span class="mini-id">${esc(c.id.slice(0, 10))}</span><span class="mini-cause">${esc(cause)}</span><span class="sev-badge ${sevClass}">${severity}</span><button class="mini-link" data-conv-id="${esc(c.id)}" onclick="viewConv(event, this)">View ${ICONS.chevRight}</button></div>`;
+      return `<div class="mini-row"><span class="mini-id">${esc(c.id.slice(0, 10))}</span><span class="mini-cause">${escBold(cause)}</span><span class="sev-badge ${sevClass}">${severity}</span><button class="mini-link" data-conv-id="${esc(c.id)}" onclick="viewConv(event, this)">View ${ICONS.chevRight}</button></div>`;
     })
     .join("");
 
@@ -399,7 +399,7 @@ export function renderRecommendations(report: Report): string {
       const evidence = report.conversations
         .filter((c) => c.diagnosis && rec.targetFailureTypes.includes(c.diagnosis.failureType))
         .slice(0, 2)
-        .map((c) => `<span style="color:var(--text-3);font-size:12px;">${esc(c.id.slice(0, 10))}: ${esc(c.diagnosis!.summary.split(".")[0]!)}</span>`)
+        .map((c) => `<span style="color:var(--text-3);font-size:12px;">${esc(c.id.slice(0, 10))}: ${escBold(c.diagnosis!.summary.split(".")[0]!)}</span>`)
         .join("<br>");
       const evidenceHtml = evidence ? `<div style="margin-top:8px;padding:8px 10px;background:var(--bg-subtle);border-radius:var(--r);border:1px solid var(--border-subtle);line-height:1.6;">${evidence}</div>` : "";
 
