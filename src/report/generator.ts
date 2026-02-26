@@ -12,10 +12,8 @@ import {
   renderHeader,
   renderHealthSummary,
   renderMetricsBar,
-  renderNextStep,
   renderRecommendations,
   renderReproducibility,
-  renderVerdict,
 } from "./sections.js";
 import { CSS, JS } from "./styles.js";
 
@@ -37,12 +35,11 @@ export async function generateHtmlReport(
 }
 
 export function buildHtml(report: Report): string {
-  // Classify conversations by health (metric-driven)
-  const scored = report.conversations.map((c) => ({
-    conv: c,
-    health: conversationHealth(c.metrics),
-    avg: avgMetrics(c.metrics),
-  }));
+  // Classify conversations by health (metrics + policy failures)
+  const scored = report.conversations.map((c) => {
+    const failures = c.policyResults.filter((pr) => !pr.passed).length;
+    return { conv: c, health: conversationHealth(c.metrics, failures), avg: avgMetrics(c.metrics) };
+  });
   const healthy = scored.filter((s) => s.health === "healthy").length;
   const needsAttention = scored.filter((s) => s.health === "attention").length;
   const critical = scored.filter((s) => s.health === "critical").length;
@@ -82,13 +79,11 @@ export function buildHtml(report: Report): string {
   ${renderHealthSummary(report, healthy, needsAttention, critical)}
   ${renderMetricsBar(report)}
   ${renderAgentHealth(report)}
-  ${renderVerdict(report, needsAttention, critical)}
   ${worstConv ? renderDeepDive(worstConv, report) : ""}
   ${renderAllConversations(issueConvs, report)}
   ${renderFailurePatterns(report)}
   ${renderRecommendations(report)}
   ${renderBehavioralRules(report)}
-  ${renderNextStep(report)}
   ${renderReproducibility(report)}
 
 </div>

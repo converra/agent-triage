@@ -22,11 +22,14 @@ export function formatDuration(seconds: number): string {
   return `${mins}m ${secs}s`;
 }
 
-export function conversationHealth(metrics: Record<string, number>): "healthy" | "attention" | "critical" {
+export function conversationHealth(
+  metrics: Record<string, number>,
+  policyFailures = 0,
+): "healthy" | "attention" | "critical" {
   const avg = avgMetrics(metrics);
-  if (avg >= 75) return "healthy";
-  if (avg >= 50) return "attention";
-  return "critical";
+  if (avg < 50) return "critical";
+  if (avg < 75 || policyFailures > 0) return "attention";
+  return "healthy";
 }
 
 export function buildConvAgentMap(report: Report): Map<string, string> {

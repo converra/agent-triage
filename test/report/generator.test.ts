@@ -163,7 +163,7 @@ describe("buildHtml", () => {
 
   it("includes reproducibility section", () => {
     const html = buildHtml(makeReport());
-    expect(html).toContain("How this report was generated");
+    expect(html).toContain("Re-run analysis");
     expect(html).toContain("agent-triage analyze");
   });
 

@@ -42,14 +42,38 @@ export function renderHealthSummary(
   critical: number,
 ): string {
   const total = report.totalConversations;
-  const healthyPct = total > 0 ? Math.round((healthy / total) * 100) : 100;
+  const issues = needsAttention + critical;
 
-  return `<div class="health-summary">
-    <div class="pipe-steps">
-      <div class="pipe-step"><div class="pipe-num">${total}</div><div class="pipe-label"><b>Conversations</b><br>evaluated</div></div>
-      <div class="pipe-step"><div class="pipe-num emerald">${healthy}</div><div class="pipe-label"><b>Healthy</b><br>${healthyPct}% of total</div></div>
-      <div class="pipe-step"><div class="pipe-num coral">${needsAttention}</div><div class="pipe-label"><b>Need attention</b><br>score 50–74</div></div>
-      <div class="pipe-step"><div class="pipe-num red">${critical}</div><div class="pipe-label"><b>Critical</b><br>score below 50</div></div>
+  const counts = `<div class="pipe-steps">
+    <div class="pipe-step"><div class="pipe-num">${total}</div><div class="pipe-label"><b>Conversations</b><br>evaluated</div></div>
+    <div class="pipe-step"><div class="pipe-num emerald">${healthy}</div><div class="pipe-label"><b>Healthy</b><br>no issues</div></div>
+    <div class="pipe-step"><div class="pipe-num coral">${needsAttention}</div><div class="pipe-label"><b>Need attention</b><br>low scores or failures</div></div>
+    <div class="pipe-step"><div class="pipe-num red">${critical}</div><div class="pipe-label"><b>Critical</b><br>score below 50</div></div>
+  </div>`;
+
+  if (issues === 0) {
+    return `<div class="health-summary">${counts}
+      <div class="verdict" style="background:var(--green-bg);border-color:var(--green-border);margin-top:16px;">
+        <div class="verdict-icon" style="color:var(--green);">${ICONS.checkCircle}</div>
+        <div><div class="verdict-text">All ${total} conversations are healthy.</div><div class="verdict-detail">Quality scores above 75 and no policy failures.</div></div>
+      </div>
+    </div>`;
+  }
+
+  const promptFixable = report.failurePatterns.byType.filter((t) => t.type === "prompt_issue" || t.type === "retrieval_rag_issue").reduce((s, t) => s + t.count, 0);
+  const needsCode = report.failurePatterns.byType.filter((t) => t.type === "orchestration_issue" || t.type === "model_limitation").reduce((s, t) => s + t.count, 0);
+  let detail = `${issues} conversations scored below 75 or have policy failures.`;
+  if (promptFixable > 0 && needsCode > 0) detail = `${promptFixable} root causes fixable via prompt changes, ${needsCode} need code changes.`;
+  else if (promptFixable > 0) detail = "Root causes are fixable via prompt changes.";
+
+  return `<div class="health-summary">${counts}
+    <div class="verdict" style="margin-top:16px;">
+      <div class="verdict-icon">${ICONS.alertTriangle}</div>
+      <div class="verdict-body">
+        <div class="verdict-text">${issues} of ${total} conversations have issues${critical > 0 ? ` — ${critical} critical` : ""}.</div>
+        <div class="verdict-detail">${detail}</div>
+      </div>
+      <a href="#diagnosis" class="verdict-cta" onclick="document.querySelector('.diag')?.scrollIntoView({behavior:'smooth',block:'start'});return false;">See diagnosis ${ICONS.chevDownSm}</a>
     </div>
   </div>`;
 }
@@ -100,49 +124,6 @@ export function renderAgentHealth(report: Report): string {
   </div>`;
 }
 
-export function renderVerdict(
-  report: Report,
-  needsAttention: number,
-  critical: number,
-): string {
-  const issues = needsAttention + critical;
-
-  if (issues === 0) {
-    return `<div class="verdict" style="background:var(--green-bg);border-color:var(--green-border);">
-      <div class="verdict-icon" style="color:var(--green);">${ICONS.checkCircle}</div>
-      <div>
-        <div class="verdict-text">All ${report.totalConversations} conversations are healthy.</div>
-        <div class="verdict-detail">Average quality scores are above 75 across all metrics.</div>
-      </div>
-    </div>`;
-  }
-
-  const promptFixable = report.failurePatterns.byType
-    .filter((t) => t.type === "prompt_issue" || t.type === "retrieval_rag_issue")
-    .reduce((s, t) => s + t.count, 0);
-
-  const needsCode = report.failurePatterns.byType
-    .filter((t) => t.type === "orchestration_issue" || t.type === "model_limitation")
-    .reduce((s, t) => s + t.count, 0);
-
-  const parts = [];
-  if (promptFixable > 0 && needsCode > 0) {
-    parts.push(
-      `${promptFixable} root causes are fixable via prompt changes, ${needsCode} need code changes`,
-    );
-  } else if (promptFixable > 0) {
-    parts.push(`Root causes are fixable via prompt changes`);
-  }
-
-  return `<div class="verdict">
-    <div class="verdict-icon">${ICONS.alertTriangle}</div>
-    <div class="verdict-body">
-      <div class="verdict-text">${issues} of ${report.totalConversations} conversations have issues${critical > 0 ? ` — ${critical} are critical` : ""}.</div>
-      <div class="verdict-detail">${parts.length > 0 ? parts.join(". ") + "." : `${issues} conversations scored below 75 on quality metrics.`}</div>
-    </div>
-    <a href="#diagnosis" class="verdict-cta" onclick="document.querySelector('.diag')?.scrollIntoView({behavior:'smooth',block:'start'});return false;">See diagnosis ${ICONS.chevDownSm}</a>
-  </div>`;
-}
 
 function buildTurnTimeline(
   conv: Report["conversations"][0],
@@ -258,7 +239,8 @@ export function renderAllConversations(
   const convHtml = shown
     .map((c) => {
       const avg = Math.round(avgMetrics(c.metrics));
-      const health = conversationHealth(c.metrics);
+      const failures = c.policyResults.filter((pr) => !pr.passed).length;
+      const health = conversationHealth(c.metrics, failures);
       const healthClass = health === "critical" ? "crit" : "major";
       const d = c.diagnosis;
       const cause = d?.summary ?? describeWeakMetrics(c.metrics as Record<string, number>);
@@ -429,70 +411,53 @@ export function renderRecommendations(report: Report): string {
     .join("");
 
   return `<div class="recs">
-    <div class="recs-header"><div class="stitle" style="margin:0;">How to fix it</div><a href="https://converra.ai" class="recs-cta">Generate patches with Converra ${ICONS.externalSm}</a></div>
+    <div class="stitle">How to fix it</div>
     ${cards}
   </div>`;
 }
 
 export function renderBehavioralRules(report: Report): string {
+  if (report.policies.length === 0) return "";
+
   const evaluated = report.policies.filter((p) => p.evaluated > 0);
   const failing = evaluated.filter((p) => p.failing > 0).sort((a, b) => a.complianceRate - b.complianceRate);
   const passing = evaluated.filter((p) => p.failing === 0);
   const na = report.policies.filter((p) => p.evaluated === 0);
 
-  if (report.policies.length === 0) return "";
+  if (failing.length === 0) {
+    return `<div class="rules-section-inline">${ICONS.checkCircleSm} <span>${evaluated.length} behavioral rules evaluated — all passing.</span>${na.length > 0 ? ` <span class="rules-na-inline">${na.length} not applicable.</span>` : ""}</div>`;
+  }
 
   const failingHtml = failing.map((p) => {
     const icon = p.complianceRate < 50 ? "red" : "amber";
     return `<div class="rule-row"><span class="rule-icon ${icon}">${p.complianceRate < 50 ? "×" : "!"}</span><span class="rule-name">${esc(p.name)}</span><span class="rule-stat ${icon}">${p.complianceRate}% (${p.failing}/${p.evaluated} failing)</span></div>`;
   }).join("");
 
-  const passingHtml = passing.map((p) =>
-    `<div class="rule-row"><span class="rule-icon green">✓</span><span class="rule-name">${esc(p.name)}</span><span class="rule-stat green">100%</span></div>`,
-  ).join("");
-
-  const openIfFailing = failing.length > 0 ? " open" : "";
-
-  return `<details class="rules-section"${openIfFailing}>
+  return `<details class="rules-section" open>
     <summary>
       <div class="stitle" style="margin:0;">Behavioral rules</div>
-      <span class="rules-summary">${evaluated.length} evaluated · ${failing.length} failing · ${na.length} not applicable</span>
+      <span class="rules-summary">${failing.length} failing · ${passing.length} passing · ${na.length} not applicable</span>
       ${ICONS.chevDown}
     </summary>
     <div class="rules-body">
       ${failingHtml}
-      ${passing.length > 0 ? `<div class="rules-divider"></div>${passingHtml}` : ""}
-      ${na.length > 0 ? `<div class="rules-na">${na.length} rules not applicable to evaluated conversations</div>` : ""}
+      <div class="rules-na">${passing.length} rules passing at 100%.${na.length > 0 ? ` ${na.length} not applicable.` : ""}</div>
     </div>
   </details>`;
 }
 
-export function renderNextStep(report: Report): string {
-  const recCount = report.failurePatterns.topRecommendations.length;
-  return `<div class="next-step">
-    <div class="next-step-header">${ICONS.external} What Converra can do with this report</div>
-    <div class="next-step-body">
-      <div class="next-step-item">${ICONS.fileSm} <strong>Generate prompt patches</strong> for all ${recCount} recommendations</div>
-      <div class="next-step-item">${ICONS.checkCircleSm2} <strong>Simulate</strong> to validate fixes before deploying</div>
-      <div class="next-step-item">${ICONS.checkAll} <strong>Deploy the winning variant</strong> without regressions</div>
-    </div>
-    <div class="next-step-footer">
-      <a class="cta" href="https://converra.ai">Import report into Converra ${ICONS.externalSm}</a>
-    </div>
-  </div>`;
-}
-
 export function renderReproducibility(report: Report): string {
+  const cmd = `agent-triage analyze --traces conversations.json --model ${esc(report.llmModel)}`;
   return `<div class="repro">
-    <div class="repro-header">${ICONS.terminal} How this report was generated</div>
+    <div class="repro-header">${ICONS.terminal} Re-run analysis</div>
     <div class="repro-body">
-      <code class="repro-cmd">agent-triage analyze --traces [source] --model ${esc(report.llmModel)}</code>
-      <button class="repro-copy" onclick="navigator.clipboard.writeText(this.previousElementSibling.textContent)">${ICONS.copy} Copy</button>
+      <code class="repro-cmd">${cmd}</code>
+      <button class="repro-copy" onclick="copyText(this, '${cmd}')">${ICONS.refresh} Copy command</button>
     </div>
     <div class="repro-meta">agent-triage v${report.agentTriageVersion} · ${report.totalConversations} conversations · ${report.policies.length} behavioral rules</div>
   </div>`;
 }
 
 export function renderFooter(): string {
-  return `<div class="ftr"><div class="ftr-brand"><div class="ftr-mark">${ICONS.check}</div><span class="ftr-text">Powered by <a href="https://converra.ai" class="ftr-name">Converra</a></span></div><div class="ftr-tag">This report diagnoses problems. Converra treats them — generates prompt patches, simulates against your rules, and deploys without regressions.</div><a class="ftr-cta" href="https://converra.ai">See how Converra works ${ICONS.externalSm}</a><div class="helpful">Was this report useful? <button class="hbtn">${ICONS.thumbUp}</button> <button class="hbtn">${ICONS.thumbDown}</button></div></div>`;
+  return `<div class="ftr"><div class="ftr-brand"><div class="ftr-mark">${ICONS.check}</div><span class="ftr-text">Powered by <a href="https://converra.ai" class="ftr-name">Converra</a></span> — generate prompt patches, simulate fixes, deploy without regressions. <a href="https://converra.ai" class="ftr-link">Learn more ${ICONS.externalSm}</a></span></div><div class="helpful">Was this report useful? <button class="hbtn">${ICONS.thumbUp}</button> <button class="hbtn">${ICONS.thumbDown}</button></div></div>`;
 }

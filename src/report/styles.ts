@@ -21,6 +21,7 @@ export const ICONS = {
   fileSm: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>',
   thumbUp: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14z"/><path d="M7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg>',
   thumbDown: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 15V19a3 3 0 003 3l4-9V2H5.72a2 2 0 00-2 1.7l-1.38 9a2 2 0 002 2.3H10z"/><path d="M17 2h3a2 2 0 012 2v7a2 2 0 01-2 2h-3"/></svg>',
+  refresh: '<svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>',
 };
 
 // ── Inlined CSS ──
@@ -275,6 +276,10 @@ details[open] > summary .chev { transform:rotate(180deg); }
 .rule-stat.green { color:var(--green); }
 .rules-divider { height:1px; background:var(--border-subtle); margin:8px 0; }
 .rules-na { font-size:12px; color:var(--text-3); padding-top:8px; }
+.rules-section-inline { display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text-3); padding:12px 0; }
+.rules-section-inline .ic-s { color:var(--green); }
+.rules-na-inline { color:var(--text-3); }
+.ftr-link { color:var(--text-3); font-size:12px; }
 .agents-section { padding:16px 0 8px; }
 .agents-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:10px; }
 .agent-card { border:1px solid var(--border); border-radius:var(--r); padding:14px; background:var(--bg); }
