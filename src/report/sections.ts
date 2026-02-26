@@ -147,20 +147,11 @@ export function renderAgentHealth(report: Report): string {
 function summarizeTurnContent(text: string): string {
   const trimmed = text.trim();
 
-  // Detect JSON objects or arrays
+  // Detect JSON objects or arrays — these are internal routing data, not user-facing content
   if ((trimmed.startsWith("{") && trimmed.endsWith("}")) || (trimmed.startsWith("[") && trimmed.endsWith("]"))) {
     try {
-      const parsed = JSON.parse(trimmed);
-      if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
-        const keys = Object.keys(parsed);
-        if (keys.length === 0) return "[Empty routing data]";
-        const preview = keys.slice(0, 3).join(", ");
-        const more = keys.length > 3 ? ` +${keys.length - 3} more` : "";
-        return `[Structured data: ${preview}${more}]`;
-      }
-      if (Array.isArray(parsed)) {
-        return `[Array with ${parsed.length} item${parsed.length !== 1 ? "s" : ""}]`;
-      }
+      JSON.parse(trimmed);
+      return "[Routing decision]";
     } catch {
       // Not valid JSON — fall through
     }
