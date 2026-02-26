@@ -20,6 +20,7 @@ export function renderHeader(report: Report, date: string, duration: string): st
     <div class="hdr-top">
       <div class="logo">${ICONS.check}</div>
       <div class="tool-name"><b>agent</b>-triage</div>
+      <span class="hdr-by">by <a href="https://converra.ai" class="hdr-by-link">Converra</a></span>
     </div>
     <h1>${headerTitle}</h1>
     <div class="hdr-desc">Evaluated ${report.totalConversations} production conversations${agentCount > 1 ? ` across ${agentCount} agents` : ""} with ${Object.keys(report.metricSummary).length} quality metrics and step-level diagnosis.</div>
@@ -133,10 +134,11 @@ export function renderVerdict(
 
   return `<div class="verdict">
     <div class="verdict-icon">${ICONS.alertTriangle}</div>
-    <div>
+    <div class="verdict-body">
       <div class="verdict-text">${issues} of ${report.totalConversations} conversations have issues${critical > 0 ? ` — ${critical} are critical` : ""}.</div>
       <div class="verdict-detail">${parts.length > 0 ? parts.join(". ") + "." : `${issues} conversations scored below 75 on quality metrics.`}</div>
     </div>
+    <a href="#diagnosis" class="verdict-cta" onclick="document.querySelector('.diag')?.scrollIntoView({behavior:'smooth',block:'start'});return false;">See diagnosis ${ICONS.chevDownSm}</a>
   </div>`;
 }
 
@@ -234,7 +236,8 @@ export function renderDeepDive(
     ${blastHtml}
 
     <div class="diag-cta">
-      <a href="https://converra.ai" class="diag-link">Generate patch + simulate ${ICONS.externalSm}</a>
+      <button class="copy-btn" onclick="copyText(this, '${esc(d.fix).replace(/'/g, "\\'")}')">${ICONS.copy} Copy fix</button>
+      <a href="https://converra.ai" class="diag-link">Test with Converra ${ICONS.externalSm}</a>
     </div>
   </details>`;
 }
@@ -383,7 +386,7 @@ function renderPatternDetail(
       <span class="type-badge ${typeClass}">${label}</span>
       <span class="pattern-count">${pattern.count}</span>
       ${criticalTag}
-      <a href="https://converra.ai" class="fix-btn" style="margin-left:auto;">Test fixes ${ICONS.externalSm}</a>
+      <a href="https://converra.ai" class="fix-link" style="margin-left:auto;">Test in Converra ${ICONS.externalSm}</a>
       ${ICONS.chevDown}
     </summary>
     <div class="pattern-body">
@@ -412,13 +415,16 @@ export function renderRecommendations(report: Report): string {
       </summary>
       <div class="rec-detail">
         <div class="rec-desc">${esc(rec.description)}</div>
+        <div class="rec-actions">
+          <button class="copy-btn" onclick="copyText(this, '${esc(rec.title + ": " + rec.description).replace(/'/g, "\\'")}')">${ICONS.copy} Copy</button>
+        </div>
       </div>
     </details>`;
     })
     .join("");
 
   return `<div class="recs">
-    <div class="stitle">How to fix it</div>
+    <div class="recs-header"><div class="stitle" style="margin:0;">How to fix it</div><a href="https://converra.ai" class="recs-cta">Generate patches with Converra ${ICONS.externalSm}</a></div>
     ${cards}
   </div>`;
 }
@@ -483,16 +489,9 @@ export function renderReproducibility(report: Report): string {
 
 export function renderFooter(): string {
   return `<div class="ftr">
-  <div class="ftr-brand">
-    <div class="ftr-mark">${ICONS.check}</div>
-    <span class="ftr-text">Powered by <a href="https://converra.ai" class="ftr-name">Converra</a></span>
-  </div>
+  <div class="ftr-brand"><div class="ftr-mark">${ICONS.check}</div><span class="ftr-text">Powered by <a href="https://converra.ai" class="ftr-name">Converra</a></span></div>
   <div class="ftr-tag">This report diagnoses problems. Converra treats them — generates prompt patches, simulates against your rules, and deploys without regressions.</div>
   <a class="ftr-cta" href="https://converra.ai">See how Converra works ${ICONS.externalSm}</a>
-  <div class="helpful">
-    Was this report useful?
-    <button class="hbtn">${ICONS.thumbUp}</button>
-    <button class="hbtn">${ICONS.thumbDown}</button>
-  </div>
+  <div class="helpful">Was this report useful? <button class="hbtn">${ICONS.thumbUp}</button> <button class="hbtn">${ICONS.thumbDown}</button></div>
 </div>`;
 }
