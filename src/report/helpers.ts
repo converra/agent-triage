@@ -11,6 +11,7 @@ export function esc(s: string): string {
 
 export function avgMetrics(m: Record<string, number>): number {
   const vals = Object.values(m);
+  if (vals.length === 0) return 0;
   return vals.reduce((s, v) => s + v, 0) / vals.length;
 }
 

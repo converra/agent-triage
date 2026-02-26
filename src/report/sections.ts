@@ -139,41 +139,23 @@ export function renderVerdict(
   </div>`;
 }
 
-export function renderDeepDive(
+function buildTurnTimeline(
   conv: Report["conversations"][0],
   report: Report,
-): string {
+  cascadeMap: Map<number, string>,
+): string[] {
   const d = conv.diagnosis!;
-  const typeClass =
-    d.failureType === "prompt_issue"
-      ? "prompt"
-      : d.failureType === "orchestration_issue"
-        ? "orch"
-        : "model";
-
-  const cascadeMap = new Map<number, string>();
-  for (const entry of d.cascadeChain) {
-    const match = entry.match(/^Turn\s+(\d+)\s*:\s*(.+)$/i);
-    if (match) {
-      cascadeMap.set(Number(match[1]), match[2]!.trim());
-    }
-  }
-
-  const turns = conv.messages
+  return conv.messages
     .filter((m) => m.role === "user" || m.role === "assistant")
     .map((msg, i) => {
       const turnNum = i + 1;
       const isRoot = turnNum === d.rootCauseTurn;
-      const isFailing = conv.policyResults.some(
-        (pr) => !pr.passed && pr.failingTurns?.includes(turnNum),
-      );
+      const isFailing = conv.policyResults.some((pr) => !pr.passed && pr.failingTurns?.includes(turnNum));
       const isCascade = !isRoot && !isFailing && turnNum > d.rootCauseTurn;
       const dotClass = isRoot || isFailing ? "f" : isCascade ? "w" : "p";
 
       const failBadges = conv.policyResults
-        .filter(
-          (pr) => !pr.passed && pr.failingTurns?.includes(turnNum),
-        )
+        .filter((pr) => !pr.passed && pr.failingTurns?.includes(turnNum))
         .map((pr) => {
           const policy = report.policies.find((p) => p.id === pr.policyId);
           return `<span class="tb f">${esc(policy?.name ?? pr.policyId)} ×</span>`;
@@ -186,25 +168,38 @@ export function renderDeepDive(
 
       return `<div class="turn"><div class="tdot ${dotClass}"></div><div class="tc"><div class="tc-label">${label}</div><div class="tc-text">${esc(content)}</div>${failBadges ? `<div class="tc-badges">${failBadges}</div>` : ""}</div></div>`;
     });
+}
 
-  const keyTurns = turns.slice(0, 8);
-
-  // Metric scores for this conversation
-  const metricBadges = [
+function buildMetricBadges(metrics: Record<string, number>): string {
+  return [
     { key: "successScore", label: "Success" },
     { key: "aiRelevancy", label: "Relevancy" },
     { key: "sentiment", label: "Sentiment" },
     { key: "clarity", label: "Clarity" },
   ].map((m) => {
-    const val = (conv.metrics as Record<string, number>)[m.key] ?? 0;
+    const val = metrics[m.key] ?? 0;
     const color = val >= 80 ? "green" : val >= 60 ? "amber" : "red";
     return `<span class="metric-pill ${color}">${m.label} ${val}</span>`;
   }).join("");
+}
 
-  const blastHtml =
-    d.blastRadius.length > 0
-      ? `<div class="blast"><span class="blast-icon">${ICONS.alertTriangleSm}</span><span><strong>Blast radius:</strong> Editing may affect ${d.blastRadius.map((r) => `<em>${esc(r)}</em>`).join(", ")}.</span></div>`
-      : "";
+export function renderDeepDive(
+  conv: Report["conversations"][0],
+  report: Report,
+): string {
+  const d = conv.diagnosis!;
+
+  const cascadeMap = new Map<number, string>();
+  for (const entry of d.cascadeChain) {
+    const match = entry.match(/^Turn\s+(\d+)\s*:\s*(.+)$/i);
+    if (match) cascadeMap.set(Number(match[1]), match[2]!.trim());
+  }
+
+  const keyTurns = buildTurnTimeline(conv, report, cascadeMap).slice(0, 8);
+  const metricBadges = buildMetricBadges(conv.metrics as Record<string, number>);
+  const blastHtml = d.blastRadius.length > 0
+    ? `<div class="blast"><span class="blast-icon">${ICONS.alertTriangleSm}</span><span><strong>Blast radius:</strong> Editing may affect ${d.blastRadius.map((r) => `<em>${esc(r)}</em>`).join(", ")}.</span></div>`
+    : "";
 
   return `<details class="diag" open>
     <summary>

@@ -227,24 +227,7 @@ export function aggregateByAgent(
       }
     }
 
-    // Top 3 failing policies
-    const topFailing = [...policyFailCounts.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 3)
-      .map(([id]) => {
-        const policy = policies.find((p) => p.id === id);
-        const policyPassed = agentResults.reduce((count, r) => {
-          const pr = r.policyResults.find((p) => p.policyId === id);
-          return count + (pr?.verdict === "pass" ? 1 : 0);
-        }, 0);
-        const policyFailed = policyFailCounts.get(id) ?? 0;
-        const policyEval = policyPassed + policyFailed;
-        return {
-          id,
-          name: policy?.name ?? id,
-          complianceRate: policyEval > 0 ? Math.round((policyPassed / policyEval) * 100) : 100,
-        };
-      });
+    const topFailing = buildTopFailingPolicies(policyFailCounts, agentResults, policies);
 
     summaries.push({
       name,
@@ -256,4 +239,28 @@ export function aggregateByAgent(
   }
 
   return summaries.sort((a, b) => a.compliance - b.compliance);
+}
+
+function buildTopFailingPolicies(
+  failCounts: Map<string, number>,
+  results: ConversationResult[],
+  policies: Policy[],
+): Array<{ id: string; name: string; complianceRate: number }> {
+  return [...failCounts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([id]) => {
+      const policy = policies.find((p) => p.id === id);
+      const policyPassed = results.reduce((count, r) => {
+        const pr = r.policyResults.find((p) => p.policyId === id);
+        return count + (pr?.verdict === "pass" ? 1 : 0);
+      }, 0);
+      const policyFailed = failCounts.get(id) ?? 0;
+      const policyEval = policyPassed + policyFailed;
+      return {
+        id,
+        name: policy?.name ?? id,
+        complianceRate: policyEval > 0 ? Math.round((policyPassed / policyEval) * 100) : 0,
+      };
+    });
 }
