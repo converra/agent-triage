@@ -235,8 +235,8 @@ describe("buildHtml", () => {
 
     it("renders red dot for root cause turn", () => {
       const html = buildHtml(makeDeepDiveReport());
-      // Turn 3 is root cause — should have red dot class "f"
-      expect(html).toContain("Turn 3 — root cause");
+      // Root cause turn should have red dot class "f" and root cause label
+      expect(html).toContain("root cause");
       expect(html).toMatch(/tdot f/);
     });
 

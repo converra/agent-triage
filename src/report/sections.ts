@@ -112,8 +112,10 @@ export function renderMetricsBar(report: Report): string {
     return `<div class="mb-cell"><div class="mb-label">${m.label}</div><div class="mb-val ${color}">${val}</div></div>`;
   });
 
-  return `<div class="stitle" style="margin-top:8px;">Quality metrics (averages)</div>
-  <div class="metrics-bar">${cells.join("")}</div>`;
+  return `<details class="section-collapse">
+  <summary><div class="stitle" style="margin:0;">Quality metrics (averages)</div>${ICONS.chevDown}</summary>
+  <div class="metrics-bar">${cells.join("")}</div>
+  </details>`;
 }
 export function renderAgentHealth(report: Report): string {
   if (!report.agents || report.agents.length <= 1) return "";
@@ -136,10 +138,10 @@ export function renderAgentHealth(report: Report): string {
     })
     .join("");
 
-  return `<div class="agents-section">
-    <div class="stitle">Agent health</div>
-    <div class="agents-grid">${cards}</div>
-  </div>`;
+  return `<details class="section-collapse">
+    <summary><div class="stitle" style="margin:0;">Agent health</div>${ICONS.chevDown}</summary>
+    <div class="agents-section"><div class="agents-grid">${cards}</div></div>
+  </details>`;
 }
 
 
@@ -162,6 +164,12 @@ function summarizeTurnContent(text: string): string {
   return trimmed;
 }
 
+/** Find the orchestrator/router agent name from policy metadata, if one exists. */
+function findOrchestratorName(report: Report): string | undefined {
+  const sourceAgents = [...new Set(report.policies.map((p) => p.sourceAgent).filter(Boolean))];
+  return sourceAgents.find((a) => /orchestrat|router|coordinator|dispatch/i.test(a!)) as string | undefined;
+}
+
 function buildTurnTimeline(
   conv: Report["conversations"][0],
   report: Report,
@@ -169,39 +177,75 @@ function buildTurnTimeline(
   fixMd?: string,
 ): string[] {
   const d = conv.diagnosis!;
-  return conv.messages
-    .filter((m) => m.role === "user" || m.role === "assistant")
-    .map((msg, i) => {
+  const orchestrator = findOrchestratorName(report);
+  let lastAgent: string | undefined;
+
+  const visible = conv.messages.filter((m) => m.role === "user" || m.role === "assistant");
+
+  return visible.map((msg, i) => {
       const turnNum = i + 1;
       const isRoot = turnNum === d.rootCauseTurn;
       const isFailing = conv.policyResults.some((pr) => !pr.passed && pr.failingTurns?.includes(turnNum));
       const isCascade = !isRoot && !isFailing && turnNum > d.rootCauseTurn;
       const dotClass = isRoot || isFailing ? "f" : isCascade ? "w" : "p";
+      const isUser = msg.role === "user";
 
-      const failingPolicies = conv.policyResults
-        .filter((pr) => !pr.passed && pr.failingTurns?.includes(turnNum));
-      const MAX_BADGES = 3;
-      const shownPolicies = failingPolicies.slice(0, MAX_BADGES);
-      const overflowCount = failingPolicies.length - MAX_BADGES;
-      const failBadges = shownPolicies
-        .map((pr) => {
-          const policy = report.policies.find((p) => p.id === pr.policyId);
-          return `<span class="tb f">${esc(policy?.name ?? pr.policyId)} ×</span>`;
-        })
-        .join("")
-        + (overflowCount > 0 ? `<span class="tb f" style="opacity:0.7;">+${overflowCount} more</span>` : "");
-      const fixCta = failingPolicies.length > 0 && fixMd
-        ? `<button class="copy-btn" style="padding:2px 8px;font-size:11px;" data-fix="${fixMd}" onclick="copyFix(this)">${ICONS.copy} Copy fix</button>`
-        : "";
+      // Policy badges on all failing turns — show first 2 inline, rest in expandable tooltip
+      let failBadges = "";
+      let fixCta = "";
+      const failingPolicies = (isRoot || isFailing)
+        ? conv.policyResults.filter((pr) => !pr.passed && pr.failingTurns?.includes(turnNum))
+        : [];
+      if (failingPolicies.length > 0) {
+        const MAX_INLINE = isRoot ? 3 : 2;
+        const shownPolicies = failingPolicies.slice(0, MAX_INLINE);
+        const overflowCount = failingPolicies.length - MAX_INLINE;
+        const overflowPolicies = failingPolicies.slice(MAX_INLINE);
+        failBadges = shownPolicies
+          .map((pr) => {
+            const policy = report.policies.find((p) => p.id === pr.policyId);
+            return `<span class="tb f">${esc(policy?.name ?? pr.policyId)} ×</span>`;
+          })
+          .join("");
+        if (overflowCount > 0) {
+          const hiddenBadges = overflowPolicies
+            .map((pr) => {
+              const policy = report.policies.find((p) => p.id === pr.policyId);
+              return `<span class="tb f">${esc(policy?.name ?? pr.policyId)} ×</span>`;
+            })
+            .join("");
+          failBadges += `<span class="tb f tb-more" onclick="this.nextElementSibling.classList.toggle('show');this.remove()">+${overflowCount} more</span><span class="tb-overflow">${hiddenBadges}</span>`;
+        }
+        if (isRoot && fixMd) {
+          fixCta = `<button class="copy-btn" style="padding:2px 8px;font-size:11px;" data-fix="${fixMd}" onclick="copyFix(this)">${ICONS.copy} Copy fix</button>`;
+        }
+      }
 
-      const agentTag = msg.agent ? ` <span class="agent-badge">${esc(msg.agent)}</span>` : "";
-      const label = isRoot ? `Turn ${turnNum} — root cause` : `Turn ${turnNum}`;
+      // Routing chain: show on first assistant turn, then only when agent changes
+      let agentTag = "";
+      if (isUser) {
+        agentTag = `<span class="agent-badge user">User</span>`;
+      } else if (msg.agent) {
+        const agentChanged = msg.agent !== lastAgent;
+        if (agentChanged) {
+          if (orchestrator && msg.agent !== orchestrator) {
+            agentTag = `<span class="agent-badge subtle">${esc(orchestrator)}</span><span class="agent-arrow">→</span><span class="agent-badge">${esc(msg.agent)}</span>`;
+          } else {
+            agentTag = `<span class="agent-badge">${esc(msg.agent)}</span>`;
+          }
+        }
+        lastAgent = msg.agent;
+      }
+
+      const stepLabel = `<span class="step-num">Step ${turnNum}</span>`;
+      const rcTag = isRoot ? `<span class="rc-label">root cause</span>` : "";
       const cascadeDesc = cascadeMap.get(turnNum);
       const plain = stripHtml(msg.content);
       const content = summarizeTurnContent(plain);
       const diagNote = cascadeDesc ? `<div class="tc-diag">↳ ${escBold(cascadeDesc)}</div>` : "";
+      const turnClass = isUser ? "turn turn-user" : "turn";
 
-      return `<div class="turn"><div class="tdot ${dotClass}"></div><div class="tc"><div class="tc-label">${label}${agentTag}</div><div class="tc-text">${escBold(content)}</div>${diagNote}${failBadges || fixCta ? `<div class="tc-badges">${failBadges}${fixCta}</div>` : ""}</div></div>`;
+      return `<div class="${turnClass}"><div class="tdot ${dotClass}"></div><div class="tc"><div class="tc-label">${stepLabel}${agentTag}${rcTag}</div><div class="tc-text">${escBold(content)}</div>${diagNote}${failBadges || fixCta ? `<div class="tc-badges">${failBadges}${fixCta}</div>` : ""}</div></div>`;
     });
 }
 
@@ -242,9 +286,9 @@ export function renderAllConversations(
 
       // Metric mini-pills
       const pills = [
-        { key: "successScore", label: "S" },
-        { key: "sentiment", label: "Se" },
-        { key: "clarity", label: "C" },
+        { key: "successScore" },
+        { key: "sentiment" },
+        { key: "clarity" },
       ].map((m) => {
         const val = (c.metrics as Record<string, number>)[m.key] ?? 0;
         const color = val >= 80 ? "green" : val >= 60 ? "amber" : "red";
@@ -275,8 +319,16 @@ export function renderAllConversations(
       ? `<div class="show-all">Showing 50 of ${issues.length} conversations with issues</div>`
       : "";
 
+  const colHeader = `<div class="conv-colhdr">
+    <span class="colhdr-id">ID</span>
+    <span class="colhdr-score">Score</span>
+    <span class="colhdr-cause">Diagnosis</span>
+    <span class="colhdr-metrics"><span>Success</span><span>Sentiment</span><span>Clarity</span></span>
+  </div>`;
+
   return `<div class="convs">
     <div class="stitle">Step analysis</div>
+    ${colHeader}
     ${convHtml}
     ${moreText}
   </div>`;
@@ -417,8 +469,55 @@ function renderPatternDetail(
   </details>`;
 }
 
+function buildFullFixMd(report: Report): string {
+  const lines: string[] = [];
+  const agent = report.agents?.[0]?.name ?? report.agent.name;
+  const issues = report.conversations.filter((c) => c.diagnosis);
+
+  lines.push(`# Agent Triage — Fix Report for ${agent}`);
+  lines.push(`> ${issues.length} conversations with issues · ${report.failurePatterns.topRecommendations.length} recommendations`);
+  lines.push("");
+
+  // Recommendations
+  if (report.failurePatterns.topRecommendations.length > 0) {
+    lines.push("---");
+    lines.push("## Recommendations");
+    lines.push("");
+    for (const [i, rec] of report.failurePatterns.topRecommendations.entries()) {
+      lines.push(`### ${i + 1}. ${rec.title}`);
+      lines.push(`**Confidence:** ${rec.confidence} · **Affected:** ${rec.affectedConversations} conversations`);
+      lines.push("");
+      lines.push(rec.description);
+      lines.push("");
+    }
+  }
+
+  // Per-conversation diagnosis
+  lines.push("---");
+  lines.push("## Conversation Diagnoses");
+  lines.push("");
+  for (const conv of issues) {
+    const d = conv.diagnosis!;
+    lines.push(`### ${conv.id.slice(0, 10)} — ${d.severity}`);
+    lines.push(`**Root cause:** Turn ${d.rootCauseTurn}${d.rootCauseAgent ? ` (${d.rootCauseAgent})` : ""} · ${formatFailureType(d.failureType)} → ${formatSubtype(d.failureSubtype)}`);
+    lines.push("");
+    lines.push(`**What happened:** ${d.summary}`);
+    lines.push("");
+    lines.push(`**Impact:** ${d.impact}`);
+    lines.push("");
+    lines.push(`**Fix:** ${d.fix}`);
+    lines.push("");
+  }
+
+  lines.push("---");
+  lines.push("*Generated by [agent-triage](https://github.com/converra/agent-triage)*");
+  return lines.join("\n");
+}
+
 export function renderRecommendations(report: Report): string {
   if (report.failurePatterns.topRecommendations.length === 0) return "";
+
+  const fullMd = btoa(unescape(encodeURIComponent(buildFullFixMd(report))));
 
   const cards = report.failurePatterns.topRecommendations
     .map((rec, i) => {
@@ -457,7 +556,13 @@ export function renderRecommendations(report: Report): string {
     .join("");
 
   return `<div class="recs">
-    <div class="stitle">How to fix it</div>
+    <div class="recs-header">
+      <div class="stitle" style="margin:0;">How to fix it</div>
+      <div class="recs-cta">
+        <button class="copy-btn primary" data-fix="${fullMd}" onclick="copyFix(this)">${ICONS.copy} Copy all fixes</button>
+        <button class="copy-btn primary" data-fix="${fullMd}" onclick="downloadFix(this, 'fix-instructions')">${ICONS.fileSm} Download .md</button>
+      </div>
+    </div>
     ${cards}
   </div>`;
 }
