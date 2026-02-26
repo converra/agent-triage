@@ -52,6 +52,22 @@ export function discoverAgents(
     // Track agent names for voting
     const name = conv.metadata.agentName ?? "Unknown Agent";
     group.names.set(name, (group.names.get(name) ?? 0) + 1);
+
+    // Surface sub-agents from multi-agent traces
+    if (conv.metadata.subAgents) {
+      for (const sub of conv.metadata.subAgents) {
+        if (!promptGroups.has(sub.promptHash)) {
+          promptGroups.set(sub.promptHash, {
+            prompt: sub.systemPrompt,
+            names: new Map(),
+            count: 0,
+          });
+        }
+        const subGroup = promptGroups.get(sub.promptHash)!;
+        subGroup.count++;
+        subGroup.names.set(sub.name, (subGroup.names.get(sub.name) ?? 0) + 1);
+      }
+    }
   }
 
   // Build discovered agents, sorted by conversation count descending

@@ -4,6 +4,7 @@ export const MessageSchema = z.object({
   role: z.enum(["user", "assistant", "system", "tool"]),
   content: z.string(),
   timestamp: z.string().optional(),
+  agent: z.string().optional(),
   toolCalls: z
     .array(
       z.object({
@@ -31,6 +32,11 @@ export const NormalizedConversationSchema = z.object({
     promptHash: z.string().optional(),
     sessionId: z.string().optional(),
     traceId: z.string().optional(),
+    subAgents: z.array(z.object({
+      name: z.string(),
+      systemPrompt: z.string(),
+      promptHash: z.string(),
+    })).optional(),
   }),
   timestamp: z.string(),
 });

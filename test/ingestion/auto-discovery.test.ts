@@ -75,6 +75,65 @@ describe("discoverAgents", () => {
     expect(agents).toHaveLength(0);
   });
 
+  it("discovers sub-agents from multi-agent trace metadata", () => {
+    const conversations: NormalizedConversation[] = [
+      {
+        ...makeConversation("c1"),
+        systemPrompt: "You are the Orchestrator.",
+        metadata: {
+          source: "langsmith",
+          agentName: "Orchestrator",
+          promptHash: hashPrompt("You are the Orchestrator."),
+          subAgents: [
+            {
+              name: "Billing Agent",
+              systemPrompt: "You are the Billing Agent.",
+              promptHash: hashPrompt("You are the Billing Agent."),
+            },
+            {
+              name: "FAQ Agent",
+              systemPrompt: "You are the FAQ Agent.",
+              promptHash: hashPrompt("You are the FAQ Agent."),
+            },
+          ],
+        },
+      },
+      {
+        ...makeConversation("c2"),
+        systemPrompt: "You are the Orchestrator.",
+        metadata: {
+          source: "langsmith",
+          agentName: "Orchestrator",
+          promptHash: hashPrompt("You are the Orchestrator."),
+          subAgents: [
+            {
+              name: "Billing Agent",
+              systemPrompt: "You are the Billing Agent.",
+              promptHash: hashPrompt("You are the Billing Agent."),
+            },
+          ],
+        },
+      },
+    ];
+
+    const agents = discoverAgents(conversations);
+
+    // Should find 3 agents: Orchestrator + Billing Agent + FAQ Agent
+    expect(agents).toHaveLength(3);
+
+    const orchestrator = agents.find((a) => a.name === "Orchestrator");
+    expect(orchestrator).toBeDefined();
+    expect(orchestrator!.conversationCount).toBe(2);
+
+    const billing = agents.find((a) => a.name === "Billing Agent");
+    expect(billing).toBeDefined();
+    expect(billing!.conversationCount).toBe(2); // appeared in both traces
+
+    const faq = agents.find((a) => a.name === "FAQ Agent");
+    expect(faq).toBeDefined();
+    expect(faq!.conversationCount).toBe(1); // appeared in one trace
+  });
+
   it("uses most common agent name per prompt group", () => {
     const prompt = "You are a support bot.";
     const conversations = [
