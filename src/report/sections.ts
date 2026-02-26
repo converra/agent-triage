@@ -104,23 +104,8 @@ export function renderMetricsBar(report: Report): string {
     return `<div class="mb-cell"><div class="mb-label">${m.label}</div><div class="mb-val ${color}">${val}</div></div>`;
   });
 
-  // Summarize key findings from step analyses using failure subtypes
-  const diagnosed = report.conversations.filter((c) => c.diagnosis);
-  const subtypeCounts = new Map<string, number>();
-  for (const c of diagnosed) {
-    const st = c.diagnosis!.failureSubtype;
-    if (st) subtypeCounts.set(st, (subtypeCounts.get(st) ?? 0) + 1);
-  }
-  const topSubtypes = [...subtypeCounts.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 3)
-    .map(([st, count]) => `${formatSubtype(st)} (${count})`);
-  const insight = topSubtypes.length > 0
-    ? `<div style="font-size:13px;color:var(--text-2);margin-bottom:8px;">Top issues: ${topSubtypes.map((s) => esc(s)).join(", ")}</div>`
-    : "";
-
   return `<div class="stitle" style="margin-top:16px;">Quality metrics (averages)</div>
-  ${insight}<div class="metrics-bar">${cells.join("")}</div>`;
+  <div class="metrics-bar">${cells.join("")}</div>`;
 }
 export function renderAgentHealth(report: Report): string {
   if (!report.agents || report.agents.length <= 1) return "";
@@ -200,19 +185,6 @@ function buildMetricBadges(metrics: Record<string, number>): string {
   }).join("");
 }
 
-/** Build a map from conversation ID to the failure pattern types it belongs to. */
-function buildConvPatternMap(report: Report): Map<string, string[]> {
-  const map = new Map<string, string[]>();
-  for (const conv of report.conversations) {
-    const types = new Set<string>();
-    for (const pr of conv.policyResults) {
-      if (!pr.passed && pr.failureType) types.add(pr.failureType);
-    }
-    if (types.size > 0) map.set(conv.id, [...types].map(formatFailureType));
-  }
-  return map;
-}
-
 export function renderAllConversations(
   issues: Report["conversations"],
   report: Report,
@@ -220,7 +192,6 @@ export function renderAllConversations(
   if (issues.length === 0) return "";
 
   const convAgentMap = buildConvAgentMap(report);
-  const convPatternMap = buildConvPatternMap(report);
   const shown = issues.slice(0, 50);
 
   const convHtml = shown
@@ -234,12 +205,6 @@ export function renderAllConversations(
       const agentName = convAgentMap.get(c.id);
       const agentBadge = agentName && (report.agents?.length ?? 0) > 1
         ? `<span class="agent-badge">${esc(agentName)}</span>`
-        : "";
-
-      // Pattern linkage: "Flagged by: Prompt Issue, Orchestration Issue"
-      const patterns = convPatternMap.get(c.id);
-      const patternBadge = patterns
-        ? `<span class="conf" style="font-size:11px;">Flagged by: ${patterns.map((p) => esc(p)).join(", ")}</span>`
         : "";
 
       // Metric mini-pills
@@ -263,7 +228,6 @@ export function renderAllConversations(
           ${agentBadge}
           <span class="conv-score ${healthClass}">${avg}</span>
           <span class="conv-cause">${esc(cause)}</span>
-          ${patternBadge}
           <span class="conv-pills">${pills}</span>
           <span class="sev-badge ${healthClass}">${health === "critical" ? "critical" : "attention"}</span>
           ${ICONS.chevDownSm}

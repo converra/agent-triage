@@ -75,8 +75,8 @@ export function buildHtml(report: Report): string {
   ${renderMetricsBar(report)}
   ${renderAgentHealth(report)}
   ${renderAllConversations(issueConvs, report)}
-  ${renderFailurePatterns(report)}
   ${renderRecommendations(report)}
+  ${renderFailurePatterns(report)}
   ${renderBehavioralRules(report)}
   ${renderReproducibility(report)}
 
