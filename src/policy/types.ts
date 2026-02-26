@@ -13,6 +13,8 @@ export const PolicySchema = z.object({
     "behavior",
     "formatting",
   ]),
+  // Which agent this policy was extracted from (undefined = global, applies to all)
+  sourceAgent: z.string().optional(),
 });
 
 export type Policy = z.infer<typeof PolicySchema>;

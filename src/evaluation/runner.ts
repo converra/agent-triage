@@ -89,9 +89,15 @@ async function evaluateSingle(
   // Use the conversation's own system prompt if available, fall back to the provided one
   const effectivePrompt = conversation.systemPrompt ?? systemPrompt;
 
+  // Scope policies: only evaluate policies from the same agent, or global (no sourceAgent)
+  const agentName = conversation.metadata.agentName;
+  const scopedPolicies = agentName
+    ? policies.filter((p) => !p.sourceAgent || p.sourceAgent === agentName)
+    : policies;
+
   const [metrics, policyResults] = await Promise.all([
     evaluateConversation(llm, conversation, effectivePrompt),
-    checkPolicies(llm, conversation, policies, effectivePrompt),
+    checkPolicies(llm, conversation, scopedPolicies, effectivePrompt),
   ]);
 
   return {

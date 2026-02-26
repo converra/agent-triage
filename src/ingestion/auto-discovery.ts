@@ -119,8 +119,11 @@ async function extractPoliciesFromAgents(
     try {
       const policies = await extractPolicies(llm, agent.systemPrompt);
 
-      // Prefix policy names with agent name if multi-agent
       for (const policy of policies) {
+        // Tag every policy with its source agent for scoping during evaluation
+        policy.sourceAgent = agent.name;
+
+        // Prefix policy names with agent name if multi-agent
         if (multiAgent) {
           policy.name = `[${agent.name}] ${policy.name}`;
           policy.id = `${slugify(agent.name)}-${policy.id}`;
