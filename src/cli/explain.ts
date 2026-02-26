@@ -334,7 +334,7 @@ function outputExplanation(
   console.log(`  Conversation: ${result.id}`);
   if (d) {
     console.log(`  Severity: ${d.severity.toUpperCase()}`);
-    console.log(`  Root Cause: Turn ${d.rootCauseTurn}${d.rootCauseAgent ? ` (${d.rootCauseAgent})` : ""}`);
+    console.log(`  Root Cause: Step ${d.rootCauseTurn}${d.rootCauseAgent ? ` (${d.rootCauseAgent})` : ""}`);
   }
   console.log(`${"─".repeat(60)}`);
 
@@ -359,7 +359,7 @@ function outputExplanation(
       if (d && turnNum === d.rootCauseTurn) annotation = " ← ROOT CAUSE";
       else if (failingTurns.has(turnNum)) annotation = " ← VIOLATION";
 
-      console.log(`    Turn ${turnNum} [${msg.role}]: ${content}${annotation}`);
+      console.log(`    Step ${turnNum} [${msg.role}]: ${content}${annotation}`);
     }
   }
 

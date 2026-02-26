@@ -91,7 +91,6 @@ export function renderHealthSummary(
         <div class="verdict-detail">${detail}</div>
         ${brightSpot}
       </div>
-      <a href="#diagnosis" class="verdict-cta"${ctaClass} onclick="document.querySelector('.convs')?.scrollIntoView({behavior:'smooth',block:'start'});return false;">See diagnosis ${ICONS.chevDownSm}</a>
     </div>
   </div>`;
 }
@@ -146,7 +145,7 @@ export function renderAgentHealth(report: Report): string {
 
 
 /** Detect raw JSON / structured routing data and return a short summary instead. */
-function summarizeTurnContent(text: string): string {
+function summarizeTurnContent(text: string, maxLen: number): string {
   const trimmed = text.trim();
 
   // Detect JSON objects or arrays — these are internal routing data, not user-facing content
@@ -159,8 +158,7 @@ function summarizeTurnContent(text: string): string {
     }
   }
 
-  // Truncate long text
-  if (trimmed.length > 200) return trimmed.slice(0, 200) + "...";
+  if (trimmed.length > maxLen) return trimmed.slice(0, maxLen) + "...";
   return trimmed;
 }
 
@@ -168,6 +166,71 @@ function summarizeTurnContent(text: string): string {
 function findOrchestratorName(report: Report): string | undefined {
   const sourceAgents = [...new Set(report.policies.map((p) => p.sourceAgent).filter(Boolean))];
   return sourceAgents.find((a) => /orchestrat|router|coordinator|dispatch/i.test(a!)) as string | undefined;
+}
+
+/** Classify each turn for visual hierarchy. */
+interface TurnClassification {
+  turnNum: number;
+  isRoot: boolean;
+  isFailing: boolean;
+  isCascade: boolean;
+  isUser: boolean;
+  msg: Report["conversations"][0]["messages"][0];
+}
+
+function classifyTurns(
+  conv: Report["conversations"][0],
+  d: NonNullable<Report["conversations"][0]["diagnosis"]>,
+): TurnClassification[] {
+  const visible = conv.messages.filter((m) => m.role === "user" || m.role === "assistant");
+  return visible.map((msg, i) => {
+    const turnNum = i + 1;
+    const isRoot = turnNum === d.rootCauseTurn;
+    const isFailing = conv.policyResults.some((pr) => !pr.passed && pr.failingTurns?.includes(turnNum));
+    const isCascade = !isRoot && !isFailing && turnNum > d.rootCauseTurn;
+    return { turnNum, isRoot, isFailing, isCascade, isUser: msg.role === "user", msg };
+  });
+}
+
+/** Collapse consecutive OK turns into summary rows (mirrors app's compactTimeline). */
+type TimelineEntry =
+  | { kind: "turn"; turn: TurnClassification }
+  | { kind: "summary"; startStep: number; endStep: number; count: number };
+
+function compactTimeline(turns: TurnClassification[]): TimelineEntry[] {
+  // Keep root cause ± 1 expanded even if OK
+  const rootIdx = turns.findIndex((t) => t.isRoot);
+  const keepExpanded = new Set<number>();
+  if (rootIdx >= 0) {
+    for (let i = Math.max(0, rootIdx - 1); i <= Math.min(turns.length - 1, rootIdx + 1); i++) {
+      keepExpanded.add(i);
+    }
+  }
+
+  const entries: TimelineEntry[] = [];
+  let okRun: TurnClassification[] = [];
+
+  const flushOkRun = () => {
+    if (okRun.length >= 3) {
+      entries.push({ kind: "summary", startStep: okRun[0].turnNum, endStep: okRun[okRun.length - 1].turnNum, count: okRun.length });
+    } else {
+      for (const t of okRun) entries.push({ kind: "turn", turn: t });
+    }
+    okRun = [];
+  };
+
+  for (let i = 0; i < turns.length; i++) {
+    const t = turns[i];
+    const isOk = !t.isRoot && !t.isFailing && !t.isCascade;
+    if (isOk && !keepExpanded.has(i)) {
+      okRun.push(t);
+    } else {
+      flushOkRun();
+      entries.push({ kind: "turn", turn: t });
+    }
+  }
+  flushOkRun();
+  return entries;
 }
 
 function buildTurnTimeline(
@@ -180,73 +243,84 @@ function buildTurnTimeline(
   const orchestrator = findOrchestratorName(report);
   let lastAgent: string | undefined;
 
-  const visible = conv.messages.filter((m) => m.role === "user" || m.role === "assistant");
+  const allTurns = classifyTurns(conv, d);
+  const entries = compactTimeline(allTurns);
 
-  return visible.map((msg, i) => {
-      const turnNum = i + 1;
-      const isRoot = turnNum === d.rootCauseTurn;
-      const isFailing = conv.policyResults.some((pr) => !pr.passed && pr.failingTurns?.includes(turnNum));
-      const isCascade = !isRoot && !isFailing && turnNum > d.rootCauseTurn;
-      const dotClass = isRoot || isFailing ? "f" : isCascade ? "w" : "p";
-      const isUser = msg.role === "user";
+  return entries.map((entry) => {
+    // Summary row for collapsed OK steps
+    if (entry.kind === "summary") {
+      return `<div class="turn turn-summary"><div class="tdot summary"></div><div class="tc"><div class="tc-summary">Steps ${entry.startStep}–${entry.endStep}: OK (${entry.count} steps)</div></div></div>`;
+    }
 
-      // Policy badges on all failing turns — show first 2 inline, rest in expandable tooltip
-      let failBadges = "";
-      let fixCta = "";
-      const failingPolicies = (isRoot || isFailing)
-        ? conv.policyResults.filter((pr) => !pr.passed && pr.failingTurns?.includes(turnNum))
-        : [];
-      if (failingPolicies.length > 0) {
-        const MAX_INLINE = isRoot ? 3 : 2;
-        const shownPolicies = failingPolicies.slice(0, MAX_INLINE);
-        const overflowCount = failingPolicies.length - MAX_INLINE;
-        const overflowPolicies = failingPolicies.slice(MAX_INLINE);
-        failBadges = shownPolicies
-          .map((pr) => {
-            const policy = report.policies.find((p) => p.id === pr.policyId);
-            return `<span class="tb f">${esc(policy?.name ?? pr.policyId)} ×</span>`;
-          })
-          .join("");
-        if (overflowCount > 0) {
-          const hiddenBadges = overflowPolicies
-            .map((pr) => {
-              const policy = report.policies.find((p) => p.id === pr.policyId);
-              return `<span class="tb f">${esc(policy?.name ?? pr.policyId)} ×</span>`;
-            })
-            .join("");
-          failBadges += `<span class="tb f tb-more" onclick="this.nextElementSibling.classList.toggle('show');this.remove()">+${overflowCount} more</span><span class="tb-overflow">${hiddenBadges}</span>`;
-        }
-        if (isRoot && fixMd) {
-          fixCta = `<button class="copy-btn" style="padding:2px 8px;font-size:11px;" data-fix="${fixMd}" onclick="copyFix(this)">${ICONS.copy} Copy fix</button>`;
+    const { turnNum, isRoot, isFailing, isCascade, isUser, msg } = entry.turn;
+    const dotClass = isRoot || isFailing ? "f" : isCascade ? "w" : "p";
+
+    // Policy violations — collapsed behind a count pill
+    let failBadges = "";
+    let fixCta = "";
+    const failingPolicies = (isRoot || isFailing)
+      ? conv.policyResults.filter((pr) => !pr.passed && pr.failingTurns?.includes(turnNum))
+      : [];
+    if (failingPolicies.length > 0) {
+      const allBadges = failingPolicies
+        .map((pr) => {
+          const policy = report.policies.find((p) => p.id === pr.policyId);
+          return `<span class="tb f">${esc(policy?.name ?? pr.policyId)} ×</span>`;
+        })
+        .join("");
+      failBadges = `<span class="tb f tb-count" onclick="this.nextElementSibling.classList.toggle('show');this.classList.toggle('expanded')">${failingPolicies.length} violation${failingPolicies.length !== 1 ? "s" : ""}</span><span class="tb-overflow">${allBadges}</span>`;
+      if (isRoot && fixMd) {
+        fixCta = `<button class="copy-btn" style="padding:2px 8px;font-size:11px;" data-fix="${fixMd}" onclick="copyFix(this)">${ICONS.copy} Copy fix</button>`;
+      }
+    }
+
+    // Routing chain: show on first assistant turn, then only when agent changes
+    let agentTag = "";
+    if (isUser) {
+      agentTag = `<span class="agent-badge user">User</span>`;
+    } else if (msg.agent) {
+      const agentChanged = msg.agent !== lastAgent;
+      if (agentChanged) {
+        if (orchestrator && msg.agent !== orchestrator) {
+          agentTag = `<span class="agent-badge subtle">${esc(orchestrator)}</span><span class="agent-arrow">→</span><span class="agent-badge">${esc(msg.agent)}</span>`;
+        } else {
+          agentTag = `<span class="agent-badge">${esc(msg.agent)}</span>`;
         }
       }
+      lastAgent = msg.agent;
+    }
 
-      // Routing chain: show on first assistant turn, then only when agent changes
-      let agentTag = "";
-      if (isUser) {
-        agentTag = `<span class="agent-badge user">User</span>`;
-      } else if (msg.agent) {
-        const agentChanged = msg.agent !== lastAgent;
-        if (agentChanged) {
-          if (orchestrator && msg.agent !== orchestrator) {
-            agentTag = `<span class="agent-badge subtle">${esc(orchestrator)}</span><span class="agent-arrow">→</span><span class="agent-badge">${esc(msg.agent)}</span>`;
-          } else {
-            agentTag = `<span class="agent-badge">${esc(msg.agent)}</span>`;
-          }
-        }
-        lastAgent = msg.agent;
-      }
+    const stepLabel = `<span class="step-num">Step ${turnNum}</span>`;
+    const rcTypeClass = d.failureType === "prompt_issue" ? "prompt" : d.failureType === "orchestration_issue" ? "orch" : "model";
+    const rcTag = isRoot
+      ? `<span class="rc-label">root cause</span><span class="type-badge sm ${rcTypeClass}">${esc(formatFailureType(d.failureType))}</span>`
+      : "";
+    const cascadeDesc = cascadeMap.get(turnNum);
+    const plain = stripHtml(msg.content);
 
-      const stepLabel = `<span class="step-num">Step ${turnNum}</span>`;
-      const rcTag = isRoot ? `<span class="rc-label">root cause</span>` : "";
-      const cascadeDesc = cascadeMap.get(turnNum);
-      const plain = stripHtml(msg.content);
-      const content = summarizeTurnContent(plain);
-      const diagNote = cascadeDesc ? `<div class="tc-diag">↳ ${escBold(cascadeDesc)}</div>` : "";
-      const turnClass = isUser ? "turn turn-user" : "turn";
+    // Narrative-first for root cause and failing turns: diagnosis is primary, message is secondary
+    const diagText = isRoot ? d.summary : (isFailing || isCascade) ? cascadeDesc : undefined;
+    let contentHtml: string;
+    if (diagText && (isRoot || isFailing || isCascade)) {
+      // Narrative as primary text, actual message dimmed below
+      const maxLen = isRoot ? 200 : 120;
+      const content = summarizeTurnContent(plain, maxLen);
+      contentHtml = `<div class="tc-narrative">${escBold(diagText)}</div><div class="tc-msg">${escBold(content)}</div>`;
+    } else {
+      const maxLen = isUser ? 80 : 120;
+      const content = summarizeTurnContent(plain, maxLen);
+      contentHtml = `<div class="tc-text">${escBold(content)}</div>`;
+    }
 
-      return `<div class="${turnClass}"><div class="tdot ${dotClass}"></div><div class="tc"><div class="tc-label">${stepLabel}${agentTag}${rcTag}</div><div class="tc-text">${escBold(content)}</div>${diagNote}${failBadges || fixCta ? `<div class="tc-badges">${failBadges}${fixCta}</div>` : ""}</div></div>`;
-    });
+    // Visual hierarchy classes
+    const turnClasses = ["turn"];
+    if (isUser) turnClasses.push("turn-user");
+    if (isRoot) turnClasses.push("turn-root");
+    else if (isFailing) turnClasses.push("turn-failing");
+    else if (isCascade) turnClasses.push("turn-cascade");
+
+    return `<div class="${turnClasses.join(" ")}"><div class="tdot ${dotClass}"></div><div class="tc"><div class="tc-label">${stepLabel}${agentTag}${rcTag}</div>${contentHtml}${failBadges || fixCta ? `<div class="tc-badges">${failBadges}${fixCta}</div>` : ""}</div></div>`;
+  });
 }
 
 function buildMetricBadges(metrics: Record<string, number>): string {
@@ -360,7 +434,7 @@ function renderConvDive(
 
   return `<div class="conv-expand">
     <div class="tl">
-      <div class="tl-header"><div class="tl-label">Turn Timeline</div><div class="tl-filter">${turns.length} of ${conv.messages.length} turns</div></div>
+      <div class="tl-header"><div class="tl-label">Step Timeline</div><div class="tl-filter">${turns.length} of ${conv.messages.length} steps</div></div>
       ${turns.join("")}
     </div>
     <div class="wif">
@@ -499,7 +573,7 @@ function buildFullFixMd(report: Report): string {
   for (const conv of issues) {
     const d = conv.diagnosis!;
     lines.push(`### ${conv.id.slice(0, 10)} — ${d.severity}`);
-    lines.push(`**Root cause:** Turn ${d.rootCauseTurn}${d.rootCauseAgent ? ` (${d.rootCauseAgent})` : ""} · ${formatFailureType(d.failureType)} → ${formatSubtype(d.failureSubtype)}`);
+    lines.push(`**Root cause:** Step ${d.rootCauseTurn}${d.rootCauseAgent ? ` (${d.rootCauseAgent})` : ""} · ${formatFailureType(d.failureType)} → ${formatSubtype(d.failureSubtype)}`);
     lines.push("");
     lines.push(`**What happened:** ${d.summary}`);
     lines.push("");

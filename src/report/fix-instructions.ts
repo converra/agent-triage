@@ -19,7 +19,7 @@ export function buildConversationFixMd(
   lines.push("");
   lines.push("## Problem");
   lines.push(`- **Severity:** ${d.severity}`);
-  lines.push(`- **Root cause:** Turn ${d.rootCauseTurn}${d.rootCauseAgent ? ` (${d.rootCauseAgent})` : ""}`);
+  lines.push(`- **Root cause:** Step ${d.rootCauseTurn}${d.rootCauseAgent ? ` (${d.rootCauseAgent})` : ""}`);
   lines.push(`- **Type:** ${formatFailureType(d.failureType)} → ${formatSubtype(d.failureSubtype)}`);
   lines.push(`- **Confidence:** ${d.confidence}`);
   lines.push(`- **Conversation:** ${conv.id}`);
@@ -191,7 +191,7 @@ function getGuidanceForCategory(type: string, subtype?: string): string[] {
           : subtype === "wrong_retrieval"
             ? "2. The agent retrieved irrelevant context — check embedding quality and chunk size"
             : "2. Verify the retrieval pipeline returns relevant results for this query",
-        "3. Test the retrieval with the exact user query from the failing turn",
+        "3. Test the retrieval with the exact user query from the failing step",
       ];
     case "model_limitation":
       return [

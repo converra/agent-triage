@@ -226,29 +226,44 @@ details[open] > summary .chev { transform:rotate(180deg); }
 .diag-b { font-size:11px; font-weight:500; padding:2px 10px; border-radius:20px; }
 .diag-b.type { background:var(--coral-50); color:var(--coral); border:1px solid var(--coral-border); }
 .conf { color:var(--text-3); font-size:12px; }
+/* Step timeline */
 .tl { padding:14px 18px; border-top:1px solid var(--border-subtle); }
 .tl-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
 .tl-label { font-family:'Space Grotesk',sans-serif; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.1em; color:var(--text-3); }
 .tl-filter { font-size:11px; color:var(--text-3); }
-.turn { display:flex; gap:12px; padding:4px 0; position:relative; }
-.turn:not(:last-child)::before { content:''; position:absolute; left:5px; top:20px; bottom:-2px; width:1px; background:var(--border); }
+.turn { display:flex; gap:12px; padding:5px 6px; position:relative; border-radius:6px; margin:0 -6px; transition:background 0.1s; }
+.turn:not(:last-child)::before { content:''; position:absolute; left:11px; top:22px; bottom:-3px; width:1px; background:var(--border); }
+/* Visual hierarchy: cascade — subtle */
+.turn-cascade { opacity:0.85; }
+/* Visual hierarchy: user turns — minimal */
+.turn-user .tc-label { opacity:0.55; }
+.turn-user .tc-text { font-size:12px; opacity:0.55; }
+/* Summary rows for collapsed OK runs */
+.turn-summary { opacity:0.5; }
 .tdot { width:11px; height:11px; border-radius:50%; flex-shrink:0; margin-top:5px; }
 .tdot.p { background:var(--emerald); }
 .tdot.f { background:var(--red); }
 .tdot.w { background:var(--amber); }
-.tc { flex:1; }
-.tc-label { font-size:13px; font-weight:600; margin-bottom:1px; display:flex; align-items:center; gap:4px; flex-wrap:wrap; }
+.tdot.summary { background:var(--border); width:7px; height:7px; margin-top:7px; margin-left:2px; }
+.tc { flex:1; min-width:0; }
+.tc-label { font-size:13px; font-weight:600; margin-bottom:1px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
 .tc-text { font-size:13px; color:var(--text-2); line-height:1.5; }
-.turn-user .tc-label { opacity:0.7; }
-.turn-user .tc-text { font-size:12px; opacity:0.7; }
+.tc-summary { font-size:11px; color:var(--text-3); font-style:italic; padding:2px 0; }
+/* Narrative-first: diagnosis as primary text */
+.tc-narrative { font-size:13px; color:var(--text); line-height:1.5; font-weight:500; }
+.turn-root .tc-narrative { color:var(--red); }
+/* Message as secondary below narrative */
+.tc-msg { font-size:11px; color:var(--text-3); line-height:1.4; margin-top:2px; opacity:0.7; }
 .step-num { font-size:12px; font-weight:600; color:var(--text-3); min-width:14px; }
-.rc-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--red); }
-.tb-more { cursor:pointer; opacity:0.7; }
-.tb-more:hover { opacity:1; }
+.rc-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--red); margin-left:2px; }
+.type-badge.sm { font-size:10px; padding:1px 7px; }
+/* Collapsed violation count pill */
+.tb-count { cursor:pointer; transition:opacity 0.15s; }
+.tb-count:hover { opacity:0.8; }
+.tb-count.expanded { opacity:0.5; font-size:10px; }
 .tb-overflow { display:none; }
 .tb-overflow.show { display:contents; }
-.tc-diag { font-size:12px; color:var(--amber); margin-top:3px; font-style:italic; }
-.tc-badges { display:flex; gap:5px; margin-top:4px; flex-wrap:wrap; }
+.tc-badges { display:flex; gap:5px; margin-top:4px; flex-wrap:wrap; align-items:center; }
 .tb { font-size:11px; padding:1px 8px; border-radius:20px; font-weight:500; }
 .tb.f { background:var(--red-bg); color:var(--red); border:1px solid var(--red-border); }
 .tb.p { background:var(--green-bg); color:var(--green); border:1px solid var(--green-border); }
@@ -355,14 +370,63 @@ details[open] > summary .chev { transform:rotate(180deg); }
 .rec-actions { margin-top:8px; display:flex; gap:8px; align-items:center; }
 @media(max-width:768px) {
   .page { padding:0 12px; }
+  /* Health summary pipeline */
   .pipe-steps { flex-wrap:wrap; gap:6px; }
   .pipe-step { flex:none; width:calc(50% - 4px); margin-right:0!important; }
   .pipe-step::after { display:none; }
+  .pipe-num { font-size:20px; }
+  /* Metrics bar */
   .metrics-bar { flex-wrap:wrap; }
   .mb-cell { flex:none; width:33.33%; }
+  /* Verdict */
+  .verdict { flex-wrap:wrap; gap:10px; }
+  .verdict-cta { width:100%; justify-content:center; }
+  /* Conversation list */
+  .conv-detail > summary { gap:6px; }
+  .conv-cause { min-width:0; font-size:11px; }
+  .conv-pills { display:none; }
+  .conv-colhdr { display:none; }
+  .cid { min-width:auto; font-size:11px; }
+  .sev-badge { font-size:10px; padding:1px 6px; }
+  /* Step timeline */
+  .tl { padding:10px 0; }
+  .conv-expand .tl { padding:10px 0; }
+  .turn { gap:8px; padding:4px 4px; margin:0 -4px; }
+  .tc-label { gap:4px; flex-wrap:wrap; }
+  .tc-narrative { font-size:12px; }
+  .tc-text { font-size:12px; }
+  .tc-msg { font-size:10px; }
+  .step-num { font-size:11px; }
+  .rc-label { font-size:9px; }
+  .type-badge.sm { font-size:9px; padding:1px 6px; }
+  .agent-badge { font-size:9px; padding:1px 6px; }
+  .tc-badges { gap:4px; }
+  .tb { font-size:10px; padding:1px 6px; }
+  /* What happened / Impact / Fix */
+  .wif { padding:12px; margin:8px 0 0; }
+  .wif-l { font-size:12px; }
+  .wif-t { font-size:12px; }
+  .blast { margin:10px 0 0; padding:8px 10px; font-size:12px; }
+  /* Recommendations */
   .rec-detail { padding:0 12px 12px 12px; }
+  .rec-card > summary { padding:8px 10px; }
+  .recs-header { flex-direction:column; gap:8px; align-items:flex-start; }
+  .recs-cta { width:100%; }
+  .recs-cta .copy-btn { flex:1; justify-content:center; }
+  /* Patterns */
   .mini-cause { white-space:normal; }
+  .mini-row { flex-wrap:wrap; gap:4px; }
+  .pattern > summary { padding:10px 8px; margin:0 -8px; }
+  /* Agents grid */
   .agents-grid { grid-template-columns:1fr; }
+  /* Diag CTAs */
+  .diag-cta { flex-wrap:wrap; gap:6px; padding:10px 0 0; }
+  .copy-btn { font-size:11px; padding:4px 10px; }
+  /* Repro */
+  .repro-body { flex-direction:column; gap:8px; align-items:flex-start; }
+  .repro-cmd { font-size:11px; word-break:break-all; }
+  /* Footer */
+  .ftr { padding:20px 0; }
 }
 `;
 
