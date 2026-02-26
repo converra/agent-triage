@@ -400,7 +400,7 @@ function printSummary(
     console.log(`\n  Top Failing Policies:`);
     for (const p of failing.slice(0, 5)) {
       const icon = p.complianceRate < 50 ? "✗" : "⚠";
-      const agentLabel = p.sourceAgent ? `[${p.sourceAgent}] ` : "";
+      const agentLabel = "sourceAgent" in p ? `[${(p as any).sourceAgent}] ` : "";
       console.log(
         `  ${icon} "${agentLabel}${p.name}" — ${p.complianceRate}% (${p.failing}/${p.evaluated} failing)`,
       );

@@ -146,7 +146,7 @@ export function renderAgentHealth(report: Report): string {
 
 
 /** Detect raw JSON / structured routing data and return a short summary instead. */
-function summarizeTurnContent(text: string): string {
+function summarizeTurnContent(text: string, maxLen: number): string {
   const trimmed = text.trim();
 
   // Detect JSON objects or arrays — these are internal routing data, not user-facing content
@@ -159,8 +159,7 @@ function summarizeTurnContent(text: string): string {
     }
   }
 
-  // Truncate long text
-  if (trimmed.length > 200) return trimmed.slice(0, 200) + "...";
+  if (trimmed.length > maxLen) return trimmed.slice(0, maxLen) + "...";
   return trimmed;
 }
 
@@ -241,8 +240,10 @@ function buildTurnTimeline(
       const rcTag = isRoot ? `<span class="rc-label">root cause</span>` : "";
       const cascadeDesc = cascadeMap.get(turnNum);
       const plain = stripHtml(msg.content);
-      const content = summarizeTurnContent(plain);
-      const diagNote = cascadeDesc ? `<div class="tc-diag">↳ ${escBold(cascadeDesc)}</div>` : "";
+      const maxLen = isRoot ? 200 : (isUser || (!isFailing && !isCascade)) ? 80 : 120;
+      const content = summarizeTurnContent(plain, maxLen);
+      const diagText = isRoot ? d.summary : cascadeDesc;
+      const diagNote = diagText ? `<div class="tc-diag">↳ ${escBold(diagText)}</div>` : "";
       const turnClass = isUser ? "turn turn-user" : "turn";
 
       return `<div class="${turnClass}"><div class="tdot ${dotClass}"></div><div class="tc"><div class="tc-label">${stepLabel}${agentTag}${rcTag}</div><div class="tc-text">${escBold(content)}</div>${diagNote}${failBadges || fixCta ? `<div class="tc-badges">${failBadges}${fixCta}</div>` : ""}</div></div>`;
