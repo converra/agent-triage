@@ -6,6 +6,7 @@ import {
   esc,
   formatFailureType,
   formatSubtype,
+  stripHtml,
 } from "./helpers.js";
 import { ICONS } from "./styles.js";
 
@@ -164,7 +165,8 @@ function buildTurnTimeline(
 
       const label = isRoot ? `Turn ${turnNum} — root cause` : `Turn ${turnNum}`;
       const cascadeDesc = cascadeMap.get(turnNum);
-      const content = cascadeDesc ?? (msg.content.length > 200 ? msg.content.slice(0, 200) + "..." : msg.content);
+      const plain = stripHtml(msg.content);
+      const content = cascadeDesc ?? (plain.length > 200 ? plain.slice(0, 200) + "..." : plain);
 
       return `<div class="turn"><div class="tdot ${dotClass}"></div><div class="tc"><div class="tc-label">${label}</div><div class="tc-text">${esc(content)}</div>${failBadges ? `<div class="tc-badges">${failBadges}</div>` : ""}</div></div>`;
     });

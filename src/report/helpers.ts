@@ -46,6 +46,11 @@ export function buildConvAgentMap(report: Report): Map<string, string> {
   return map;
 }
 
+/** Strip HTML tags from conversation content so it renders as plain text. */
+export function stripHtml(s: string): string {
+  return s.replace(/<[^>]+>/g, " ").replace(/\s{2,}/g, " ").trim();
+}
+
 export function formatFailureType(type: string): string {
   return type
     .replace(/_/g, " ")

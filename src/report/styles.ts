@@ -57,6 +57,38 @@ export const CSS = `
   --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
   --shadow-md: 0 4px 12px rgba(0,0,0,0.06), 0 2px 4px rgba(0,0,0,0.04);
 }
+@media (prefers-color-scheme: dark) {
+  :root {
+    --coral: #F0927E;
+    --coral-dark: #E5775F;
+    --coral-50: rgba(240,146,126,0.14);
+    --coral-border: rgba(240,146,126,0.32);
+    --emerald: #5DBDAF;
+    --emerald-50: rgba(93,189,175,0.10);
+    --emerald-border: rgba(93,189,175,0.28);
+    --bg: #161B22;
+    --bg-subtle: #0D1117;
+    --bg-warm: #1C2128;
+    --border: #30363D;
+    --border-subtle: #21262D;
+    --text: #E6EDF3;
+    --text-2: #9DA5B0;
+    --text-3: #7D8590;
+    --red: #F07178;
+    --red-bg: rgba(240,113,120,0.10);
+    --red-border: rgba(240,113,120,0.22);
+    --amber: #E5B567;
+    --amber-bg: rgba(229,181,103,0.10);
+    --amber-border: rgba(229,181,103,0.22);
+    --green: #56D364;
+    --green-bg: rgba(86,211,100,0.10);
+    --green-border: rgba(86,211,100,0.22);
+    --blue: #58A6FF;
+    --violet: #A5A0D6;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.3), 0 2px 4px rgba(0,0,0,0.2);
+  }
+}
 * { margin:0; padding:0; box-sizing:border-box; }
 body { font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif; background:var(--bg-subtle); color:var(--text); line-height:1.6; font-size:14px; }
 h1,h2,h3 { font-family:'Space Grotesk',system-ui,sans-serif; }
