@@ -14,9 +14,11 @@ import { ICONS } from "./styles.js";
 
 export function renderHeader(report: Report, date: string, duration: string): string {
   const agentCount = report.agents?.length ?? 0;
+  const autoName = report.agents?.[0]?.name;
+  const agentName = autoName && autoName !== "Unknown Agent" ? autoName : report.agent.name;
   const headerTitle = agentCount > 1
     ? `${agentCount} Agents Analyzed`
-    : esc(report.agents?.[0]?.name ?? report.agent.name);
+    : esc(agentName !== "AI Agent" ? agentName : `${report.totalConversations} Conversations Analyzed`);
 
   return `<div class="hdr">
     <div class="hdr-top">
