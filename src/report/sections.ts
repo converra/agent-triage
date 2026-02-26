@@ -104,7 +104,7 @@ export function renderMetricsBar(report: Report): string {
     return `<div class="mb-cell"><div class="mb-label">${m.label}</div><div class="mb-val ${color}">${val}</div></div>`;
   });
 
-  return `<div class="stitle" style="margin-top:16px;">Quality metrics (averages)</div>
+  return `<div class="stitle" style="margin-top:8px;">Quality metrics (averages)</div>
   <div class="metrics-bar">${cells.join("")}</div>`;
 }
 export function renderAgentHealth(report: Report): string {
