@@ -667,18 +667,50 @@ function extractUserMessageFromRoot(rootRun: LangSmithRun): string | null {
 function extractAssistantResponseWithAgent(
   childRuns: LangSmithRun[],
 ): { response: string | null; agentName: string | undefined } {
+  // Strategy: find the best user-facing response across all child runs.
+  // Priority: non-JSON content > JSON with html_response/message_to_user > raw JSON
+  let jsonFallback: { response: string; agentName: string | undefined } | null = null;
+
   for (let i = childRuns.length - 1; i >= 0; i--) {
     const run = childRuns[i];
     const response = extractResponseFromRun(run);
-    if (response) {
-      const extracted = extractMessagesFromRun(run);
-      const name = extracted.systemPrompt
-        ? resolveAgentName(run, extracted.systemPrompt)
-        : resolveAgentNameFromRun(run);
+    if (!response) continue;
+
+    const extracted = extractMessagesFromRun(run);
+    const name = extracted.systemPrompt
+      ? resolveAgentName(run, extracted.systemPrompt)
+      : resolveAgentNameFromRun(run);
+
+    const trimmed = response.trim();
+    const looksLikeHtml = trimmed.startsWith("<") || trimmed.includes("<p>") || trimmed.includes("<div");
+
+    if (looksLikeHtml) {
+      // User-facing HTML content — best match
       return { response, agentName: name };
     }
+
+    if (!jsonFallback) jsonFallback = { response, agentName: name };
   }
-  return { response: null, agentName: undefined };
+
+  return jsonFallback ?? { response: null, agentName: undefined };
+}
+
+/**
+ * Try to extract a user-facing response from a JSON string.
+ * Many agents return structured JSON with the actual content in fields like html_response.
+ */
+function tryExtractUserFacingContent(jsonStr: string): string | null {
+  try {
+    const parsed = JSON.parse(jsonStr) as Record<string, unknown>;
+    if (typeof parsed === "object" && parsed !== null) {
+      for (const field of ["html_response", "message_to_user", "response"]) {
+        if (typeof parsed[field] === "string" && parsed[field]) return parsed[field] as string;
+      }
+    }
+  } catch {
+    // Not valid JSON
+  }
+  return null;
 }
 
 /**
@@ -688,24 +720,29 @@ function extractResponseFromRun(run: LangSmithRun): string | null {
   if (!run.outputs) return null;
   const outputs = run.outputs;
 
+  // Check direct fields, but if they're JSON, try to extract user-facing content first
   for (const field of ["html_response", "response", "content", "message"]) {
     if (typeof outputs[field] === "string") {
-      return outputs[field] as string;
+      const val = outputs[field] as string;
+      const userFacing = tryExtractUserFacingContent(val);
+      if (userFacing) return userFacing;
+      return val;
     }
   }
 
   if (typeof outputs.output === "string") {
-    try {
-      const parsed = JSON.parse(outputs.output) as Record<string, unknown>;
-      if (typeof parsed.html_response === "string") return parsed.html_response;
-      if (typeof parsed.message_to_user === "string") return parsed.message_to_user;
-      if (typeof parsed.response === "string") return parsed.response;
-    } catch {
-      return outputs.output;
-    }
+    const userFacing = tryExtractUserFacingContent(outputs.output);
+    if (userFacing) return userFacing;
+    return outputs.output;
   }
 
-  return extractOutputContent(outputs);
+  // Fallback: extract via generations/choices/messages formats
+  const raw = extractOutputContent(outputs);
+  if (raw) {
+    const userFacing = tryExtractUserFacingContent(raw);
+    if (userFacing) return userFacing;
+  }
+  return raw;
 }
 
 function extractAssistantResponseFromChildren(
@@ -820,15 +857,24 @@ export function resolveAgentName(
   // 1. Try extracting from system prompt
   if (systemPrompt) {
     const fromPrompt = extractAgentNameFromPrompt(systemPrompt);
-    if (fromPrompt) return fromPrompt;
+    if (fromPrompt) return normalizeAgentName(fromPrompt);
   }
 
   // 2. Use run name if it's not generic
   if (!GENERIC_RUN_NAMES.has(run.name.toLowerCase())) {
-    return run.name;
+    return normalizeAgentName(run.name);
   }
 
-  return run.name;
+  return normalizeAgentName(run.name);
+}
+
+/**
+ * Strip per-customer suffixes like " for Allred and Associates" from agent names.
+ * Many multi-agent systems create dynamic agent variants per customer/company —
+ * these are the same base agent with custom instructions, not separate agents.
+ */
+function normalizeAgentName(name: string): string {
+  return name.replace(/\s+for\s+.+$/i, "").trim();
 }
 
 function extractAgentNameFromPrompt(prompt: string): string | null {

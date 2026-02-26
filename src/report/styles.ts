@@ -132,6 +132,11 @@ details[open] > summary .chev { transform:rotate(180deg); }
 .verdict-cta { flex-shrink:0; font-size:12px; font-weight:600; color:var(--coral); text-decoration:none; display:inline-flex; align-items:center; gap:4px; padding:6px 12px; border:1px solid var(--coral-border); border-radius:var(--r); white-space:nowrap; transition:all 0.15s; align-self:center; }
 .verdict-cta:hover { background:var(--coral-50); border-color:var(--coral); }
 .stitle { font-family:'Space Grotesk',sans-serif; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.1em; color:var(--text-3); margin-bottom:6px; }
+.section-collapse { border-bottom:1px solid var(--border-subtle); padding:12px 0; }
+.section-collapse > summary { display:flex; align-items:center; gap:8px; cursor:pointer; list-style:none; }
+.section-collapse > summary::-webkit-details-marker { display:none; }
+.section-collapse > summary svg { transition:transform 0.2s; color:var(--text-4); }
+.section-collapse[open] > summary svg { transform:rotate(180deg); }
 .type-badge { font-size:11px; font-weight:600; padding:2px 10px; border-radius:20px; display:inline-flex; align-items:center; gap:4px; }
 .type-badge.prompt { background:var(--coral-50); color:var(--coral); border:1px solid var(--coral-border); }
 .type-badge.orch { background:var(--amber-bg); color:var(--amber); border:1px solid var(--amber-border); }
@@ -143,7 +148,14 @@ details[open] > summary .chev { transform:rotate(180deg); }
 .metric-pill.green { background:var(--green-bg); color:var(--green); border:1px solid var(--green-border); }
 .metric-pill.amber { background:var(--amber-bg); color:var(--amber); border:1px solid var(--amber-border); }
 .metric-pill.red { background:var(--red-bg); color:var(--red); border:1px solid var(--red-border); }
-.metric-mini { font-size:10px; font-weight:700; font-family:'Space Grotesk',sans-serif; padding:1px 5px; border-radius:3px; margin-right:2px; }
+.metric-mini { font-size:10px; font-weight:700; font-family:'Space Grotesk',sans-serif; padding:1px 5px; border-radius:3px; margin-right:2px; min-width:22px; text-align:center; display:inline-block; }
+.conv-colhdr { display:flex; align-items:center; gap:8px; padding:6px 8px 4px; margin:0 -8px; border-bottom:1px solid var(--border-subtle); }
+.conv-colhdr span { font-size:10px; color:var(--text-4); text-transform:uppercase; letter-spacing:0.4px; font-weight:600; }
+.colhdr-id { min-width:68px; }
+.colhdr-score { min-width:28px; text-align:center; }
+.colhdr-cause { flex:1; min-width:200px; }
+.colhdr-metrics { display:flex; gap:3px; margin-right:90px; }
+.colhdr-metrics span { min-width:22px; text-align:center; padding:0 5px; font-size:9px; }
 .metric-mini.green { background:var(--green-bg); color:var(--green); }
 .metric-mini.amber { background:var(--amber-bg); color:var(--amber); }
 .metric-mini.red { background:var(--red-bg); color:var(--red); }
@@ -182,7 +194,10 @@ details[open] > summary .chev { transform:rotate(180deg); }
 .trust-note { font-size:11px; color:var(--text-3); padding:8px 0 0; display:flex; align-items:center; gap:5px; }
 .recs { padding:20px 0; border-top:1px solid var(--border); }
 .recs-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
-.recs-cta { font-size:11px; font-weight:600; color:var(--coral); text-decoration:none; display:inline-flex; align-items:center; gap:4px; }
+.recs-cta { display:flex; gap:6px; }
+.copy-btn.primary { background:var(--coral); color:#fff; border-color:var(--coral); }
+.copy-btn.primary:hover { background:var(--red); border-color:var(--red); color:#fff; }
+.copy-btn.primary.copied { background:var(--green); border-color:var(--green); color:#fff; }
 .recs-cta:hover { text-decoration:underline; }
 .rec-card { border:1px solid var(--border-subtle); border-radius:var(--r); margin-bottom:6px; overflow:hidden; }
 .rec-card > summary { padding:10px 12px; display:flex; align-items:flex-start; gap:8px; }
@@ -224,8 +239,8 @@ details[open] > summary .chev { transform:rotate(180deg); }
 .tc { flex:1; }
 .tc-label { font-size:13px; font-weight:600; margin-bottom:1px; display:flex; align-items:center; gap:4px; flex-wrap:wrap; }
 .tc-text { font-size:13px; color:var(--text-2); line-height:1.5; }
-.turn-user { opacity:0.7; }
-.turn-user .tc-text { font-size:12px; }
+.turn-user .tc-label { opacity:0.7; }
+.turn-user .tc-text { font-size:12px; opacity:0.7; }
 .step-num { font-size:12px; font-weight:600; color:var(--text-3); min-width:14px; }
 .rc-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--red); }
 .tb-more { cursor:pointer; opacity:0.7; }

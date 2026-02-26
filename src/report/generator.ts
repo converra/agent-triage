@@ -72,11 +72,11 @@ export function buildHtml(report: Report): string {
 
   ${renderHeader(report, date, duration)}
   ${renderHealthSummary(report, healthy, needsAttention, critical)}
-  ${renderMetricsBar(report)}
-  ${renderAgentHealth(report)}
   ${renderAllConversations(issueConvs, report)}
   ${renderRecommendations(report)}
   ${renderFailurePatterns(report)}
+  ${renderAgentHealth(report)}
+  ${renderMetricsBar(report)}
   ${renderBehavioralRules(report)}
   ${renderReproducibility(report)}
 
