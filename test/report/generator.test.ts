@@ -252,13 +252,13 @@ describe("buildHtml", () => {
       expect(html).toMatch(/tdot p/);
     });
 
-    it("uses cascadeChain descriptions instead of raw message content", () => {
+    it("shows both message content and cascadeChain diagnosis note", () => {
       const html = buildHtml(makeDeepDiveReport());
-      // CascadeChain description for turn 3 should appear
+      // CascadeChain descriptions should appear as diagnosis notes
       expect(html).toContain("Agent lost context and ignored user input");
-      // CascadeChain description for turn 4 should appear instead of raw content
       expect(html).toContain("User expressed confusion about the loop");
-      expect(html).not.toContain("Raw message content for turn 4");
+      // Raw message content should ALSO appear (not replaced)
+      expect(html).toContain("Raw message content for turn 4");
     });
 
     it("falls back to raw content when no cascadeChain entry for a turn", () => {
