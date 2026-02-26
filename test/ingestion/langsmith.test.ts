@@ -363,6 +363,232 @@ describe("readLangSmithTraces", () => {
     expect(mockFetch).toHaveBeenCalledTimes(4);
   });
 
+  it("composes multi-agent trace into one conversation", async () => {
+    // A trace with 3 LLM runs: orchestrator + 2 sub-agents
+    const multiAgentFixture = {
+      runs: [
+        {
+          id: "run_orchestrator",
+          name: "ChatOpenAI",
+          run_type: "llm",
+          trace_id: "trace_multi",
+          inputs: {
+            messages: [
+              { role: "system", content: "You are the Orchestrator Agent. Route user requests to the appropriate agent." },
+              { role: "user", content: "What is my account balance?" },
+            ],
+          },
+          outputs: {
+            choices: [
+              { message: { content: "Let me route you to the billing agent." } },
+            ],
+          },
+          start_time: "2026-02-20T10:00:00Z",
+          end_time: "2026-02-20T10:00:01Z",
+          status: "success",
+          extra: { invocation_params: { model: "gpt-4o" } },
+          parent_run_id: null,
+          total_tokens: 30,
+        },
+        {
+          id: "run_billing",
+          name: "ChatOpenAI",
+          run_type: "llm",
+          trace_id: "trace_multi",
+          inputs: {
+            messages: [
+              { role: "system", content: "You are the Billing Agent. Help users with billing questions." },
+              { role: "user", content: "What is my account balance?" },
+            ],
+          },
+          outputs: {
+            choices: [
+              { message: { content: "Your account balance is $150.00." } },
+            ],
+          },
+          start_time: "2026-02-20T10:00:02Z",
+          end_time: "2026-02-20T10:00:03Z",
+          status: "success",
+          extra: { invocation_params: { model: "gpt-4o" } },
+          parent_run_id: "chain_billing",
+          total_tokens: 40,
+        },
+        {
+          id: "run_summarizer",
+          name: "ChatOpenAI",
+          run_type: "llm",
+          trace_id: "trace_multi",
+          inputs: {
+            messages: [
+              { role: "system", content: "You are the Summary Agent. Summarize results for the user." },
+              { role: "user", content: "Summarize: account balance is $150.00" },
+            ],
+          },
+          outputs: {
+            choices: [
+              { message: { content: "Your current balance is $150.00. Is there anything else?" } },
+            ],
+          },
+          start_time: "2026-02-20T10:00:04Z",
+          end_time: "2026-02-20T10:00:05Z",
+          status: "success",
+          extra: { invocation_params: { model: "gpt-4o" } },
+          parent_run_id: "chain_summary",
+          total_tokens: 35,
+        },
+      ],
+      cursors: { next: null },
+    };
+
+    mockFetch
+      .mockResolvedValueOnce(mockProjectsResponse())
+      .mockResolvedValueOnce(mockSampleRunsResponse())
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(multiAgentFixture), { status: 200 }),
+      );
+
+    const convs = await readLangSmithTraces({
+      apiKey: "test-key",
+      project: "saleapeak-prod",
+    });
+
+    // Should produce ONE conversation for the trace, not 3
+    expect(convs.length).toBe(1);
+    const conv = convs[0];
+
+    // Primary agent should be the orchestrator (first with system prompt)
+    expect(conv.metadata.agentName).toBe("Orchestrator Agent");
+    expect(conv.systemPrompt).toContain("Orchestrator Agent");
+    expect(conv.metadata.traceId).toBe("trace_multi");
+
+    // Should have sub-agents in metadata
+    expect(conv.metadata.subAgents).toBeDefined();
+    expect(conv.metadata.subAgents!.length).toBe(2);
+    const subNames = conv.metadata.subAgents!.map((s) => s.name);
+    expect(subNames).toContain("Billing Agent");
+    expect(subNames).toContain("Summary Agent");
+
+    // User message should be deduplicated (all 3 runs had similar user input)
+    const userMessages = conv.messages.filter((m) => m.role === "user");
+    expect(userMessages.length).toBeLessThanOrEqual(2); // original + summarizer's different input
+
+    // Assistant messages should be tagged with agent names
+    const assistantMessages = conv.messages.filter((m) => m.role === "assistant");
+    expect(assistantMessages.length).toBe(3);
+    expect(assistantMessages[0].agent).toBe("Orchestrator Agent");
+    expect(assistantMessages[1].agent).toBe("Billing Agent");
+    expect(assistantMessages[2].agent).toBe("Summary Agent");
+
+    // Total tokens should be summed
+    expect(conv.metadata.totalTokens).toBe(105);
+
+    // Duration should span from first run start to last run end
+    expect(conv.metadata.duration).toBe(5);
+  });
+
+  it("keeps single-run traces as individual conversations", async () => {
+    // Two separate traces, each with one LLM run — unchanged behavior
+    const llmFixture = makeLlmRunsFixture();
+
+    mockFetch
+      .mockResolvedValueOnce(mockProjectsResponse())
+      .mockResolvedValueOnce(mockSampleRunsResponse())
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(llmFixture), { status: 200 }),
+      );
+
+    const convs = await readLangSmithTraces({
+      apiKey: "test-key",
+      project: "saleapeak-prod",
+    });
+
+    expect(convs.length).toBe(2);
+    // Each should have its own agent/prompt
+    expect(convs[0].id).toBe("run_abc123");
+    expect(convs[1].id).toBe("run_def456");
+    // No subAgents for single-run traces
+    expect(convs[0].metadata.subAgents).toBeUndefined();
+    expect(convs[1].metadata.subAgents).toBeUndefined();
+  });
+
+  it("handles multi-agent trace where sub-agents lack system prompts", async () => {
+    // Orchestrator has system prompt, sub-agent does not
+    const fixture = {
+      runs: [
+        {
+          id: "run_orch",
+          name: "ChatOpenAI",
+          run_type: "llm",
+          trace_id: "trace_partial",
+          inputs: {
+            messages: [
+              { role: "system", content: "You are the Router. Route requests." },
+              { role: "user", content: "Help me" },
+            ],
+          },
+          outputs: {
+            choices: [{ message: { content: "Routing to helper." } }],
+          },
+          start_time: "2026-02-20T10:00:00Z",
+          end_time: "2026-02-20T10:00:01Z",
+          status: "success",
+          extra: {},
+          parent_run_id: null,
+          total_tokens: 20,
+        },
+        {
+          id: "run_helper",
+          name: "HelperBot",
+          run_type: "llm",
+          trace_id: "trace_partial",
+          inputs: {
+            messages: [
+              { role: "user", content: "Help me" },
+            ],
+          },
+          outputs: {
+            choices: [{ message: { content: "Here's how I can help." } }],
+          },
+          start_time: "2026-02-20T10:00:02Z",
+          end_time: "2026-02-20T10:00:03Z",
+          status: "success",
+          extra: {},
+          parent_run_id: "chain_helper",
+          total_tokens: 15,
+        },
+      ],
+      cursors: { next: null },
+    };
+
+    mockFetch
+      .mockResolvedValueOnce(mockProjectsResponse())
+      .mockResolvedValueOnce(mockSampleRunsResponse())
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(fixture), { status: 200 }),
+      );
+
+    const convs = await readLangSmithTraces({
+      apiKey: "test-key",
+      project: "saleapeak-prod",
+    });
+
+    // Should still produce one conversation
+    expect(convs.length).toBe(1);
+    const conv = convs[0];
+
+    // Primary agent is the orchestrator
+    expect(conv.metadata.agentName).toBe("Router");
+
+    // Sub-agent without system prompt should still contribute messages
+    const assistantMessages = conv.messages.filter((m) => m.role === "assistant");
+    expect(assistantMessages.length).toBe(2);
+    // Sub-agent uses run name since no system prompt
+    expect(assistantMessages[1].agent).toBe("HelperBot");
+
+    // No subAgents metadata since helper had no system prompt
+    expect(conv.metadata.subAgents).toBeUndefined();
+  });
+
   it("detects session-based strategy when inputs have session_id", async () => {
     const sessionRuns = [{
       id: "root_1",

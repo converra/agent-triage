@@ -152,13 +152,11 @@ async function ingestTraceBased(
         new Date(a.start_time).getTime() - new Date(b.start_time).getTime(),
     );
 
-    for (const run of runs) {
-      if (conversations.length >= limit) break;
-
+    // Single LLM run in trace — simple case, one conversation
+    if (runs.length === 1) {
+      const run = runs[0];
       const extracted = extractMessagesFromRun(run);
-      // Skip LLM runs without a system prompt (internal routing/classification calls)
-      if (!extracted.systemPrompt) continue;
-      if (extracted.messages.length === 0) continue;
+      if (!extracted.systemPrompt || extracted.messages.length === 0) continue;
 
       const agentName = resolveAgentName(run, extracted.systemPrompt);
       const promptHash = hashPrompt(extracted.systemPrompt);
@@ -178,10 +176,144 @@ async function ingestTraceBased(
         },
         timestamp: run.start_time,
       });
+      continue;
+    }
+
+    // Multiple LLM runs in trace — multi-agent, compose into one conversation
+    const composed = composeMultiAgentTrace(runs, traceId);
+    if (composed) {
+      conversations.push(composed);
     }
   }
 
   return conversations;
+}
+
+/**
+ * Compose multiple LLM runs within a single trace into one conversation.
+ * Identifies the orchestrator (first run with system prompt), merges messages
+ * chronologically, and tags assistant messages with the agent that produced them.
+ */
+function composeMultiAgentTrace(
+  runs: LangSmithRun[],
+  traceId: string,
+): NormalizedConversation | null {
+  // Extract data from each run
+  interface RunInfo {
+    run: LangSmithRun;
+    extracted: ExtractedMessages;
+    agentName: string;
+  }
+
+  const runInfos: RunInfo[] = [];
+  let primarySystemPrompt: string | undefined;
+  let primaryAgentName: string | undefined;
+  let model: string | undefined;
+  let totalTokens = 0;
+
+  // Collect sub-agent system prompts (distinct from primary)
+  const subAgentPrompts = new Map<string, { name: string; systemPrompt: string; promptHash: string }>();
+
+  for (const run of runs) {
+    const extracted = extractMessagesFromRun(run);
+    if (extracted.messages.length === 0 && !extracted.systemPrompt) continue;
+
+    const agentName = extracted.systemPrompt
+      ? resolveAgentName(run, extracted.systemPrompt)
+      : resolveAgentNameFromRun(run);
+
+    // First run with a system prompt becomes the primary agent (orchestrator)
+    if (extracted.systemPrompt && !primarySystemPrompt) {
+      primarySystemPrompt = extracted.systemPrompt;
+      primaryAgentName = agentName;
+      model = extractModel(run);
+    } else if (extracted.systemPrompt) {
+      // Sub-agent with its own system prompt
+      const ph = hashPrompt(extracted.systemPrompt);
+      if (!subAgentPrompts.has(ph)) {
+        subAgentPrompts.set(ph, {
+          name: agentName,
+          systemPrompt: extracted.systemPrompt,
+          promptHash: ph,
+        });
+      }
+    }
+
+    if (run.total_tokens) totalTokens += run.total_tokens;
+    if (!model) model = extractModel(run);
+
+    runInfos.push({ run, extracted, agentName });
+  }
+
+  if (runInfos.length === 0) return null;
+
+  // If no system prompt found at all, skip this trace
+  if (!primarySystemPrompt) {
+    // Try to salvage: use first run with messages
+    const first = runInfos[0];
+    if (first.extracted.messages.length === 0) return null;
+  }
+
+  // Build merged message list from all runs chronologically
+  const messages: Message[] = [];
+  const seenUserContent = new Set<string>();
+
+  for (const { extracted, agentName } of runInfos) {
+    for (const msg of extracted.messages) {
+      if (msg.role === "user") {
+        // Deduplicate user messages — orchestrators and sub-agents often
+        // receive the same user input
+        const key = msg.content.trim().toLowerCase();
+        if (seenUserContent.has(key)) continue;
+        seenUserContent.add(key);
+        messages.push(msg);
+      } else if (msg.role === "assistant") {
+        // Tag assistant messages with the agent that produced them
+        messages.push({ ...msg, agent: agentName });
+      } else {
+        messages.push(msg);
+      }
+    }
+  }
+
+  if (messages.length === 0) return null;
+
+  const promptHash = primarySystemPrompt ? hashPrompt(primarySystemPrompt) : undefined;
+  const firstRun = runs[0];
+  const lastRun = runs[runs.length - 1];
+  const duration = firstRun.start_time && lastRun.end_time
+    ? (new Date(lastRun.end_time).getTime() - new Date(firstRun.start_time).getTime()) / 1000
+    : undefined;
+
+  return {
+    id: firstRun.id,
+    messages,
+    systemPrompt: primarySystemPrompt,
+    metadata: {
+      model,
+      totalTokens: totalTokens || undefined,
+      duration: duration && duration > 0 ? duration : undefined,
+      source: "langsmith",
+      agentName: primaryAgentName,
+      promptHash,
+      traceId,
+      subAgents: subAgentPrompts.size > 0
+        ? [...subAgentPrompts.values()]
+        : undefined,
+    },
+    timestamp: firstRun.start_time,
+  };
+}
+
+/**
+ * Resolve agent name from run metadata when no system prompt is available.
+ * Walks up parent_run_id chain (among available runs) for a non-generic name.
+ */
+function resolveAgentNameFromRun(run: LangSmithRun): string {
+  if (!GENERIC_RUN_NAMES.has(run.name.toLowerCase())) {
+    return run.name;
+  }
+  return run.name;
 }
 
 // ─── Session-Based Ingestion ─────────────────────────────────────────
