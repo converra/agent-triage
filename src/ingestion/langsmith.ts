@@ -381,26 +381,46 @@ async function ingestSessionBased(
     let totalTokens = 0;
     let agentName: string | undefined;
 
+    // Collect all sub-agent system prompts across the session
+    const subAgentPrompts = new Map<string, { name: string; systemPrompt: string; promptHash: string }>();
+
     for (const rootRun of runs) {
       // Use pre-fetched child LLM runs (cache hit, no API call)
       const childRuns = llmRunsByTrace.get(rootRun.trace_id) ?? [];
 
-      // Extract system prompt from first child LLM run that has one
+      // Extract system prompts and agent names from ALL child LLM runs
       for (const child of childRuns) {
         const extracted = extractMessagesFromRun(child);
-        if (extracted.systemPrompt && !systemPrompt) {
-          systemPrompt = extracted.systemPrompt;
-          agentName = resolveAgentName(child, systemPrompt);
-          model = extractModel(child);
-        }
         if (child.total_tokens) totalTokens += child.total_tokens;
+
+        if (!extracted.systemPrompt) continue;
+
+        const childAgentName = resolveAgentName(child, extracted.systemPrompt);
+
+        if (!systemPrompt) {
+          // First system prompt becomes the primary agent
+          systemPrompt = extracted.systemPrompt;
+          agentName = childAgentName;
+          model = extractModel(child);
+        } else {
+          // Track sub-agent system prompts
+          const ph = hashPrompt(extracted.systemPrompt);
+          if (ph !== hashPrompt(systemPrompt) && !subAgentPrompts.has(ph)) {
+            subAgentPrompts.set(ph, {
+              name: childAgentName,
+              systemPrompt: extracted.systemPrompt,
+              promptHash: ph,
+            });
+          }
+        }
       }
 
       // Extract user message from root run inputs
       const userMessage = extractUserMessageFromRoot(rootRun);
 
-      // Extract assistant response from child LLM runs
-      const assistantResponse = extractAssistantResponseFromChildren(childRuns);
+      // Extract assistant response and identify which agent produced it
+      const { response: assistantResponse, agentName: responseAgent } =
+        extractAssistantResponseWithAgent(childRuns);
 
       // Parse conversation history from root run
       const history = parseHistory(rootRun);
@@ -414,7 +434,11 @@ async function ingestSessionBased(
         allMessages.push({ role: "user", content: userMessage });
       }
       if (assistantResponse) {
-        allMessages.push({ role: "assistant", content: assistantResponse });
+        allMessages.push({
+          role: "assistant",
+          content: assistantResponse,
+          ...(responseAgent ? { agent: responseAgent } : {}),
+        });
       }
     }
 
@@ -435,6 +459,9 @@ async function ingestSessionBased(
         promptHash,
         sessionId,
         traceId: runs[0]?.trace_id,
+        subAgents: subAgentPrompts.size > 0
+          ? [...subAgentPrompts.values()]
+          : undefined,
       },
       timestamp: runs[0]?.start_time ?? new Date().toISOString(),
     });
@@ -631,6 +658,54 @@ function extractUserMessageFromRoot(rootRun: LangSmithRun): string | null {
     return rootRun.inputs.question as string;
   }
   return null;
+}
+
+/**
+ * Extract assistant response from child LLM runs and identify which agent produced it.
+ * Searches from last to first since the response generator is typically the final LLM call.
+ */
+function extractAssistantResponseWithAgent(
+  childRuns: LangSmithRun[],
+): { response: string | null; agentName: string | undefined } {
+  for (let i = childRuns.length - 1; i >= 0; i--) {
+    const run = childRuns[i];
+    const response = extractResponseFromRun(run);
+    if (response) {
+      const extracted = extractMessagesFromRun(run);
+      const name = extracted.systemPrompt
+        ? resolveAgentName(run, extracted.systemPrompt)
+        : resolveAgentNameFromRun(run);
+      return { response, agentName: name };
+    }
+  }
+  return { response: null, agentName: undefined };
+}
+
+/**
+ * Extract the response content from a single run's outputs.
+ */
+function extractResponseFromRun(run: LangSmithRun): string | null {
+  if (!run.outputs) return null;
+  const outputs = run.outputs;
+
+  for (const field of ["html_response", "response", "content", "message"]) {
+    if (typeof outputs[field] === "string") {
+      return outputs[field] as string;
+    }
+  }
+
+  if (typeof outputs.output === "string") {
+    try {
+      const parsed = JSON.parse(outputs.output) as Record<string, unknown>;
+      if (typeof parsed.html_response === "string") return parsed.html_response;
+      if (typeof parsed.message_to_user === "string") return parsed.message_to_user;
+      if (typeof parsed.response === "string") return parsed.response;
+    } catch {
+      return outputs.output;
+    }
+  }
+
+  return extractOutputContent(outputs);
 }
 
 function extractAssistantResponseFromChildren(
