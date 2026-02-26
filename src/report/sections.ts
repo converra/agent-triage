@@ -76,15 +76,22 @@ export function renderHealthSummary(
     ? `<div class="verdict-detail" style="margin-top:2px;color:var(--text-3);">${passingRules} behavioral rule${passingRules !== 1 ? "s" : ""} passing at 100%.</div>`
     : "";
 
+  const isAmber = critical === 0;
+  const verdictStyle = isAmber
+    ? `background:var(--amber-bg);border-color:var(--amber-border);margin-top:16px;`
+    : `margin-top:16px;`;
+  const iconStyle = isAmber ? ` style="color:var(--amber);"` : "";
+  const ctaClass = isAmber ? ` style="color:var(--amber);border-color:var(--amber-border);"` : "";
+
   return `<div class="health-summary">${counts}
-    <div class="verdict" style="margin-top:16px;">
-      <div class="verdict-icon">${ICONS.alertTriangle}</div>
+    <div class="verdict" style="${verdictStyle}">
+      <div class="verdict-icon"${iconStyle}>${ICONS.alertTriangle}</div>
       <div class="verdict-body">
         <div class="verdict-text">${issues} of ${total} conversations have issues${critical > 0 ? ` — ${critical} critical` : ""}.</div>
         <div class="verdict-detail">${detail}</div>
         ${brightSpot}
       </div>
-      <a href="#diagnosis" class="verdict-cta" onclick="document.querySelector('.convs')?.scrollIntoView({behavior:'smooth',block:'start'});return false;">See diagnosis ${ICONS.chevDownSm}</a>
+      <a href="#diagnosis" class="verdict-cta"${ctaClass} onclick="document.querySelector('.convs')?.scrollIntoView({behavior:'smooth',block:'start'});return false;">See diagnosis ${ICONS.chevDownSm}</a>
     </div>
   </div>`;
 }
@@ -164,12 +171,13 @@ function buildTurnTimeline(
         ? `<button class="copy-btn" style="padding:2px 8px;font-size:11px;" data-fix="${fixMd}" onclick="copyFix(this)">${ICONS.copy} Copy fix</button>`
         : "";
 
+      const agentTag = msg.agent ? ` <span class="agent-badge">${esc(msg.agent)}</span>` : "";
       const label = isRoot ? `Turn ${turnNum} — root cause` : `Turn ${turnNum}`;
       const cascadeDesc = cascadeMap.get(turnNum);
       const plain = stripHtml(msg.content);
       const content = cascadeDesc ?? (plain.length > 200 ? plain.slice(0, 200) + "..." : plain);
 
-      return `<div class="turn"><div class="tdot ${dotClass}"></div><div class="tc"><div class="tc-label">${label}</div><div class="tc-text">${escBold(content)}</div>${failBadges || fixCta ? `<div class="tc-badges">${failBadges}${fixCta}</div>` : ""}</div></div>`;
+      return `<div class="turn"><div class="tdot ${dotClass}"></div><div class="tc"><div class="tc-label">${label}${agentTag}</div><div class="tc-text">${escBold(content)}</div>${failBadges || fixCta ? `<div class="tc-badges">${failBadges}${fixCta}</div>` : ""}</div></div>`;
     });
 }
 
