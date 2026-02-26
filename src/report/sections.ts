@@ -4,6 +4,7 @@ import {
   avgMetrics,
   buildConvAgentMap,
   conversationHealth,
+  describeWeakMetrics,
   esc,
   formatFailureType,
   formatSubtype,
@@ -260,7 +261,7 @@ export function renderAllConversations(
       const health = conversationHealth(c.metrics);
       const healthClass = health === "critical" ? "crit" : "major";
       const d = c.diagnosis;
-      const cause = d?.summary ?? "Low quality scores detected";
+      const cause = d?.summary ?? describeWeakMetrics(c.metrics as Record<string, number>);
       const agentName = convAgentMap.get(c.id);
       const agentBadge = agentName && (report.agents?.length ?? 0) > 1
         ? `<span class="agent-badge">${esc(agentName)}</span>`

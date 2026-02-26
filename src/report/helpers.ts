@@ -46,6 +46,31 @@ export function buildConvAgentMap(report: Report): Map<string, string> {
   return map;
 }
 
+const METRIC_LABELS: Record<string, string> = {
+  successScore: "Success",
+  aiRelevancy: "Relevancy",
+  sentiment: "Sentiment",
+  hallucinationScore: "Hallucination",
+  contextRetentionScore: "Context retention",
+  verbosityScore: "Verbosity",
+  taskCompletion: "Task completion",
+  clarity: "Clarity",
+  consistencyScore: "Consistency",
+  naturalLanguageScore: "Language quality",
+  repetitionScore: "Repetition",
+};
+
+/** Describe which metrics are low for a conversation — replaces generic "Low quality scores detected". */
+export function describeWeakMetrics(metrics: Record<string, number>): string {
+  const weak = Object.entries(metrics)
+    .filter(([k, v]) => v < 70 && k !== "truncationScore")
+    .sort((a, b) => a[1] - b[1])
+    .slice(0, 3)
+    .map(([k, v]) => `${METRIC_LABELS[k] ?? k} ${v}`);
+  if (weak.length === 0) return "Borderline quality scores";
+  return `Low ${weak.join(", ")}`;
+}
+
 /** Strip HTML tags from conversation content so it renders as plain text. */
 export function stripHtml(s: string): string {
   return s.replace(/<[^>]+>/g, " ").replace(/\s{2,}/g, " ").trim();
