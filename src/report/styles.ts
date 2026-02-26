@@ -333,6 +333,27 @@ details[open] > summary .chev { transform:rotate(180deg); }
 // ── Inlined JS ──
 
 export const JS = `
+function decodeFix(btn) {
+  return decodeURIComponent(escape(atob(btn.getAttribute('data-fix'))));
+}
+function copyFix(btn) {
+  var text = decodeFix(btn);
+  navigator.clipboard.writeText(text).then(function() {
+    var orig = btn.innerHTML;
+    btn.classList.add('copied');
+    btn.innerHTML = '\\u2713 Copied';
+    setTimeout(function() { btn.innerHTML = orig; btn.classList.remove('copied'); }, 1500);
+  });
+}
+function downloadFix(btn, name) {
+  var text = decodeFix(btn);
+  var blob = new Blob([text], { type: 'text/markdown' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name + '.md';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
 function copyText(btn, text) {
   navigator.clipboard.writeText(text).then(function() {
     var orig = btn.innerHTML;

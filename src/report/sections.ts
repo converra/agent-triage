@@ -1,4 +1,5 @@
 import type { Report } from "../evaluation/types.js";
+import { buildConversationFixMd, buildRecommendationFixMd } from "./fix-instructions.js";
 import {
   avgMetrics,
   buildConvAgentMap,
@@ -201,6 +202,7 @@ export function renderDeepDive(
 
   const keyTurns = buildTurnTimeline(conv, report, cascadeMap).slice(0, 8);
   const metricBadges = buildMetricBadges(conv.metrics as Record<string, number>);
+  const fixMd = btoa(unescape(encodeURIComponent(buildConversationFixMd(conv, report))));
   const blastHtml = d.blastRadius.length > 0
     ? `<div class="blast"><span class="blast-icon">${ICONS.alertTriangleSm}</span><span><strong>Blast radius:</strong> Editing may affect ${d.blastRadius.map((r) => `<em>${esc(r)}</em>`).join(", ")}.</span></div>`
     : "";
@@ -236,7 +238,8 @@ export function renderDeepDive(
     ${blastHtml}
 
     <div class="diag-cta">
-      <button class="copy-btn" onclick="copyText(this, '${esc(d.fix).replace(/'/g, "\\'")}')">${ICONS.copy} Copy fix</button>
+      <button class="copy-btn" data-fix="${fixMd}" onclick="copyFix(this)">${ICONS.copy} Copy fix instructions</button>
+      <button class="copy-btn" data-fix="${fixMd}" onclick="downloadFix(this, 'fix-${esc(conv.id.slice(0, 10))}')">${ICONS.fileSm} Download .md</button>
       <a href="https://converra.ai" class="diag-link">Test with Converra ${ICONS.externalSm}</a>
     </div>
   </details>`;
@@ -274,13 +277,7 @@ export function renderAllConversations(
         return `<span class="metric-mini ${color}">${val}</span>`;
       }).join("");
 
-      const wif = d
-        ? `<div class="conv-expand"><div class="wif">
-            <div class="wif-s"><div class="wif-l">What happened</div><div class="wif-t">${esc(d.summary)}</div></div>
-            <div class="wif-s"><div class="wif-l impact">Impact</div><div class="wif-t">${esc(d.impact)}</div></div>
-            <div class="wif-s"><div class="wif-l fix">Fix</div><div class="wif-t">${esc(d.fix)} <span class="wif-conf">(${d.confidence} confidence)</span></div></div>
-          </div></div>`
-        : "";
+      const wif = d ? `<div class="conv-expand"><div class="wif"><div class="wif-s"><div class="wif-l">What happened</div><div class="wif-t">${esc(d.summary)}</div></div><div class="wif-s"><div class="wif-l impact">Impact</div><div class="wif-t">${esc(d.impact)}</div></div><div class="wif-s"><div class="wif-l fix">Fix</div><div class="wif-t">${esc(d.fix)} <span class="wif-conf">(${d.confidence} confidence)</span></div></div></div></div>` : "";
 
       return `<details class="conv-detail" id="${esc(c.id)}">
         <summary>
@@ -404,6 +401,7 @@ export function renderRecommendations(report: Report): string {
       const targets = [...rec.targetSubtypes, ...rec.targetFailureTypes]
         .map(formatSubtype)
         .join(", ");
+      const recMd = btoa(unescape(encodeURIComponent(buildRecommendationFixMd(rec, i))));
       return `<details class="rec-card"${i === 0 ? " open" : ""}>
       <summary>
         <span class="rec-num">${i + 1}</span>
@@ -416,7 +414,8 @@ export function renderRecommendations(report: Report): string {
       <div class="rec-detail">
         <div class="rec-desc">${esc(rec.description)}</div>
         <div class="rec-actions">
-          <button class="copy-btn" onclick="copyText(this, '${esc(rec.title + ": " + rec.description).replace(/'/g, "\\'")}')">${ICONS.copy} Copy</button>
+          <button class="copy-btn" data-fix="${recMd}" onclick="copyFix(this)">${ICONS.copy} Copy instructions</button>
+          <button class="copy-btn" data-fix="${recMd}" onclick="downloadFix(this, 'rec-${i + 1}')">${ICONS.fileSm} Download .md</button>
         </div>
       </div>
     </details>`;
@@ -463,11 +462,12 @@ export function renderBehavioralRules(report: Report): string {
 }
 
 export function renderNextStep(report: Report): string {
+  const recCount = report.failurePatterns.topRecommendations.length;
   return `<div class="next-step">
     <div class="next-step-header">${ICONS.external} What Converra can do with this report</div>
     <div class="next-step-body">
-      <div class="next-step-item">${ICONS.fileSm} <strong>Generate prompt patches</strong> for all ${report.failurePatterns.topRecommendations.length} recommendations</div>
-      <div class="next-step-item">${ICONS.checkCircleSm2} <strong>Simulate with 50 conversations</strong> to validate fixes before deploying</div>
+      <div class="next-step-item">${ICONS.fileSm} <strong>Generate prompt patches</strong> for all ${recCount} recommendations</div>
+      <div class="next-step-item">${ICONS.checkCircleSm2} <strong>Simulate</strong> to validate fixes before deploying</div>
       <div class="next-step-item">${ICONS.checkAll} <strong>Deploy the winning variant</strong> without regressions</div>
     </div>
     <div class="next-step-footer">
