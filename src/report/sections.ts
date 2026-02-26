@@ -6,6 +6,7 @@ import {
   conversationHealth,
   describeWeakMetrics,
   esc,
+  escBold,
   formatFailureType,
   formatSubtype,
   stripHtml,
@@ -168,7 +169,7 @@ function buildTurnTimeline(
       const plain = stripHtml(msg.content);
       const content = cascadeDesc ?? (plain.length > 200 ? plain.slice(0, 200) + "..." : plain);
 
-      return `<div class="turn"><div class="tdot ${dotClass}"></div><div class="tc"><div class="tc-label">${label}</div><div class="tc-text">${esc(content)}</div>${failBadges || fixCta ? `<div class="tc-badges">${failBadges}${fixCta}</div>` : ""}</div></div>`;
+      return `<div class="turn"><div class="tdot ${dotClass}"></div><div class="tc"><div class="tc-label">${label}</div><div class="tc-text">${escBold(content)}</div>${failBadges || fixCta ? `<div class="tc-badges">${failBadges}${fixCta}</div>` : ""}</div></div>`;
     });
 }
 
@@ -279,9 +280,9 @@ function renderConvDive(
       ${turns.join("")}
     </div>
     <div class="wif">
-      <div class="wif-s"><div class="wif-l">What happened</div><div class="wif-t">${esc(d.summary)}</div></div>
-      <div class="wif-s"><div class="wif-l impact">Impact</div><div class="wif-t">${esc(d.impact)}</div></div>
-      <div class="wif-s"><div class="wif-l fix">Fix</div><div class="wif-t">${esc(d.fix)} <span class="wif-conf">(${d.confidence} confidence)</span></div></div>
+      <div class="wif-s"><div class="wif-l">What happened</div><div class="wif-t">${escBold(d.summary)}</div></div>
+      <div class="wif-s"><div class="wif-l impact">Impact</div><div class="wif-t">${escBold(d.impact)}</div></div>
+      <div class="wif-s"><div class="wif-l fix">Fix</div><div class="wif-t">${escBold(d.fix)} <span class="wif-conf">(${d.confidence} confidence)</span></div></div>
     </div>
     ${blastHtml}
     <div class="diag-cta">

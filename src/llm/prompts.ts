@@ -223,6 +223,7 @@ Provide a detailed diagnosis:
 9. failureType: "prompt_issue" | "orchestration_issue" | "model_limitation" | "retrieval_rag_issue"
 10. failureSubtype: specific sub-category
 11. blastRadius: array of policy names that might be affected if the suggested fix is applied (policies that could regress)
+12. When multiple agents/roles are involved, wrap agent or role names in **bold** markers in summary, impact, fix, and cascadeChain fields. Example: "**Router** failed to hand off to **FAQ Agent**". This makes agent attribution scannable in the report.
 
 Return ONLY valid JSON with no additional text:
 {
