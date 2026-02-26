@@ -143,6 +143,34 @@ export function renderAgentHealth(report: Report): string {
 }
 
 
+/** Detect raw JSON / structured routing data and return a short summary instead. */
+function summarizeTurnContent(text: string): string {
+  const trimmed = text.trim();
+
+  // Detect JSON objects or arrays
+  if ((trimmed.startsWith("{") && trimmed.endsWith("}")) || (trimmed.startsWith("[") && trimmed.endsWith("]"))) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+        const keys = Object.keys(parsed);
+        if (keys.length === 0) return "[Empty routing data]";
+        const preview = keys.slice(0, 3).join(", ");
+        const more = keys.length > 3 ? ` +${keys.length - 3} more` : "";
+        return `[Structured data: ${preview}${more}]`;
+      }
+      if (Array.isArray(parsed)) {
+        return `[Array with ${parsed.length} item${parsed.length !== 1 ? "s" : ""}]`;
+      }
+    } catch {
+      // Not valid JSON — fall through
+    }
+  }
+
+  // Truncate long text
+  if (trimmed.length > 200) return trimmed.slice(0, 200) + "...";
+  return trimmed;
+}
+
 function buildTurnTimeline(
   conv: Report["conversations"][0],
   report: Report,
@@ -161,12 +189,16 @@ function buildTurnTimeline(
 
       const failingPolicies = conv.policyResults
         .filter((pr) => !pr.passed && pr.failingTurns?.includes(turnNum));
-      const failBadges = failingPolicies
+      const MAX_BADGES = 3;
+      const shownPolicies = failingPolicies.slice(0, MAX_BADGES);
+      const overflowCount = failingPolicies.length - MAX_BADGES;
+      const failBadges = shownPolicies
         .map((pr) => {
           const policy = report.policies.find((p) => p.id === pr.policyId);
           return `<span class="tb f">${esc(policy?.name ?? pr.policyId)} ×</span>`;
         })
-        .join("");
+        .join("")
+        + (overflowCount > 0 ? `<span class="tb f" style="opacity:0.7;">+${overflowCount} more</span>` : "");
       const fixCta = failingPolicies.length > 0 && fixMd
         ? `<button class="copy-btn" style="padding:2px 8px;font-size:11px;" data-fix="${fixMd}" onclick="copyFix(this)">${ICONS.copy} Copy fix</button>`
         : "";
@@ -175,9 +207,10 @@ function buildTurnTimeline(
       const label = isRoot ? `Turn ${turnNum} — root cause` : `Turn ${turnNum}`;
       const cascadeDesc = cascadeMap.get(turnNum);
       const plain = stripHtml(msg.content);
-      const content = cascadeDesc ?? (plain.length > 200 ? plain.slice(0, 200) + "..." : plain);
+      const content = summarizeTurnContent(plain);
+      const diagNote = cascadeDesc ? `<div class="tc-diag">↳ ${escBold(cascadeDesc)}</div>` : "";
 
-      return `<div class="turn"><div class="tdot ${dotClass}"></div><div class="tc"><div class="tc-label">${label}${agentTag}</div><div class="tc-text">${escBold(content)}</div>${failBadges || fixCta ? `<div class="tc-badges">${failBadges}${fixCta}</div>` : ""}</div></div>`;
+      return `<div class="turn"><div class="tdot ${dotClass}"></div><div class="tc"><div class="tc-label">${label}${agentTag}</div><div class="tc-text">${escBold(content)}</div>${diagNote}${failBadges || fixCta ? `<div class="tc-badges">${failBadges}${fixCta}</div>` : ""}</div></div>`;
     });
 }
 

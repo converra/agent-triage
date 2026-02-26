@@ -224,6 +224,7 @@ details[open] > summary .chev { transform:rotate(180deg); }
 .tc { flex:1; }
 .tc-label { font-size:13px; font-weight:600; margin-bottom:1px; }
 .tc-text { font-size:13px; color:var(--text-2); line-height:1.5; }
+.tc-diag { font-size:12px; color:var(--amber); margin-top:3px; font-style:italic; }
 .tc-badges { display:flex; gap:5px; margin-top:4px; flex-wrap:wrap; }
 .tb { font-size:11px; padding:1px 8px; border-radius:20px; font-weight:500; }
 .tb.f { background:var(--red-bg); color:var(--red); border:1px solid var(--red-border); }
