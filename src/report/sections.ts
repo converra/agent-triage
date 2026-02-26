@@ -1,5 +1,5 @@
 import type { Report } from "../evaluation/types.js";
-import { buildConversationFixMd, buildRecommendationFixMd } from "./fix-instructions.js";
+import { buildConversationFixMd, buildPatternFixMd, buildRecommendationFixMd } from "./fix-instructions.js";
 import {
   avgMetrics,
   buildConvAgentMap,
@@ -379,17 +379,22 @@ function renderPatternDetail(
       ? `<span class="critical-tag">${ICONS.alertTriangleSm} ${pattern.criticalCount} critical</span>`
       : "";
 
+  const patternMd = btoa(unescape(encodeURIComponent(buildPatternFixMd(pattern, affected))));
+
   return `<details class="pattern">
     <summary>
       <span class="type-badge ${typeClass}">${label}</span>
       <span class="pattern-count">${pattern.count}</span>
       ${criticalTag}
-      <a href="https://converra.ai" class="fix-link" style="margin-left:auto;">Test in Converra ${ICONS.externalSm}</a>
       ${ICONS.chevDown}
     </summary>
     <div class="pattern-body">
       <div class="subtypes">${subtypesHtml}</div>
       ${convRows ? `<div class="pattern-convs"><div class="pattern-convs-label">Top affected conversations</div>${convRows}</div>` : ""}
+      <div class="rec-actions" style="margin-top:12px;">
+        <button class="copy-btn" data-fix="${patternMd}" onclick="copyFix(this)">${ICONS.copy} Copy fix instructions</button>
+        <button class="copy-btn" data-fix="${patternMd}" onclick="downloadFix(this, 'fix-${esc(pattern.type)}')">${ICONS.fileSm} Download .md</button>
+      </div>
     </div>
   </details>`;
 }
@@ -489,10 +494,5 @@ export function renderReproducibility(report: Report): string {
 }
 
 export function renderFooter(): string {
-  return `<div class="ftr">
-  <div class="ftr-brand"><div class="ftr-mark">${ICONS.check}</div><span class="ftr-text">Powered by <a href="https://converra.ai" class="ftr-name">Converra</a></span></div>
-  <div class="ftr-tag">This report diagnoses problems. Converra treats them — generates prompt patches, simulates against your rules, and deploys without regressions.</div>
-  <a class="ftr-cta" href="https://converra.ai">See how Converra works ${ICONS.externalSm}</a>
-  <div class="helpful">Was this report useful? <button class="hbtn">${ICONS.thumbUp}</button> <button class="hbtn">${ICONS.thumbDown}</button></div>
-</div>`;
+  return `<div class="ftr"><div class="ftr-brand"><div class="ftr-mark">${ICONS.check}</div><span class="ftr-text">Powered by <a href="https://converra.ai" class="ftr-name">Converra</a></span></div><div class="ftr-tag">This report diagnoses problems. Converra treats them — generates prompt patches, simulates against your rules, and deploys without regressions.</div><a class="ftr-cta" href="https://converra.ai">See how Converra works ${ICONS.externalSm}</a><div class="helpful">Was this report useful? <button class="hbtn">${ICONS.thumbUp}</button> <button class="hbtn">${ICONS.thumbDown}</button></div></div>`;
 }
