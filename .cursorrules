@@ -1,0 +1,21 @@
+TypeScript strict mode, ESM. All imports use `.js` extensions (Node16 module resolution).
+
+Early returns, small functions (<50 lines), descriptive names. Prefer editing existing files.
+
+Core flow: Traces → NormalizedConversation → Evaluate (metrics + policies) → Diagnose → Report.
+
+Key files:
+- src/ingestion/types.ts — NormalizedConversation (universal trace format)
+- src/evaluation/types.ts — Report, PolicyResult, Diagnosis, MetricScores
+- src/llm/client.ts — createLlmClient() for OpenAI/Anthropic
+- src/llm/prompts.ts — all prompt templates (structured JSON output)
+- src/llm/json.ts — safeJSONParse() for LLM responses (never raw JSON.parse)
+- src/report/generator.ts — buildHtml(report) entry point
+- src/report/sections.ts — all report render functions
+- src/report/styles.ts — inline CSS, JS, and SVG icons
+- src/mcp/tools-read.ts — zero-cost MCP tools
+- src/mcp/tools-eval.ts — LLM-cost MCP tools
+
+Tests: vitest, mirror src/ structure, mock LLM responses. Run: npm test
+Type-check: npm run lint
+Commits: feat: | fix: | test: | docs: | refactor:
