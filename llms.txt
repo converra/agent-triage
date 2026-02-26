@@ -1,0 +1,65 @@
+# agent-triage
+
+> Diagnose your AI agents in production. Extract testable policies from your agent's system prompt, evaluate real traces against them, and generate a diagnostic report that pinpoints exactly what's failing, which agent caused it, and what to fix.
+
+## What it does
+
+agent-triage treats your agent's system prompt as a behavioral contract. It extracts testable policies from the prompt, evaluates production traces against every policy, and generates a single self-contained HTML report showing:
+
+- Which policies are failing and at what rate
+- Step-level root cause analysis (which step, which agent, which policy)
+- Failure cascade chains (how one mistake propagates)
+- Blast-radius warnings (what else might break if you fix this)
+- 12 quality metrics (success, hallucination, sentiment, relevancy, etc.)
+- Ranked recommendations with confidence scores
+
+## Quick start
+
+```bash
+npx agent-triage demo                                    # see it in action
+npx agent-triage analyze --langsmith my-project           # zero-config evaluation
+npx agent-triage analyze --traces data.json --prompt p.txt # from JSON traces
+```
+
+## Trace sources
+
+- **JSON** — array of `{id, messages: [{role, content}]}` objects
+- **LangSmith** — auto-discovers agents, extracts policies, fetches traces
+- **OpenTelemetry** — OTLP/JSON export following GenAI semantic conventions
+
+## CLI commands
+
+- `init` — extract policies from a system prompt
+- `analyze` — evaluate traces and generate a diagnostic report
+- `check` — targeted policy compliance check (cheaper than analyze)
+- `explain` — deep-dive root cause diagnosis of a single conversation
+- `status` — instant health check from last report (zero LLM cost)
+- `history` — compliance trends across runs
+- `diff` — compare two reports
+- `view` — open HTML report in browser
+- `demo` — run a full demo with built-in examples
+
+## MCP server
+
+agent-triage includes an MCP server for AI assistants (Claude, Cursor, etc.):
+
+```json
+{"mcpServers": {"agent-triage": {"command": "npx", "args": ["-y", "agent-triage-mcp"]}}}
+```
+
+Tools: `triage_status`, `triage_sample`, `triage_list_policies`, `triage_history`, `triage_diff`, `triage_check`, `triage_explain`, `triage_init`, `triage_analyze`
+
+## Programmatic API
+
+```typescript
+import { readJsonTraces, extractPolicies, createLlmClient, evaluateAll, buildHtml } from "agent-triage";
+```
+
+## Links
+
+- Docs: https://github.com/converra/agent-triage#readme
+- Full LLM context: https://github.com/converra/agent-triage/blob/main/llms-full.txt
+- npm: https://www.npmjs.com/package/agent-triage
+- Issues: https://github.com/converra/agent-triage/issues
+- License: FSL-1.1-Apache-2.0 (converts to Apache 2.0 after 2 years)
+- Built by: Converra (https://converra.ai)

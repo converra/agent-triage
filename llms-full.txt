@@ -1,0 +1,361 @@
+# agent-triage — Full Reference
+
+> Diagnose your AI agents in production. Extract testable policies from your agent's system prompt, evaluate real traces against them, and generate a diagnostic report that pinpoints exactly what's failing, which agent caused it, and what to fix.
+
+## Overview
+
+agent-triage is a CLI tool, MCP server, and Node.js library for debugging AI agents. It works by:
+
+1. **Extracting policies** from your agent's system prompt (e.g., "never fabricate pricing", "escalate billing issues to a human")
+2. **Evaluating production traces** against those policies using an LLM judge
+3. **Generating a diagnostic report** with step-level root cause analysis, failure cascades, blast-radius warnings, and ranked fix recommendations
+
+It supports three trace sources (JSON, LangSmith, OpenTelemetry) and works with OpenAI or Anthropic as the evaluator LLM.
+
+## Installation
+
+```bash
+# Run directly (no install)
+npx agent-triage demo
+
+# Install as dependency
+npm install agent-triage
+```
+
+Requirements: Node.js >= 18, an OpenAI or Anthropic API key.
+
+```bash
+export OPENAI_API_KEY=sk-...
+# or
+export ANTHROPIC_API_KEY=sk-ant-...
+```
+
+## CLI Commands
+
+### analyze
+
+Evaluate traces against policies and generate a diagnostic report.
+
+```bash
+agent-triage analyze --traces conversations.json --prompt system-prompt.txt
+agent-triage analyze --langsmith my-project
+agent-triage analyze --otel traces.json
+agent-triage analyze --langsmith my-project --since 24h --quick
+agent-triage analyze --langsmith my-project --agent "billing-agent"
+```
+
+Options:
+- `--traces <path>` — path to JSON/JSONL trace file
+- `--langsmith <project>` — LangSmith project name
+- `--otel <path>` — OpenTelemetry OTLP/JSON export
+- `--prompt <path>` — system prompt file for policy extraction
+- `--quick` — skip diagnosis and fix generation (~60% cheaper)
+- `--since <duration>` — start of time window (e.g., 2h, 24h, 7d)
+- `--until <duration>` — end of time window
+- `--agent <name>` — filter to a specific agent
+- `--dry-run` — show estimated cost without calling the LLM
+- `--max-conversations <n>` — limit to N traces
+- `--format json` — output JSON to stdout
+- `--model <model>` — evaluator model (default: gpt-4o-mini)
+- `--provider <provider>` — openai, anthropic, or openai-compatible
+- `--include-prompt` — include system prompt in report JSON
+- `--summary-only` — omit trace transcripts from report
+
+### init
+
+Extract testable policies from a system prompt.
+
+```bash
+agent-triage init --prompt system-prompt.txt
+```
+
+Outputs `policies.json` — editable behavioral rules.
+
+### check
+
+Targeted policy compliance check (cheaper than full analyze).
+
+```bash
+agent-triage check --langsmith my-project --since 24h
+agent-triage check --langsmith my-project --policy escalation-policy --policy tone-policy
+agent-triage check --traces data.json --threshold 90  # CI gate: exit 1 if below threshold
+```
+
+### explain
+
+Deep-dive diagnosis of a single conversation.
+
+```bash
+agent-triage explain --worst          # worst from last report
+agent-triage explain conv_abc123      # specific conversation
+agent-triage explain conv_abc123 --langsmith my-project
+```
+
+### status
+
+Instant health check from last report (zero LLM cost).
+
+```bash
+agent-triage status
+```
+
+### history
+
+Compliance trends across runs (zero LLM cost).
+
+```bash
+agent-triage history
+agent-triage history --last 5
+agent-triage history --format json
+```
+
+### diff
+
+Compare two reports.
+
+```bash
+agent-triage diff before/report.json after/report.json
+```
+
+### view
+
+Open the HTML report in your browser.
+
+```bash
+agent-triage view
+```
+
+### demo
+
+Run a full demo with built-in example data.
+
+```bash
+agent-triage demo
+```
+
+## Debugging Workflow
+
+agent-triage is designed around a debugging funnel:
+
+```
+SIGNAL -> SCOPE -> ISOLATE -> DIAGNOSE -> FIX -> VERIFY
+```
+
+1. `status` — is something wrong? (instant, reads from disk)
+2. `analyze --quick` — what kind of conversations are failing? (cheaper)
+3. `explain --worst` — find the worst failure
+4. `explain conv_id` — deep-dive into a specific conversation
+5. Fix the prompt, re-run `analyze`
+6. `diff before.json after.json` — did the fix work?
+7. `history` — track progress over time
+
+## Trace Formats
+
+### JSON
+
+```json
+[
+  {
+    "id": "conv_001",
+    "messages": [
+      {"role": "system", "content": "You are a support agent..."},
+      {"role": "user", "content": "I need help"},
+      {"role": "assistant", "content": "I'd be happy to help!"}
+    ]
+  }
+]
+```
+
+Flexible field mapping: `role`/`sender`, `content`/`text`/`message`, `human`/`ai`/`bot`/`agent` role variants. JSONL also supported.
+
+### LangSmith
+
+Set `LANGSMITH_API_KEY` env var. Auto-detects trace-based vs session-based architectures, discovers agents by system prompt, pushes time filters server-side.
+
+### OpenTelemetry
+
+OTLP/JSON traces following GenAI semantic conventions (v1.36.0).
+
+## MCP Server
+
+For AI assistants (Claude, Cursor, etc.):
+
+```json
+{
+  "mcpServers": {
+    "agent-triage": {
+      "command": "npx",
+      "args": ["-y", "agent-triage-mcp"]
+    }
+  }
+}
+```
+
+### MCP Tools
+
+| Tool | Cost | Purpose |
+|------|------|---------|
+| `triage_status` | Zero | Health check from last report |
+| `triage_sample` | Zero | Browse conversations with keyword search |
+| `triage_list_policies` | Zero | List loaded policies |
+| `triage_history` | Zero | Compliance trends across runs |
+| `triage_diff` | Zero | Compare two reports |
+| `triage_check` | Moderate | Targeted policy compliance |
+| `triage_explain` | Moderate | Root cause diagnosis |
+| `triage_init` | Moderate | Extract policies from prompt |
+| `triage_analyze` | High | Full evaluation pipeline |
+
+## Programmatic API
+
+```typescript
+import {
+  // Trace ingestion
+  readJsonTraces,
+  readLangSmithTraces,
+  readOtelTraces,
+  autoExtractPolicies,
+  discoverAgents,
+
+  // Policy extraction
+  extractPolicies,
+
+  // LLM client
+  createLlmClient,
+
+  // Evaluation
+  evaluateConversation,
+  checkPolicies,
+  evaluateAll,
+  generateDiagnoses,
+  generateFixes,
+  generateRecommendations,
+
+  // Aggregation
+  aggregatePolicies,
+  aggregateFailurePatterns,
+  calculateMetricSummary,
+  calculateOverallCompliance,
+
+  // Reporting
+  buildHtml,
+  generateHtmlReport,
+  diffReports,
+  formatDiffTerminal,
+
+  // Config
+  loadConfig,
+  resolveApiKey,
+  estimateCost,
+
+  // Utilities
+  parseJsonResponse,
+  applyFilters,
+  parseDuration,
+  createLogger,
+  appendHistory,
+  readHistory,
+  extractHistoryEntry,
+} from "agent-triage";
+```
+
+### Key types
+
+```typescript
+interface NormalizedConversation {
+  id: string;
+  messages: Message[];
+}
+
+interface Message {
+  role: "system" | "user" | "assistant" | "tool";
+  content: string;
+}
+
+interface Policy {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  severity: "critical" | "high" | "medium" | "low";
+  testable: boolean;
+}
+
+interface Report {
+  conversations: ConversationResult[];
+  policies: PolicyResult[];
+  metrics: MetricScores;
+  failurePatterns: FailurePattern[];
+  recommendations: Recommendation[];
+}
+```
+
+## Configuration File
+
+`agent-triage.config.yaml`:
+
+```yaml
+llm:
+  provider: openai          # openai | anthropic | openai-compatible
+  model: gpt-4o-mini
+  maxConcurrency: 5
+
+prompt:
+  path: system-prompt.txt
+
+agent:
+  name: "My Support Agent"
+
+output:
+  dir: .
+  maxConversations: 500
+```
+
+Environment variable references (`${VAR_NAME}`) are resolved automatically. CLI flags override config values.
+
+## 12 Quality Metrics
+
+| Metric | What It Measures |
+|--------|-----------------|
+| Success Score | Did the agent achieve the user's goal? |
+| AI Relevancy | Were responses on-topic and useful? |
+| Sentiment | How did the user feel? |
+| Hallucination | Claims not supported by system prompt? |
+| Repetition | Unnecessary repetition? |
+| Consistency | Responses consistent with each other? |
+| Natural Language | Did the agent sound natural? |
+| Context Retention | Did the agent remember earlier context? |
+| Verbosity | Appropriately concise? |
+| Task Completion | Were all user requests addressed? |
+| Clarity | Clear and easy to understand? |
+| Truncation | Responses cut off mid-sentence? |
+
+## Project Structure
+
+```
+src/
+  cli/          — CLI commands (analyze, check, explain, init, status, history, diff, view, demo)
+  ingestion/    — Trace connectors (json, langsmith, otel, auto-discovery)
+  evaluation/   — Evaluator, policy checker, diagnosis, fix generator
+  aggregation/  — Policy and metric aggregation
+  llm/          — LLM client abstraction (OpenAI, Anthropic)
+  policy/       — Policy types and extraction
+  report/       — HTML report generation
+  diff/         — Cross-run comparison
+  config/       — Configuration loading and defaults
+  mcp/          — MCP server (tools-read, tools-eval, helpers)
+  history.ts    — Run history tracking
+  index.ts      — Public API exports
+test/           — Vitest unit tests
+data/           — Built-in demo data
+```
+
+## License
+
+FSL-1.1-Apache-2.0 — Free to use and self-host. Cannot be offered as a competing hosted service. Converts to Apache 2.0 after 2 years.
+
+## Links
+
+- Repository: https://github.com/converra/agent-triage
+- npm: https://www.npmjs.com/package/agent-triage
+- Issues: https://github.com/converra/agent-triage/issues
+- Built by Converra: https://converra.ai

@@ -27,11 +27,15 @@
   "keywords": [
     "ai",
     "ai-agent",
+    "ai-agent-debugging",
     "ai-evaluation",
     "agent-testing",
+    "agent-monitoring",
+    "agent-observability",
     "llm",
     "llm-evaluation",
     "llm-testing",
+    "llm-ops",
     "prompt-engineering",
     "prompt-testing",
     "policy",
@@ -44,7 +48,11 @@
     "langsmith",
     "ai-observability",
     "evaluation-framework",
-    "triage"
+    "triage",
+    "mcp",
+    "model-context-protocol",
+    "ai-safety",
+    "hallucination-detection"
   ],
   "author": "Converra <hello@converra.ai>",
   "license": "FSL-1.1-Apache-2.0",
@@ -70,7 +78,9 @@
     "dist",
     "data",
     "LICENSE",
-    "README.md"
+    "README.md",
+    "llms.txt",
+    "llms-full.txt"
   ],
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
