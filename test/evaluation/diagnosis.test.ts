@@ -59,11 +59,13 @@ describe("generateDiagnoses", () => {
     expect(d.blastRadius).toContain("tone-policy");
   });
 
-  it("skips conversations with no policy failures", async () => {
+  it("skips conversations with no policy failures and good scores", async () => {
     const llm = createMockLlm(() => diagnosisResponse);
     const conversations = [makeConversation("conv-1")];
+    // All metrics at 80+ (avg well above 75) and no policy failures → should skip
+    const highMetrics = { ...VALID_METRICS, truncationScore: 0, repetitionScore: 80, sentiment: 80, contextRetentionScore: 80 };
     const results: ConversationResult[] = [
-      makeResult("conv-1"), // all passing
+      makeResult("conv-1", { metrics: highMetrics }),
     ];
 
     await generateDiagnoses(
@@ -75,6 +77,30 @@ describe("generateDiagnoses", () => {
 
     expect(results[0]!.diagnosis).toBeUndefined();
     expect(llm.call).not.toHaveBeenCalled();
+  });
+
+  it("diagnoses low-scoring conversations even without policy failures", async () => {
+    const llm = createMockLlm(() => diagnosisResponse);
+    const conversations = [makeConversation("conv-1")];
+    // Low scores but no policy failures → should still diagnose
+    const results: ConversationResult[] = [
+      makeResult("conv-1", {
+        metrics: { ...VALID_METRICS, successScore: 40, sentiment: 30 },
+        policyResults: [
+          { policyId: "greet", verdict: "pass" as const, passed: true, evidence: "OK" },
+        ],
+      }),
+    ];
+
+    await generateDiagnoses(
+      llm as unknown as LlmClient,
+      results,
+      conversations,
+      systemPrompt,
+    );
+
+    expect(results[0]!.diagnosis).toBeDefined();
+    expect(results[0]!.diagnosis!.summary).toContain("fabricated");
   });
 
   it("prioritizes worst conversations by average metric score", async () => {

@@ -9,6 +9,7 @@ function makeReport(overrides: Partial<Report> = {}): Report {
     llmModel: "gpt-4o-mini",
     policiesHash: "abc123",
     agent: { name: "Test Agent", promptPath: "prompt.txt" },
+    agents: [],
     generatedAt: "2025-06-15T12:00:00Z",
     runDuration: 45,
     totalConversations: 5,
@@ -21,6 +22,8 @@ function makeReport(overrides: Partial<Report> = {}): Report {
         category: "tone",
         passing: 4,
         failing: 1,
+        notApplicable: 0,
+        evaluated: 5,
         total: 5,
         complianceRate: 80,
         failingConversationIds: ["conv-3"],
@@ -43,7 +46,7 @@ function makeReport(overrides: Partial<Report> = {}): Report {
           clarity: 85,
           truncationScore: 0,
         },
-        policyResults: [{ policyId: "greet", passed: true, evidence: "OK" }],
+        policyResults: [{ policyId: "greet", verdict: "pass" as const, passed: true, evidence: "OK" }],
         messages: [
           { role: "user", content: "Hello" },
           { role: "assistant", content: "Hi there!" },
@@ -98,11 +101,11 @@ describe("buildHtml", () => {
     expect(html).toContain("Sentiment");
   });
 
-  it("includes pipeline statistics", () => {
+  it("includes health summary statistics", () => {
     const html = buildHtml(makeReport());
-    expect(html).toContain("Policies extracted");
     expect(html).toContain("Conversations");
-    expect(html).toContain("Failures found");
+    expect(html).toContain("Healthy");
+    expect(html).toContain("evaluated");
   });
 
   it("includes recommendations section", () => {
@@ -113,7 +116,7 @@ describe("buildHtml", () => {
 
   it("includes failure patterns section", () => {
     const html = buildHtml(makeReport());
-    expect(html).toContain("Where things break");
+    expect(html).toContain("Root cause analysis");
     expect(html).toContain("Prompt Issue");
   });
 
@@ -123,7 +126,7 @@ describe("buildHtml", () => {
     expect(html).toContain("$0.05");
   });
 
-  it("shows all-passing verdict when no failures", () => {
+  it("shows all-healthy verdict when no failures", () => {
     const html = buildHtml(
       makeReport({
         policies: [
@@ -135,6 +138,8 @@ describe("buildHtml", () => {
             category: "tone",
             passing: 5,
             failing: 0,
+            notApplicable: 0,
+            evaluated: 5,
             total: 5,
             complianceRate: 100,
             failingConversationIds: [],
@@ -143,7 +148,7 @@ describe("buildHtml", () => {
         failurePatterns: { byType: [], topRecommendations: [], totalFailures: 0 },
       }),
     );
-    expect(html).toContain("All 1 policies are passing");
+    expect(html).toContain("conversations are healthy");
   });
 
   it("escapes HTML in agent name", () => {
@@ -191,6 +196,7 @@ describe("buildHtml", () => {
             policyResults: [
               {
                 policyId: "greet",
+                verdict: "fail" as const,
                 passed: false,
                 evidence: "Turn 3: Agent lost context",
                 failingTurns: [3],

@@ -72,7 +72,7 @@ export function makeResult(
     id,
     metrics: { ...VALID_METRICS },
     policyResults: [
-      { policyId: "greet", passed: true, evidence: "OK" },
+      { policyId: "greet", verdict: "pass" as const, passed: true, evidence: "OK" },
     ],
     messages: [
       { role: "user", content: "hello" },

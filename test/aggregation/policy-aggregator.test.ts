@@ -34,8 +34,8 @@ const results: ConversationResult[] = [
     id: "conv-1",
     metrics: makeMetrics(),
     policyResults: [
-      { policyId: "greet", passed: true, evidence: "Greeted" },
-      { policyId: "escalate", passed: true, evidence: "Escalated correctly" },
+      { policyId: "greet", verdict: "pass", passed: true, evidence: "Greeted" },
+      { policyId: "escalate", verdict: "pass", passed: true, evidence: "Escalated correctly" },
     ],
     messages: [],
   },
@@ -43,9 +43,10 @@ const results: ConversationResult[] = [
     id: "conv-2",
     metrics: makeMetrics({ successScore: 30 }),
     policyResults: [
-      { policyId: "greet", passed: true, evidence: "Greeted" },
+      { policyId: "greet", verdict: "pass", passed: true, evidence: "Greeted" },
       {
         policyId: "escalate",
+        verdict: "fail",
         passed: false,
         evidence: "Did not escalate",
         failingTurns: [3],
@@ -59,8 +60,8 @@ const results: ConversationResult[] = [
     id: "conv-3",
     metrics: makeMetrics({ successScore: 20, sentiment: 20 }),
     policyResults: [
-      { policyId: "greet", passed: false, evidence: "No greeting", failureType: "prompt_issue", failureSubtype: "tone_violation" },
-      { policyId: "escalate", passed: false, evidence: "Ignored billing", failureType: "orchestration_issue", failureSubtype: "wrong_routing" },
+      { policyId: "greet", verdict: "fail", passed: false, evidence: "No greeting", failureType: "prompt_issue", failureSubtype: "tone_violation" },
+      { policyId: "escalate", verdict: "fail", passed: false, evidence: "Ignored billing", failureType: "orchestration_issue", failureSubtype: "wrong_routing" },
     ],
     messages: [],
   },
@@ -144,7 +145,7 @@ describe("aggregateFailurePatterns", () => {
         id: "clean",
         metrics: makeMetrics(),
         policyResults: [
-          { policyId: "greet", passed: true, evidence: "OK" },
+          { policyId: "greet", verdict: "pass", passed: true, evidence: "OK" },
         ],
         messages: [],
       },
@@ -183,8 +184,8 @@ describe("calculateOverallCompliance", () => {
         id: "good",
         metrics: makeMetrics(),
         policyResults: [
-          { policyId: "greet", passed: true, evidence: "OK" },
-          { policyId: "escalate", passed: true, evidence: "OK" },
+          { policyId: "greet", verdict: "pass", passed: true, evidence: "OK" },
+          { policyId: "escalate", verdict: "pass", passed: true, evidence: "OK" },
         ],
         messages: [],
       },

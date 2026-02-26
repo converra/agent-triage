@@ -80,6 +80,7 @@ describe("PolicyResultSchema", () => {
   it("accepts a passing result", () => {
     const result = {
       policyId: "greet",
+      verdict: "pass",
       passed: true,
       evidence: "Agent greeted the user.",
     };
@@ -89,6 +90,7 @@ describe("PolicyResultSchema", () => {
   it("accepts a failing result with all fields", () => {
     const result = {
       policyId: "escalate",
+      verdict: "fail",
       passed: false,
       evidence: "Did not escalate billing dispute",
       failingTurns: [3, 5],
@@ -101,6 +103,7 @@ describe("PolicyResultSchema", () => {
   it("allows null failureType and failureSubtype", () => {
     const result = {
       policyId: "test",
+      verdict: "pass",
       passed: true,
       evidence: "OK",
       failureType: null,

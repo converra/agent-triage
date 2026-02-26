@@ -92,6 +92,15 @@ export async function analyzeCommand(options: AnalyzeOptions): Promise<void> {
   const limited = filtered.slice(0, maxConvs);
   log.log(`\nLoaded ${limited.length} conversations.`);
 
+  // Cache normalized conversations so subsequent runs can use --traces instead of re-fetching
+  if (options.langsmith || options.otel) {
+    const outDir = resolve(process.cwd(), options.output ?? ".");
+    await mkdir(outDir, { recursive: true });
+    const cachePath = resolve(outDir, "conversations.json");
+    await writeFile(cachePath, JSON.stringify(limited, null, 2), "utf-8");
+    log.log(`Saved ${limited.length} conversations to ${cachePath} (re-run with --traces ${cachePath} to skip re-fetching).`);
+  }
+
   // Resolve policies: from file, or auto-discover
   const policiesPath = resolve(
     process.cwd(),
@@ -159,16 +168,10 @@ export async function analyzeCommand(options: AnalyzeOptions): Promise<void> {
         quick: options.quick ?? false,
       }));
     } else {
-      console.log(`\n--- Dry Run ---`);
-      console.log(`Conversations: ${limited.length}`);
-      console.log(`Policies: ${policies.length}`);
-      console.log(`Mode: ${options.quick ? "quick (policy checks only)" : "full (metrics + policies + diagnosis + fixes)"}`);
-      console.log(`Estimated LLM calls: ~${totalCalls}`);
+      const mode = options.quick ? "quick (policy checks only)" : "full (metrics + policies + diagnosis + fixes)";
       const modelLabel = options.model ?? options.provider ?? "gpt-4o-mini";
-      console.log(
-        `Estimated cost with ${modelLabel}: ~$${(limited.length * (options.quick ? 0.006 : 0.012) + (options.quick ? 0 : 0.15)).toFixed(2)}`,
-      );
-      console.log(`\nRun without --dry-run to proceed.`);
+      const cost = (limited.length * (options.quick ? 0.006 : 0.012) + (options.quick ? 0 : 0.15)).toFixed(2);
+      console.log(`\n--- Dry Run ---\nConversations: ${limited.length}\nPolicies: ${policies.length}\nMode: ${mode}\nEstimated LLM calls: ~${totalCalls}\nEstimated cost with ${modelLabel}: ~$${cost}\n\nRun without --dry-run to proceed.`);
     }
     return;
   }
