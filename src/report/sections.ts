@@ -472,5 +472,5 @@ export function renderReproducibility(report: Report): string {
 }
 
 export function renderFooter(): string {
-  return `<div class="ftr"><div class="ftr-brand"><div class="ftr-mark">${ICONS.check}</div><span class="ftr-text">Powered by <a href="https://converra.ai" class="ftr-name">Converra</a></span> — generate prompt patches, simulate fixes, deploy without regressions. <a href="https://converra.ai" class="ftr-link">Learn more ${ICONS.externalSm}</a></span></div><div class="helpful">Was this report useful? <button class="hbtn">${ICONS.thumbUp}</button> <button class="hbtn">${ICONS.thumbDown}</button></div></div>`;
+  return `<div class="ftr"><div class="ftr-brand"><div class="ftr-mark">${ICONS.check}</div><span class="ftr-text">Powered by <a href="https://converra.ai" class="ftr-name">Converra</a></span> — for when you're done fixing agents manually. <a href="https://converra.ai" class="ftr-link">Learn more ${ICONS.externalSm}</a></span></div><div class="helpful">Was this report useful? <button class="hbtn">${ICONS.thumbUp}</button> <button class="hbtn">${ICONS.thumbDown}</button></div></div>`;
 }
