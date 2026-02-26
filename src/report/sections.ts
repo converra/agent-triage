@@ -260,7 +260,7 @@ export function renderAllConversations(
         return `<span class="metric-mini ${color}">${val}</span>`;
       }).join("");
 
-      const wif = d ? `<div class="conv-expand"><div class="wif"><div class="wif-s"><div class="wif-l">What happened</div><div class="wif-t">${esc(d.summary)}</div></div><div class="wif-s"><div class="wif-l impact">Impact</div><div class="wif-t">${esc(d.impact)}</div></div><div class="wif-s"><div class="wif-l fix">Fix</div><div class="wif-t">${esc(d.fix)} <span class="wif-conf">(${d.confidence} confidence)</span></div></div></div></div>` : "";
+      const expand = d ? renderConvDive(c, d, report) : "";
 
       return `<details class="conv-detail" id="${esc(c.id)}">
         <summary>
@@ -272,7 +272,7 @@ export function renderAllConversations(
           <span class="sev-badge ${healthClass}">${health === "critical" ? "critical" : "attention"}</span>
           ${ICONS.chevDownSm}
         </summary>
-        ${wif}
+        ${expand}
       </details>`;
     })
     .join("");
@@ -286,6 +286,37 @@ export function renderAllConversations(
     <div class="stitle">Conversations with issues</div>
     ${convHtml}
     ${moreText}
+  </div>`;
+}
+
+function renderConvDive(
+  conv: Report["conversations"][0],
+  d: NonNullable<Report["conversations"][0]["diagnosis"]>,
+  report: Report,
+): string {
+  const cascadeMap = new Map<number, string>();
+  for (const entry of d.cascadeChain) {
+    const match = entry.match(/^Turn\s+(\d+)\s*:\s*(.+)$/i);
+    if (match) cascadeMap.set(Number(match[1]), match[2]!.trim());
+  }
+
+  const turns = buildTurnTimeline(conv, report, cascadeMap).slice(0, 6);
+  const fixMd = btoa(unescape(encodeURIComponent(buildConversationFixMd(conv, report))));
+
+  return `<div class="conv-expand">
+    <div class="tl">
+      <div class="tl-header"><div class="tl-label">Turn Timeline</div><div class="tl-filter">${turns.length} of ${conv.messages.length} turns</div></div>
+      ${turns.join("")}
+    </div>
+    <div class="wif">
+      <div class="wif-s"><div class="wif-l">What happened</div><div class="wif-t">${esc(d.summary)}</div></div>
+      <div class="wif-s"><div class="wif-l impact">Impact</div><div class="wif-t">${esc(d.impact)}</div></div>
+      <div class="wif-s"><div class="wif-l fix">Fix</div><div class="wif-t">${esc(d.fix)} <span class="wif-conf">(${d.confidence} confidence)</span></div></div>
+    </div>
+    <div class="diag-cta">
+      <button class="copy-btn" data-fix="${fixMd}" onclick="copyFix(this)">${ICONS.copy} Copy fix instructions</button>
+      <button class="copy-btn" data-fix="${fixMd}" onclick="downloadFix(this, 'fix-${esc(conv.id.slice(0, 10))}')">${ICONS.fileSm} Download .md</button>
+    </div>
   </div>`;
 }
 
