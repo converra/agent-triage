@@ -6,7 +6,6 @@ import {
   renderAgentHealth,
   renderAllConversations,
   renderBehavioralRules,
-  renderDeepDive,
   renderFailurePatterns,
   renderFooter,
   renderHeader,
@@ -44,13 +43,9 @@ export function buildHtml(report: Report): string {
   const needsAttention = scored.filter((s) => s.health === "attention").length;
   const critical = scored.filter((s) => s.health === "critical").length;
 
-  const worstConv = report.conversations
-    .filter((c) => c.diagnosis)
-    .sort((a, b) => avgMetrics(a.metrics) - avgMetrics(b.metrics))[0];
-
-  // Conversations with issues — exclude the worst (already shown in deep dive)
+  // All conversations with issues, sorted by score (worst first)
   const issueConvs = scored
-    .filter((s) => s.health !== "healthy" && s.conv.diagnosis && s.conv !== worstConv)
+    .filter((s) => s.health !== "healthy" && s.conv.diagnosis)
     .sort((a, b) => a.avg - b.avg)
     .map((s) => s.conv);
 
@@ -79,7 +74,6 @@ export function buildHtml(report: Report): string {
   ${renderHealthSummary(report, healthy, needsAttention, critical)}
   ${renderMetricsBar(report)}
   ${renderAgentHealth(report)}
-  ${worstConv ? renderDeepDive(worstConv, report) : ""}
   ${renderAllConversations(issueConvs, report)}
   ${renderFailurePatterns(report)}
   ${renderRecommendations(report)}

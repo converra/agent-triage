@@ -68,14 +68,22 @@ export function renderHealthSummary(
   if (promptFixable > 0 && needsCode > 0) detail = `${promptFixable} root causes fixable via prompt changes, ${needsCode} need code changes.`;
   else if (promptFixable > 0) detail = "Root causes are fixable via prompt changes.";
 
+  // Bright spot: count passing rules
+  const evaluated = report.policies.filter((p) => p.evaluated > 0);
+  const passingRules = evaluated.filter((p) => p.failing === 0).length;
+  const brightSpot = passingRules > 0
+    ? `<div class="verdict-detail" style="margin-top:2px;color:var(--text-3);">${passingRules} behavioral rule${passingRules !== 1 ? "s" : ""} passing at 100%.</div>`
+    : "";
+
   return `<div class="health-summary">${counts}
     <div class="verdict" style="margin-top:16px;">
       <div class="verdict-icon">${ICONS.alertTriangle}</div>
       <div class="verdict-body">
         <div class="verdict-text">${issues} of ${total} conversations have issues${critical > 0 ? ` — ${critical} critical` : ""}.</div>
         <div class="verdict-detail">${detail}</div>
+        ${brightSpot}
       </div>
-      <a href="#diagnosis" class="verdict-cta" onclick="document.querySelector('.diag')?.scrollIntoView({behavior:'smooth',block:'start'});return false;">See diagnosis ${ICONS.chevDownSm}</a>
+      <a href="#diagnosis" class="verdict-cta" onclick="document.querySelector('.convs')?.scrollIntoView({behavior:'smooth',block:'start'});return false;">See diagnosis ${ICONS.chevDownSm}</a>
     </div>
   </div>`;
 }
@@ -96,8 +104,23 @@ export function renderMetricsBar(report: Report): string {
     return `<div class="mb-cell"><div class="mb-label">${m.label}</div><div class="mb-val ${color}">${val}</div></div>`;
   });
 
+  // Summarize key findings from step analyses using failure subtypes
+  const diagnosed = report.conversations.filter((c) => c.diagnosis);
+  const subtypeCounts = new Map<string, number>();
+  for (const c of diagnosed) {
+    const st = c.diagnosis!.failureSubtype;
+    if (st) subtypeCounts.set(st, (subtypeCounts.get(st) ?? 0) + 1);
+  }
+  const topSubtypes = [...subtypeCounts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([st, count]) => `${formatSubtype(st)} (${count})`);
+  const insight = topSubtypes.length > 0
+    ? `<div style="font-size:13px;color:var(--text-2);margin-bottom:8px;">Top issues: ${topSubtypes.map((s) => esc(s)).join(", ")}</div>`
+    : "";
+
   return `<div class="stitle" style="margin-top:16px;">Quality metrics (averages)</div>
-  <div class="metrics-bar">${cells.join("")}</div>`;
+  ${insight}<div class="metrics-bar">${cells.join("")}</div>`;
 }
 export function renderAgentHealth(report: Report): string {
   if (!report.agents || report.agents.length <= 1) return "";
@@ -131,6 +154,7 @@ function buildTurnTimeline(
   conv: Report["conversations"][0],
   report: Report,
   cascadeMap: Map<number, string>,
+  fixMd?: string,
 ): string[] {
   const d = conv.diagnosis!;
   return conv.messages
@@ -142,20 +166,24 @@ function buildTurnTimeline(
       const isCascade = !isRoot && !isFailing && turnNum > d.rootCauseTurn;
       const dotClass = isRoot || isFailing ? "f" : isCascade ? "w" : "p";
 
-      const failBadges = conv.policyResults
-        .filter((pr) => !pr.passed && pr.failingTurns?.includes(turnNum))
+      const failingPolicies = conv.policyResults
+        .filter((pr) => !pr.passed && pr.failingTurns?.includes(turnNum));
+      const failBadges = failingPolicies
         .map((pr) => {
           const policy = report.policies.find((p) => p.id === pr.policyId);
           return `<span class="tb f">${esc(policy?.name ?? pr.policyId)} ×</span>`;
         })
         .join("");
+      const fixCta = failingPolicies.length > 0 && fixMd
+        ? `<button class="copy-btn" style="padding:2px 8px;font-size:11px;" data-fix="${fixMd}" onclick="copyFix(this)">${ICONS.copy} Copy fix</button>`
+        : "";
 
       const label = isRoot ? `Turn ${turnNum} — root cause` : `Turn ${turnNum}`;
       const cascadeDesc = cascadeMap.get(turnNum);
       const plain = stripHtml(msg.content);
       const content = cascadeDesc ?? (plain.length > 200 ? plain.slice(0, 200) + "..." : plain);
 
-      return `<div class="turn"><div class="tdot ${dotClass}"></div><div class="tc"><div class="tc-label">${label}</div><div class="tc-text">${esc(content)}</div>${failBadges ? `<div class="tc-badges">${failBadges}</div>` : ""}</div></div>`;
+      return `<div class="turn"><div class="tdot ${dotClass}"></div><div class="tc"><div class="tc-label">${label}</div><div class="tc-text">${esc(content)}</div>${failBadges || fixCta ? `<div class="tc-badges">${failBadges}${fixCta}</div>` : ""}</div></div>`;
     });
 }
 
@@ -172,61 +200,17 @@ function buildMetricBadges(metrics: Record<string, number>): string {
   }).join("");
 }
 
-export function renderDeepDive(
-  conv: Report["conversations"][0],
-  report: Report,
-): string {
-  const d = conv.diagnosis!;
-
-  const cascadeMap = new Map<number, string>();
-  for (const entry of d.cascadeChain) {
-    const match = entry.match(/^Turn\s+(\d+)\s*:\s*(.+)$/i);
-    if (match) cascadeMap.set(Number(match[1]), match[2]!.trim());
+/** Build a map from conversation ID to the failure pattern types it belongs to. */
+function buildConvPatternMap(report: Report): Map<string, string[]> {
+  const map = new Map<string, string[]>();
+  for (const conv of report.conversations) {
+    const types = new Set<string>();
+    for (const pr of conv.policyResults) {
+      if (!pr.passed && pr.failureType) types.add(pr.failureType);
+    }
+    if (types.size > 0) map.set(conv.id, [...types].map(formatFailureType));
   }
-
-  const keyTurns = buildTurnTimeline(conv, report, cascadeMap).slice(0, 8);
-  const metricBadges = buildMetricBadges(conv.metrics as Record<string, number>);
-  const fixMd = btoa(unescape(encodeURIComponent(buildConversationFixMd(conv, report))));
-  const blastHtml = d.blastRadius.length > 0
-    ? `<div class="blast"><span class="blast-icon">${ICONS.alertTriangleSm}</span><span><strong>Blast radius:</strong> Editing may affect ${d.blastRadius.map((r) => `<em>${esc(r)}</em>`).join(", ")}.</span></div>`
-    : "";
-
-  return `<details class="diag" open>
-    <summary>
-      <div>
-        <h2>Deep Dive — Worst Conversation</h2>
-        <div class="diag-sub">
-          Root cause at Turn ${d.rootCauseTurn}${d.rootCauseAgent ? ` (${esc(d.rootCauseAgent)})` : ""} — ${esc(d.summary.split(".")[0] ?? d.summary)}
-          <span class="sev-badge ${d.severity === "critical" ? "crit" : "major"}">${d.severity}</span>
-          <span class="conf">${d.confidence} confidence</span>
-        </div>
-        <div class="diag-badges">${metricBadges}<span class="diag-b type">${formatFailureType(d.failureType)}</span></div>
-      </div>
-      ${ICONS.chevDownLg}
-    </summary>
-
-    <div class="tl">
-      <div class="tl-header">
-        <div class="tl-label">Turn Timeline</div>
-        <div class="tl-filter">Key turns (${keyTurns.length} of ${conv.messages.length})</div>
-      </div>
-      ${keyTurns.join("")}
-    </div>
-
-    <div class="wif">
-      <div class="wif-s"><div class="wif-l">What happened</div><div class="wif-t">${esc(d.summary)}</div></div>
-      <div class="wif-s"><div class="wif-l impact">Impact</div><div class="wif-t">${esc(d.impact)}</div></div>
-      <div class="wif-s"><div class="wif-l fix">Fix</div><div class="wif-t">${esc(d.fix)} <span class="wif-conf">(${d.confidence} confidence)</span></div></div>
-    </div>
-
-    ${blastHtml}
-
-    <div class="diag-cta">
-      <button class="copy-btn" data-fix="${fixMd}" onclick="copyFix(this)">${ICONS.copy} Copy fix instructions</button>
-      <button class="copy-btn" data-fix="${fixMd}" onclick="downloadFix(this, 'fix-${esc(conv.id.slice(0, 10))}')">${ICONS.fileSm} Download .md</button>
-      <a href="https://converra.ai" class="diag-link">Test with Converra ${ICONS.externalSm}</a>
-    </div>
-  </details>`;
+  return map;
 }
 
 export function renderAllConversations(
@@ -236,10 +220,11 @@ export function renderAllConversations(
   if (issues.length === 0) return "";
 
   const convAgentMap = buildConvAgentMap(report);
+  const convPatternMap = buildConvPatternMap(report);
   const shown = issues.slice(0, 50);
 
   const convHtml = shown
-    .map((c) => {
+    .map((c, index) => {
       const avg = Math.round(avgMetrics(c.metrics));
       const failures = c.policyResults.filter((pr) => !pr.passed).length;
       const health = conversationHealth(c.metrics, failures);
@@ -249,6 +234,12 @@ export function renderAllConversations(
       const agentName = convAgentMap.get(c.id);
       const agentBadge = agentName && (report.agents?.length ?? 0) > 1
         ? `<span class="agent-badge">${esc(agentName)}</span>`
+        : "";
+
+      // Pattern linkage: "Flagged by: Prompt Issue, Orchestration Issue"
+      const patterns = convPatternMap.get(c.id);
+      const patternBadge = patterns
+        ? `<span class="conf" style="font-size:11px;">Flagged by: ${patterns.map((p) => esc(p)).join(", ")}</span>`
         : "";
 
       // Metric mini-pills
@@ -262,14 +253,17 @@ export function renderAllConversations(
         return `<span class="metric-mini ${color}">${val}</span>`;
       }).join("");
 
-      const expand = d ? renderConvDive(c, d, report) : "";
+      // First conversation gets full step analysis (expanded), rest get compact view
+      const isFirst = index === 0;
+      const expand = d ? renderConvDive(c, d, report, isFirst) : "";
 
-      return `<details class="conv-detail" id="${esc(c.id)}">
+      return `<details class="conv-detail" id="${esc(c.id)}"${isFirst ? " open" : ""}>
         <summary>
           <span class="cid">${esc(c.id.slice(0, 10))}</span>
           ${agentBadge}
           <span class="conv-score ${healthClass}">${avg}</span>
           <span class="conv-cause">${esc(cause)}</span>
+          ${patternBadge}
           <span class="conv-pills">${pills}</span>
           <span class="sev-badge ${healthClass}">${health === "critical" ? "critical" : "attention"}</span>
           ${ICONS.chevDownSm}
@@ -285,7 +279,7 @@ export function renderAllConversations(
       : "";
 
   return `<div class="convs">
-    <div class="stitle">Conversations with issues</div>
+    <div class="stitle">Step analysis</div>
     ${convHtml}
     ${moreText}
   </div>`;
@@ -295,6 +289,7 @@ function renderConvDive(
   conv: Report["conversations"][0],
   d: NonNullable<Report["conversations"][0]["diagnosis"]>,
   report: Report,
+  isFirst = false,
 ): string {
   const cascadeMap = new Map<number, string>();
   for (const entry of d.cascadeChain) {
@@ -302,8 +297,17 @@ function renderConvDive(
     if (match) cascadeMap.set(Number(match[1]), match[2]!.trim());
   }
 
-  const turns = buildTurnTimeline(conv, report, cascadeMap).slice(0, 6);
   const fixMd = btoa(unescape(encodeURIComponent(buildConversationFixMd(conv, report))));
+  const maxTurns = isFirst ? 8 : 6;
+  const turns = buildTurnTimeline(conv, report, cascadeMap, fixMd).slice(0, maxTurns);
+
+  const blastHtml = isFirst && d.blastRadius.length > 0
+    ? `<div class="blast"><span class="blast-icon">${ICONS.alertTriangleSm}</span><span><strong>Blast radius:</strong> Editing may affect ${d.blastRadius.map((r) => `<em>${esc(r)}</em>`).join(", ")}.</span></div>`
+    : "";
+
+  const converraLink = isFirst
+    ? `<a href="https://converra.ai" class="diag-link">Test with Converra ${ICONS.externalSm}</a>`
+    : "";
 
   return `<div class="conv-expand">
     <div class="tl">
@@ -315,9 +319,11 @@ function renderConvDive(
       <div class="wif-s"><div class="wif-l impact">Impact</div><div class="wif-t">${esc(d.impact)}</div></div>
       <div class="wif-s"><div class="wif-l fix">Fix</div><div class="wif-t">${esc(d.fix)} <span class="wif-conf">(${d.confidence} confidence)</span></div></div>
     </div>
+    ${blastHtml}
     <div class="diag-cta">
       <button class="copy-btn" data-fix="${fixMd}" onclick="copyFix(this)">${ICONS.copy} Copy fix instructions</button>
       <button class="copy-btn" data-fix="${fixMd}" onclick="downloadFix(this, 'fix-${esc(conv.id.slice(0, 10))}')">${ICONS.fileSm} Download .md</button>
+      ${converraLink}
     </div>
   </div>`;
 }
@@ -423,6 +429,15 @@ export function renderRecommendations(report: Report): string {
         .map(formatSubtype)
         .join(", ");
       const recMd = btoa(unescape(encodeURIComponent(buildRecommendationFixMd(rec, i))));
+
+      // Pull evidence from conversations matching this recommendation's failure types
+      const evidence = report.conversations
+        .filter((c) => c.diagnosis && rec.targetFailureTypes.includes(c.diagnosis.failureType))
+        .slice(0, 2)
+        .map((c) => `<span style="color:var(--text-3);font-size:12px;">${esc(c.id.slice(0, 10))}: ${esc(c.diagnosis!.summary.split(".")[0]!)}</span>`)
+        .join("<br>");
+      const evidenceHtml = evidence ? `<div style="margin-top:8px;padding:8px 10px;background:var(--bg-subtle);border-radius:var(--r);border:1px solid var(--border-subtle);line-height:1.6;">${evidence}</div>` : "";
+
       return `<details class="rec-card"${i === 0 ? " open" : ""}>
       <summary>
         <span class="rec-num">${i + 1}</span>
@@ -434,6 +449,7 @@ export function renderRecommendations(report: Report): string {
       </summary>
       <div class="rec-detail">
         <div class="rec-desc">${esc(rec.description)}</div>
+        ${evidenceHtml}
         <div class="rec-actions">
           <button class="copy-btn" data-fix="${recMd}" onclick="copyFix(this)">${ICONS.copy} Copy instructions</button>
           <button class="copy-btn" data-fix="${recMd}" onclick="downloadFix(this, 'rec-${i + 1}')">${ICONS.fileSm} Download .md</button>

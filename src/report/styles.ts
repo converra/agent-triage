@@ -256,8 +256,10 @@ details[open] > summary .chev { transform:rotate(180deg); }
 .conv-detail > summary:hover { background:var(--bg-subtle); }
 .cid { font-size:12px; font-weight:600; font-family:'SF Mono','Fira Code',monospace; color:var(--text-3); min-width:68px; }
 .conv-cause { font-size:12px; color:var(--text-2); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.conv-expand { padding:12px 14px 14px; }
+.conv-expand { padding:0 0 14px; }
 .conv-expand .wif { margin:0; }
+.conv-expand .tl { padding:14px 0; border-top:1px solid var(--border-subtle); }
+.conv-expand .diag-cta { padding:0; }
 .show-all { font-size:12px; color:var(--text-3); padding:10px 0; text-align:center; }
 .rules-section { border:1px solid var(--border-subtle); border-radius:var(--r); margin:20px 0; overflow:hidden; }
 .rules-section > summary { padding:12px 14px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
