@@ -17,14 +17,14 @@ export async function generateDiagnoses(
   systemPrompt: string,
   onProgress?: (current: number, total: number) => void,
 ): Promise<void> {
-  // Find worst conversations by aggregate metric score
+  // Find worst conversations: policy failures OR low metric scores (< 75 avg)
   const scored = results
     .map((r) => ({
       result: r,
       avgScore: averageMetrics(r.metrics),
       failCount: r.policyResults.filter((pr) => !pr.passed).length,
     }))
-    .filter((s) => s.failCount > 0)
+    .filter((s) => s.failCount > 0 || s.avgScore < 75)
     .sort((a, b) => a.avgScore - b.avgScore);
 
   const worst = scored.slice(0, TOP_N_WORST);

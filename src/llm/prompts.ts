@@ -184,15 +184,19 @@ export function buildDiagnosisPrompt(
   conversation: string,
   policyResults: Array<{ policyId: string; passed: boolean; evidence: string; failingTurns?: number[] }>,
 ): string {
-  const failures = policyResults
-    .filter((r) => !r.passed)
+  const failedPolicies = policyResults.filter((r) => !r.passed);
+  const failures = failedPolicies
     .map(
       (r) =>
         `- ${r.policyId}: ${r.evidence} (turns: ${r.failingTurns?.join(", ") ?? "unknown"})`,
     )
     .join("\n");
 
-  return `You are an expert AI agent diagnostician. Analyze this failed conversation to identify the root cause, trace its cascade effects, and attribute responsibility.
+  const issueContext = failures
+    ? `POLICY FAILURES DETECTED:\n${failures}`
+    : `No policy failures detected, but the conversation scored poorly on quality metrics. Analyze what went wrong — low user satisfaction, missed goals, poor response quality, or other issues.`;
+
+  return `You are an expert AI agent diagnostician. Analyze this conversation to identify the root cause of quality issues, trace cascade effects, and attribute responsibility.
 
 SYSTEM PROMPT:
 <system_prompt>
@@ -204,8 +208,7 @@ CONVERSATION:
 ${conversation}
 </conversation>
 
-POLICY FAILURES DETECTED:
-${failures}
+${issueContext}
 
 Provide a detailed diagnosis:
 

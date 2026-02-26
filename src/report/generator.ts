@@ -51,9 +51,9 @@ export function buildHtml(report: Report): string {
     .filter((c) => c.diagnosis)
     .sort((a, b) => avgMetrics(a.metrics) - avgMetrics(b.metrics))[0];
 
-  // Conversations with issues = attention + critical
+  // Conversations with issues — only show those with a diagnosis (something to say)
   const issueConvs = scored
-    .filter((s) => s.health !== "healthy")
+    .filter((s) => s.health !== "healthy" && s.conv.diagnosis)
     .sort((a, b) => a.avg - b.avg)
     .map((s) => s.conv);
 
