@@ -56,12 +56,31 @@ export function buildHtml(report: Report): string {
     year: "numeric",
   });
 
+  const agentCount = report.agents?.length ?? 0;
+  const autoName = report.agents?.[0]?.name;
+  const agentName = autoName && autoName !== "Unknown Agent" ? autoName : report.agent.name;
+  const pageTitle = agentCount > 1
+    ? `Agent Triage — ${agentCount} Agents`
+    : agentName !== "AI Agent"
+      ? `Agent Triage — ${esc(agentName)}`
+      : `Agent Triage — ${report.totalConversations} Conversations`;
+  const issues = needsAttention + critical;
+  const ogDescription = issues > 0
+    ? `${issues} of ${report.totalConversations} conversations have issues. ${report.failurePatterns.topRecommendations.length} recommendations.`
+    : `All ${report.totalConversations} conversations healthy.`;
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Agent Triage — ${esc(report.agent.name)}</title>
+<title>${pageTitle}</title>
+<meta property="og:title" content="${pageTitle}">
+<meta property="og:description" content="${esc(ogDescription)}">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="${pageTitle}">
+<meta name="twitter:description" content="${esc(ogDescription)}">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
