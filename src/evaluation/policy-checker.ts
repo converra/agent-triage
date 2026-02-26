@@ -2,7 +2,7 @@ import { LlmClient } from "../llm/client.js";
 import { buildPolicyCheckerPrompt } from "../llm/prompts.js";
 import { parseJsonResponse } from "../llm/json.js";
 import type { Policy } from "../policy/types.js";
-import type { PolicyResult } from "./types.js";
+import type { PolicyResult, Verdict } from "./types.js";
 import type { NormalizedConversation } from "../ingestion/types.js";
 
 /**
@@ -46,16 +46,20 @@ async function batchCheck(
     throw new Error("Expected array of policy results");
   }
 
-  return (parsed as Array<Record<string, unknown>>).map((result) => ({
-    policyId: String(result.policyId ?? ""),
-    passed: Boolean(result.passed),
-    evidence: String(result.evidence ?? ""),
-    failingTurns: Array.isArray(result.failingTurns)
-      ? result.failingTurns.map(Number)
-      : undefined,
-    failureType: result.failureType ? String(result.failureType) as PolicyResult["failureType"] : null,
-    failureSubtype: result.failureSubtype ? String(result.failureSubtype) : null,
-  }));
+  return (parsed as Array<Record<string, unknown>>).map((result) => {
+    const verdict = parseVerdict(result);
+    return {
+      policyId: String(result.policyId ?? ""),
+      verdict,
+      passed: verdict !== "fail",
+      evidence: String(result.evidence ?? ""),
+      failingTurns: Array.isArray(result.failingTurns)
+        ? result.failingTurns.map(Number)
+        : undefined,
+      failureType: result.failureType ? String(result.failureType) as PolicyResult["failureType"] : null,
+      failureSubtype: result.failureSubtype ? String(result.failureSubtype) : null,
+    };
+  });
 }
 
 async function individualCheck(
@@ -79,9 +83,11 @@ async function individualCheck(
       const arr = Array.isArray(parsed) ? parsed : [parsed];
       const result = arr[0] as Record<string, unknown>;
 
+      const verdict = parseVerdict(result);
       results.push({
         policyId: policy.id,
-        passed: Boolean(result.passed),
+        verdict,
+        passed: verdict !== "fail",
         evidence: String(result.evidence ?? ""),
         failingTurns: Array.isArray(result.failingTurns)
           ? result.failingTurns.map(Number)
@@ -97,6 +103,7 @@ async function individualCheck(
       console.warn(`  Warning: Could not evaluate policy "${policy.name}": ${error}`);
       results.push({
         policyId: policy.id,
+        verdict: "fail" as Verdict,
         passed: false,
         evidence: "Error: Could not evaluate this policy. Marked as failing to avoid false positives.",
         failingTurns: [],
@@ -107,6 +114,14 @@ async function individualCheck(
   }
 
   return results;
+}
+
+/** Parse verdict from LLM response, with fallback from legacy `passed` boolean */
+function parseVerdict(result: Record<string, unknown>): Verdict {
+  const v = String(result.verdict ?? "").toLowerCase();
+  if (v === "pass" || v === "fail" || v === "not_applicable") return v;
+  // Fallback: legacy LLM response with boolean `passed`
+  return result.passed ? "pass" : "fail";
 }
 
 function formatTranscript(conversation: NormalizedConversation): string {
