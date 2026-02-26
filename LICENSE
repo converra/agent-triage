@@ -1,46 +1,21 @@
-Functional Source License, Version 1.1, Apache 2.0 Future License
+MIT License
 
-Licensor: Converra Ltd.
+Copyright (c) 2026 Converra Ltd.
 
-Licensed Work: agent-triage
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-The Licensed Work is (c) 2026 Converra Ltd.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-Grant of Rights
-
-Subject to the terms and conditions of this License, the Licensor hereby grants
-to each recipient of the Licensed Work a non-exclusive, worldwide,
-royalty-free, non-sublicensable, non-transferable license to use, copy, modify,
-create derivative works based upon, publicly display, publicly perform, and
-distribute the Licensed Work.
-
-Limitations
-
-You may not make the functionality of the Licensed Work or a modified version
-available to third parties as a service, or use the Licensed Work to provide a
-service to third parties that competes with the Licensor's products or services.
-
-Change Date
-
-Two years from the date the Licensed Work is published.
-
-Change License
-
-Apache License, Version 2.0
-
-For information about alternative licensing arrangements, please contact
-hello@converra.ai.
-
-Notice
-
-The Licensor hereby grants you permission to use this Software, subject to the
-above terms and conditions.
-
-This License does not grant you any right in any trademark or logo of Licensor
-or its affiliates.
-
-THIS SOFTWARE IS PROVIDED "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
-INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND
-FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE LICENSOR
-BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-CONSEQUENTIAL DAMAGES.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
