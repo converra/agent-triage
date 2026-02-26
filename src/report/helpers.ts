@@ -9,6 +9,11 @@ export function esc(s: string): string {
     .replace(/'/g, "&#39;");
 }
 
+/** HTML-escape then convert **bold** markers to <strong> for agent name emphasis. */
+export function escBold(s: string): string {
+  return esc(s).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+}
+
 export function avgMetrics(m: Record<string, number>): number {
   const vals = Object.values(m);
   if (vals.length === 0) return 0;
