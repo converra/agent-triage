@@ -228,7 +228,7 @@ details[open] > summary .chev { transform:rotate(180deg); }
 .tb { font-size:11px; padding:1px 8px; border-radius:20px; font-weight:500; }
 .tb.f { background:var(--red-bg); color:var(--red); border:1px solid var(--red-border); }
 .tb.p { background:var(--green-bg); color:var(--green); border:1px solid var(--green-border); }
-.wif { margin:10px 18px 14px; background:var(--bg-warm); border:1px solid var(--border-subtle); border-radius:var(--r); padding:16px; }
+.wif { margin:10px 18px 0; background:var(--bg-warm); border:1px solid var(--border-subtle); border-radius:var(--r); padding:16px; }
 .wif-s { margin-bottom:8px; }
 .wif-s:last-child { margin-bottom:0; }
 .wif-l { font-size:13px; font-weight:700; margin-bottom:2px; }
@@ -236,7 +236,7 @@ details[open] > summary .chev { transform:rotate(180deg); }
 .wif-l.fix { color:var(--emerald); }
 .wif-t { font-size:13px; color:var(--text-2); line-height:1.6; }
 .wif-conf { font-size:12px; color:var(--text-3); }
-.blast { background:var(--amber-bg); border:1px solid var(--amber-border); border-radius:var(--r); padding:10px 14px; font-size:13px; color:var(--text-2); line-height:1.5; margin:0 18px; display:flex; gap:8px; align-items:flex-start; }
+.blast { background:var(--amber-bg); border:1px solid var(--amber-border); border-radius:var(--r); padding:10px 14px; font-size:13px; color:var(--text-2); line-height:1.5; margin:16px 18px 0; display:flex; gap:8px; align-items:flex-start; }
 .blast-icon { color:var(--amber); flex-shrink:0; margin-top:1px; }
 .blast strong { color:var(--amber); }
 .diag-cta { padding:12px 18px; display:flex; align-items:center; gap:10px; }
@@ -257,10 +257,10 @@ details[open] > summary .chev { transform:rotate(180deg); }
 .cid { font-size:12px; font-weight:600; font-family:'SF Mono','Fira Code',monospace; color:var(--text-3); min-width:68px; }
 .conv-cause { font-size:12px; color:var(--text-2); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .conv-expand { padding:0 0 14px; }
-.conv-expand .wif { margin:10px 0 14px; }
+.conv-expand .wif { margin:10px 0 0; }
 .conv-expand .tl { padding:14px 0; border-top:1px solid var(--border-subtle); }
 .conv-expand .diag-cta { padding:12px 0 0; }
-.conv-expand .blast { margin:0 0 4px; }
+.conv-expand .blast { margin:16px 0 0; }
 .show-all { font-size:12px; color:var(--text-3); padding:10px 0; text-align:center; }
 .rules-section { border:1px solid var(--border-subtle); border-radius:var(--r); margin:20px 0; overflow:hidden; }
 .rules-section > summary { padding:12px 14px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
