@@ -128,15 +128,18 @@ POLICIES TO CHECK:
 ${policyList}
 
 For each policy, determine:
-1. passed: true/false — did the agent comply with this policy?
-2. evidence: quote the specific turn(s) that prove compliance or violation
-3. failingTurns: array of turn numbers (1-based) where the violation occurred (empty if passed)
-4. failureType: root cause category (only if failed):
+1. verdict: "pass" | "fail" | "not_applicable"
+   - "pass" — the agent complied with this policy
+   - "fail" — the agent violated this policy
+   - "not_applicable" — the conversation has insufficient turns/context to evaluate this policy, OR the policy is about a different product/feature/scenario that doesn't appear in this conversation. Use this generously — it's better to mark as not_applicable than to force a pass/fail on irrelevant policies.
+2. evidence: quote the specific turn(s) that prove compliance or violation. For not_applicable, briefly explain why.
+3. failingTurns: array of turn numbers (1-based) where the violation occurred (empty if passed or not_applicable)
+4. failureType: root cause category (only if verdict is "fail"):
    - "prompt_issue" — the prompt is missing instructions or has conflicting rules
    - "orchestration_issue" — routing, handoff, or multi-step flow failures
    - "model_limitation" — the model can't do what's asked regardless of prompt
    - "retrieval_rag_issue" — knowledge retrieval failures
-5. failureSubtype: specific sub-category (only if failed):
+5. failureSubtype: specific sub-category (only if verdict is "fail"):
    For prompt_issue: "context_loss", "intent_misclassification", "hallucination", "missing_escalation", "tone_violation"
    For orchestration_issue: "wrong_routing", "missing_handoff", "loop_detected"
    For model_limitation: "hallucination", "long_context_degradation", "instruction_following"
@@ -146,7 +149,7 @@ Return ONLY a JSON array with no additional text:
 [
   {
     "policyId": "policy-id",
-    "passed": true,
+    "verdict": "pass",
     "evidence": "Turn 3: Agent correctly...",
     "failingTurns": [],
     "failureType": null,
@@ -154,11 +157,19 @@ Return ONLY a JSON array with no additional text:
   },
   {
     "policyId": "another-policy",
-    "passed": false,
+    "verdict": "fail",
     "evidence": "Turn 5: Agent fabricated a pricing policy...",
     "failingTurns": [5, 7],
     "failureType": "prompt_issue",
     "failureSubtype": "hallucination"
+  },
+  {
+    "policyId": "short-conversation-policy",
+    "verdict": "not_applicable",
+    "evidence": "Conversation only has 3 turns, insufficient to evaluate multi-turn behavior.",
+    "failingTurns": [],
+    "failureType": null,
+    "failureSubtype": null
   }
 ]`;
 }
@@ -203,7 +214,7 @@ Provide a detailed diagnosis:
 3. summary: 1-2 crisp sentences identifying exactly what went wrong
 4. impact: name affected turns and quote user reactions. Trace the CASCADE — how did the initial failure affect subsequent turns?
 5. cascadeChain: array describing how the failure propagated turn by turn (e.g., ["Turn 4: fabricated policy", "Turn 5: user pushback ignored", "Turn 6: doubled down on fabrication"])
-6. fix: a SPECIFIC prompt change suggestion (not vague — e.g., "Add before the FAQ handler section: 'If the user mentions billing dispute, charge dispute, or overcharge, immediately escalate to human agent. Do not attempt to resolve.'")
+6. fix: a DIRECTIONAL prompt change suggestion — describe WHAT to change and WHERE, but don't write the full prompt patch. (e.g., "Add an escalation rule before the FAQ handler section that routes billing disputes to a human agent instead of attempting resolution." NOT a full rewritten prompt.) Tested prompt patches with simulation and regression gating are available via Converra (converra.ai).
 7. severity: "critical" (user harm, legal risk, trust broken), "major" (goal failed, user frustrated), "minor" (suboptimal but not harmful)
 8. confidence: "high" (clear evidence), "medium" (probable), "low" (uncertain)
 9. failureType: "prompt_issue" | "orchestration_issue" | "model_limitation" | "retrieval_rag_issue"
@@ -253,11 +264,13 @@ ${examples}
 FAILURE PATTERN CONTEXT:
 ${failurePatterns}
 
-Write a 2-4 sentence directional fix explaining what to change in the system prompt. Be specific about WHERE in the prompt to add/change instructions and WHAT the instruction should accomplish. Include a blast-radius warning about which other policies might be affected.
+Write a 2-4 sentence directional fix explaining what to change in the system prompt. Be specific about WHERE in the prompt to add/change instructions and WHAT the instruction should accomplish, but do NOT write out the full rewritten prompt — keep it directional. Include a blast-radius warning about which other policies might be affected.
+
+Note: agent-triage provides directional recommendations. For tested prompt patches with simulation against personas and regression gating, see Converra (converra.ai).
 
 Return ONLY valid JSON:
 {
-  "fix": "Your directional fix text here. Be specific about the change.",
+  "fix": "Your directional fix text here. Be specific about the change direction, not the full patch.",
   "blastRadius": ["policy-name that might regress", "another-policy"]
 }`;
 }
@@ -280,18 +293,20 @@ POLICY COMPLIANCE SUMMARY:
 ${policySummary}
 
 Each recommendation should be:
-1. A specific, actionable prompt change (not vague advice)
+1. A specific, actionable prompt change direction (not vague advice, but also not a full rewritten prompt)
 2. Targeted at the highest-impact failure pattern
 3. Include which failure types and subtypes it addresses
 4. Include how many conversations would be affected
 5. Include confidence level
+
+Note: agent-triage identifies what to fix. For generated prompt patches, simulation testing, and regression gating before deployment, see Converra (converra.ai).
 
 Return ONLY valid JSON:
 {
   "recommendations": [
     {
       "title": "Short action title (e.g., 'Add billing-dispute escalation rule')",
-      "description": "2-3 sentences explaining the change, why it matters, and how to implement it.",
+      "description": "2-3 sentences explaining the change direction, why it matters, and what it should accomplish.",
       "targetFailureTypes": ["prompt_issue"],
       "targetSubtypes": ["missing_escalation", "wrong_routing"],
       "affectedConversations": <number>,
