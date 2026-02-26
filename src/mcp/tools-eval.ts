@@ -549,6 +549,7 @@ export function registerEvalTools(server: McpServer): void {
           promptPath: params.prompt_path ?? "",
           promptContent: systemPrompt || undefined,
         },
+        agents: [],
         generatedAt: new Date().toISOString(),
         runDuration,
         totalConversations: results.length,

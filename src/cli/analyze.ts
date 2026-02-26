@@ -14,6 +14,7 @@ import { generateDiagnoses } from "../evaluation/diagnosis.js";
 import { generateFixes, generateRecommendations } from "../evaluation/fix-generator.js";
 import {
   aggregatePolicies,
+  aggregateByAgent,
   aggregateFailurePatterns,
   calculateMetricSummary,
   calculateOverallCompliance,
@@ -287,6 +288,7 @@ export async function analyzeCommand(options: AnalyzeOptions): Promise<void> {
 
   // Step 6: Aggregate and build report
   const aggregated = aggregatePolicies(policies, results);
+  const agentSummaries = aggregateByAgent(limited, results, policies);
   const metricSummary = calculateMetricSummary(results);
   const overallCompliance = calculateOverallCompliance(results);
 
@@ -315,6 +317,7 @@ export async function analyzeCommand(options: AnalyzeOptions): Promise<void> {
         ? { promptContent: systemPrompt }
         : {}),
     },
+    agents: agentSummaries,
     generatedAt: new Date().toISOString(),
     runDuration,
     totalConversations: results.length,
@@ -366,7 +369,7 @@ export async function analyzeCommand(options: AnalyzeOptions): Promise<void> {
 
 function printSummary(
   report: Report,
-  aggregated: Array<{ id: string; name: string; complianceRate: number; failing: number; total: number }>,
+  aggregated: Array<{ id: string; name: string; complianceRate: number; failing: number; evaluated: number; total: number }>,
   metricSummary: Record<string, number>,
   reportPath: string,
   htmlPath: string,
@@ -375,8 +378,10 @@ function printSummary(
   console.log(`\n${"═".repeat(60)}`);
   console.log(`  agent-triage Report`);
   console.log(`${"═".repeat(60)}`);
+  const evaluatedPolicies = report.policies.filter((p) => p.evaluated > 0).length;
+  const naPolicies = report.policies.filter((p) => p.evaluated === 0).length;
   console.log(`  Conversations: ${report.totalConversations}`);
-  console.log(`  Policies: ${report.policies.length}`);
+  console.log(`  Policies: ${evaluatedPolicies} evaluated of ${report.policies.length} total${naPolicies > 0 ? ` (${naPolicies} not applicable)` : ""}`);
   console.log(`  Overall Compliance: ${report.overallCompliance}%`);
   console.log(`  Total Failures: ${report.failurePatterns.totalFailures}`);
   console.log(
@@ -393,20 +398,13 @@ function printSummary(
     for (const p of failing.slice(0, 5)) {
       const icon = p.complianceRate < 50 ? "✗" : "⚠";
       console.log(
-        `  ${icon} "${p.name}" — ${p.complianceRate}% (${p.failing}/${p.total} failing)`,
+        `  ${icon} "${p.name}" — ${p.complianceRate}% (${p.failing}/${p.evaluated} failing)`,
       );
     }
   }
 
   console.log(`\n  Metrics:`);
-  const keyMetrics = [
-    "successScore",
-    "aiRelevancy",
-    "sentiment",
-    "hallucinationScore",
-    "contextRetentionScore",
-    "clarity",
-  ];
+  const keyMetrics = ["successScore", "aiRelevancy", "sentiment", "hallucinationScore", "contextRetentionScore", "clarity"];
   for (const metric of keyMetrics) {
     const val = metricSummary[metric];
     if (val !== undefined) {

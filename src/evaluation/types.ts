@@ -42,8 +42,13 @@ export const FailureTypeSchema = z.enum([
 ]);
 export type FailureType = z.infer<typeof FailureTypeSchema>;
 
+export const VerdictSchema = z.enum(["pass", "fail", "not_applicable"]);
+export type Verdict = z.infer<typeof VerdictSchema>;
+
 export const PolicyResultSchema = z.object({
   policyId: z.string(),
+  verdict: VerdictSchema,
+  // Backward compat: passed = verdict === "pass" (true for both pass and not_applicable in legacy consumers)
   passed: z.boolean(),
   evidence: z.string(),
   failingTurns: z.array(z.number()).optional(),
@@ -81,12 +86,21 @@ export interface FailurePattern {
   subtypes: Array<{ name: string; count: number; percentage: number }>;
 }
 
+export interface AgentSummary {
+  name: string;
+  conversationCount: number;
+  policiesEvaluated: number;
+  compliance: number;
+  topFailingPolicies: Array<{ id: string; name: string; complianceRate: number }>;
+}
+
 export interface Report {
   agentTriageVersion: string;
   llmProvider: string;
   llmModel: string;
   policiesHash: string;
   agent: { name: string; promptPath: string; promptContent?: string };
+  agents: AgentSummary[];
   generatedAt: string;
   runDuration: number;
   totalConversations: number;
@@ -94,6 +108,8 @@ export interface Report {
     Policy & {
       passing: number;
       failing: number;
+      notApplicable: number;
+      evaluated: number;
       total: number;
       complianceRate: number;
       fix?: string;
