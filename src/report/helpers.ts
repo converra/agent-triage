@@ -79,10 +79,26 @@ export function describeWeakMetrics(metrics: Record<string, number>): string {
   return `Low ${weak.join(", ")}`;
 }
 
-/** Strip HTML tags from conversation content so it renders as plain text. */
+/** Strip HTML tags and decode common entities so content renders as plain text. */
 export function stripHtml(s: string): string {
-  return s.replace(/<[^>]+>/g, " ").replace(/\s{2,}/g, " ").trim();
+  return s
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&rsquo;/gi, "\u2019")
+    .replace(/&lsquo;/gi, "\u2018")
+    .replace(/&rdquo;/gi, "\u201C")
+    .replace(/&ldquo;/gi, "\u201D")
+    .replace(/&mdash;/gi, "\u2014")
+    .replace(/&ndash;/gi, "\u2013")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 }
+
 
 export function formatFailureType(type: string): string {
   return type

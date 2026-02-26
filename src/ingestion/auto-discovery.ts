@@ -139,9 +139,8 @@ async function extractPoliciesFromAgents(
         // Tag every policy with its source agent for scoping during evaluation
         policy.sourceAgent = agent.name;
 
-        // Prefix policy names with agent name if multi-agent
+        // Namespace policy IDs to avoid collisions in multi-agent setups
         if (multiAgent) {
-          policy.name = `[${agent.name}] ${policy.name}`;
           policy.id = `${slugify(agent.name)}-${policy.id}`;
         }
         allPolicies.push(policy);

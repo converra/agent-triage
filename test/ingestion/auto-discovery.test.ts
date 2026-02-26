@@ -212,9 +212,10 @@ describe("autoExtractPolicies", () => {
 
     expect(result.method).toBe("prompt-based");
     expect(result.policies).toHaveLength(2);
-    // Policies should be prefixed with agent name
-    expect(result.policies[0].name).toContain("[Billing]");
-    expect(result.policies[1].name).toContain("[Sales]");
+    // Policies should NOT have agent prefix in name (sourceAgent tracks this)
+    expect(result.policies[0].name).not.toContain("[");
+    expect(result.policies[0].sourceAgent).toBe("Billing");
+    expect(result.policies[1].sourceAgent).toBe("Sales");
   });
 
   it("falls back to behavioral inference when no system prompts", async () => {
