@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Converra — Continuous Agent Monitoring
+    url: https://converra.ai
+    about: "Automated fix proposals, simulation testing, regression gating, and team dashboards for your AI agents."
+  - name: Documentation
+    url: https://github.com/converra/agent-triage#readme
+    about: "Full documentation including CLI commands, trace formats, MCP setup, and programmatic API."
