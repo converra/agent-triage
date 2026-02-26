@@ -162,6 +162,12 @@ function summarizeTurnContent(text: string): string {
   return trimmed;
 }
 
+/** Find the orchestrator/router agent name from policy metadata, if one exists. */
+function findOrchestratorName(report: Report): string | undefined {
+  const sourceAgents = [...new Set(report.policies.map((p) => p.sourceAgent).filter(Boolean))];
+  return sourceAgents.find((a) => /orchestrat|router|coordinator|dispatch/i.test(a!)) as string | undefined;
+}
+
 function buildTurnTimeline(
   conv: Report["conversations"][0],
   report: Report,
@@ -169,39 +175,75 @@ function buildTurnTimeline(
   fixMd?: string,
 ): string[] {
   const d = conv.diagnosis!;
-  return conv.messages
-    .filter((m) => m.role === "user" || m.role === "assistant")
-    .map((msg, i) => {
+  const orchestrator = findOrchestratorName(report);
+  let lastAgent: string | undefined;
+
+  const visible = conv.messages.filter((m) => m.role === "user" || m.role === "assistant");
+
+  return visible.map((msg, i) => {
       const turnNum = i + 1;
       const isRoot = turnNum === d.rootCauseTurn;
       const isFailing = conv.policyResults.some((pr) => !pr.passed && pr.failingTurns?.includes(turnNum));
       const isCascade = !isRoot && !isFailing && turnNum > d.rootCauseTurn;
       const dotClass = isRoot || isFailing ? "f" : isCascade ? "w" : "p";
+      const isUser = msg.role === "user";
 
-      const failingPolicies = conv.policyResults
-        .filter((pr) => !pr.passed && pr.failingTurns?.includes(turnNum));
-      const MAX_BADGES = 3;
-      const shownPolicies = failingPolicies.slice(0, MAX_BADGES);
-      const overflowCount = failingPolicies.length - MAX_BADGES;
-      const failBadges = shownPolicies
-        .map((pr) => {
-          const policy = report.policies.find((p) => p.id === pr.policyId);
-          return `<span class="tb f">${esc(policy?.name ?? pr.policyId)} ×</span>`;
-        })
-        .join("")
-        + (overflowCount > 0 ? `<span class="tb f" style="opacity:0.7;">+${overflowCount} more</span>` : "");
-      const fixCta = failingPolicies.length > 0 && fixMd
-        ? `<button class="copy-btn" style="padding:2px 8px;font-size:11px;" data-fix="${fixMd}" onclick="copyFix(this)">${ICONS.copy} Copy fix</button>`
-        : "";
+      // Policy badges on all failing turns — show first 2 inline, rest in expandable tooltip
+      let failBadges = "";
+      let fixCta = "";
+      const failingPolicies = (isRoot || isFailing)
+        ? conv.policyResults.filter((pr) => !pr.passed && pr.failingTurns?.includes(turnNum))
+        : [];
+      if (failingPolicies.length > 0) {
+        const MAX_INLINE = isRoot ? 3 : 2;
+        const shownPolicies = failingPolicies.slice(0, MAX_INLINE);
+        const overflowCount = failingPolicies.length - MAX_INLINE;
+        const overflowPolicies = failingPolicies.slice(MAX_INLINE);
+        failBadges = shownPolicies
+          .map((pr) => {
+            const policy = report.policies.find((p) => p.id === pr.policyId);
+            return `<span class="tb f">${esc(policy?.name ?? pr.policyId)} ×</span>`;
+          })
+          .join("");
+        if (overflowCount > 0) {
+          const hiddenBadges = overflowPolicies
+            .map((pr) => {
+              const policy = report.policies.find((p) => p.id === pr.policyId);
+              return `<span class="tb f">${esc(policy?.name ?? pr.policyId)} ×</span>`;
+            })
+            .join("");
+          failBadges += `<span class="tb f tb-more" onclick="this.nextElementSibling.classList.toggle('show');this.remove()">+${overflowCount} more</span><span class="tb-overflow">${hiddenBadges}</span>`;
+        }
+        if (isRoot && fixMd) {
+          fixCta = `<button class="copy-btn" style="padding:2px 8px;font-size:11px;" data-fix="${fixMd}" onclick="copyFix(this)">${ICONS.copy} Copy fix</button>`;
+        }
+      }
 
-      const agentTag = msg.agent ? ` <span class="agent-badge">${esc(msg.agent)}</span>` : "";
-      const label = isRoot ? `Turn ${turnNum} — root cause` : `Turn ${turnNum}`;
+      // Routing chain: show on first assistant turn, then only when agent changes
+      let agentTag = "";
+      if (isUser) {
+        agentTag = `<span class="agent-badge user">User</span>`;
+      } else if (msg.agent) {
+        const agentChanged = msg.agent !== lastAgent;
+        if (agentChanged) {
+          if (orchestrator && msg.agent !== orchestrator) {
+            agentTag = `<span class="agent-badge subtle">${esc(orchestrator)}</span><span class="agent-arrow">→</span><span class="agent-badge">${esc(msg.agent)}</span>`;
+          } else {
+            agentTag = `<span class="agent-badge">${esc(msg.agent)}</span>`;
+          }
+        }
+        lastAgent = msg.agent;
+      }
+
+      const stepLabel = `<span class="step-num">Step ${turnNum}</span>`;
+      const rcTag = isRoot ? `<span class="rc-label">root cause</span>` : "";
       const cascadeDesc = cascadeMap.get(turnNum);
       const plain = stripHtml(msg.content);
       const content = summarizeTurnContent(plain);
       const diagNote = cascadeDesc ? `<div class="tc-diag">↳ ${escBold(cascadeDesc)}</div>` : "";
+      const turnClass = isUser ? "turn turn-user" : "turn";
 
-      return `<div class="turn"><div class="tdot ${dotClass}"></div><div class="tc"><div class="tc-label">${label}${agentTag}</div><div class="tc-text">${escBold(content)}</div>${diagNote}${failBadges || fixCta ? `<div class="tc-badges">${failBadges}${fixCta}</div>` : ""}</div></div>`;
+      return `<div class="${turnClass}"><div class="tdot ${dotClass}"></div><div class="tc"><div class="tc-label">${stepLabel}${agentTag}${rcTag}</div><div class="tc-text">${escBold(content)}</div>${diagNote}${failBadges || fixCta ? `<div class="tc-badges">${failBadges}${fixCta}</div>` : ""}</div></div>`;
     });
 }
 

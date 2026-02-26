@@ -222,8 +222,16 @@ details[open] > summary .chev { transform:rotate(180deg); }
 .tdot.f { background:var(--red); }
 .tdot.w { background:var(--amber); }
 .tc { flex:1; }
-.tc-label { font-size:13px; font-weight:600; margin-bottom:1px; }
+.tc-label { font-size:13px; font-weight:600; margin-bottom:1px; display:flex; align-items:center; gap:4px; flex-wrap:wrap; }
 .tc-text { font-size:13px; color:var(--text-2); line-height:1.5; }
+.turn-user { opacity:0.7; }
+.turn-user .tc-text { font-size:12px; }
+.step-num { font-size:12px; font-weight:600; color:var(--text-3); min-width:14px; }
+.rc-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--red); }
+.tb-more { cursor:pointer; opacity:0.7; }
+.tb-more:hover { opacity:1; }
+.tb-overflow { display:none; }
+.tb-overflow.show { display:contents; }
 .tc-diag { font-size:12px; color:var(--amber); margin-top:3px; font-style:italic; }
 .tc-badges { display:flex; gap:5px; margin-top:4px; flex-wrap:wrap; }
 .tb { font-size:11px; padding:1px 8px; border-radius:20px; font-weight:500; }
@@ -302,6 +310,9 @@ details[open] > summary .chev { transform:rotate(180deg); }
 .agent-fail .red { color:var(--red); font-weight:600; }
 .agent-fail .amber { color:var(--amber); font-weight:600; }
 .agent-badge { font-size:10px; font-weight:600; padding:1px 8px; border-radius:20px; background:var(--bg-subtle); color:var(--text-3); border:1px solid var(--border); white-space:nowrap; }
+.agent-badge.subtle { opacity:0.6; }
+.agent-badge.user { background:transparent; color:var(--text-4); border-color:transparent; font-weight:500; padding:0; }
+.agent-arrow { font-size:11px; color:var(--text-4); margin:0 2px; }
 .repro { border:1px solid var(--border); border-radius:var(--r); margin-bottom:20px; overflow:hidden; }
 .repro-header { padding:8px 14px; background:var(--bg-subtle); border-bottom:1px solid var(--border-subtle); font-size:11px; font-weight:600; color:var(--text-3); text-transform:uppercase; letter-spacing:0.06em; display:flex; align-items:center; gap:6px; }
 .repro-body { padding:10px 14px; font-family:'SF Mono','Fira Code','Consolas',monospace; font-size:12px; color:var(--text-2); line-height:1.5; display:flex; align-items:center; justify-content:space-between; }
