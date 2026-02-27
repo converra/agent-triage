@@ -111,7 +111,7 @@ export async function ingestTraces(params: {
   }
 
   throw new Error(
-    "No trace source specified. Provide one of: traces (JSON file path), langsmith (project name), or otel (OTLP/JSON file path).",
+    "No trace source specified. Provide traces (path to a JSON file — recommended, instant, flexible format) or alternatively langsmith (project name) or otel (OTLP/JSON file path).",
   );
 }
 

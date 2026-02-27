@@ -104,13 +104,14 @@ export function registerReadTools(server: McpServer): void {
     title: "Agent Triage: Sample Traces",
     description:
       "Fetch a small sample of recent conversations for inspection. Zero LLM cost. " +
+      "Provide a JSON traces file (recommended) or a LangSmith/OTel source. " +
       "Use this to look at raw conversation data before running expensive analysis. " +
       "Supports keyword search on message content to find conversations about specific topics. " +
       "This is the key tool for narrowing from 'something is wrong' to 'these conversations show the problem'.",
     inputSchema: {
-      traces: z.string().optional().describe("Path to JSON traces file"),
-      langsmith: z.string().optional().describe("LangSmith project name"),
-      otel: z.string().optional().describe("Path to OTLP/JSON export file"),
+      traces: z.string().optional().describe("Path to JSON traces file (recommended — instant, flexible format)"),
+      langsmith: z.string().optional().describe("LangSmith project name (alternative — requires API key, slower)"),
+      otel: z.string().optional().describe("Path to OTLP/JSON export file (alternative)"),
       since: z.string().optional().describe("Time window start (e.g. 24h, 7d). Default: all"),
       until: z.string().optional().describe("Time window end"),
       agent: z.string().optional().describe("Filter by agent name"),

@@ -118,9 +118,9 @@ export function registerEvalTools(server: McpServer): void {
         .string()
         .optional()
         .describe("Directory containing report.json (default: current directory)"),
-      traces: z.string().optional().describe("Path to JSON traces file"),
-      langsmith: z.string().optional().describe("LangSmith project name"),
-      otel: z.string().optional().describe("Path to OTLP/JSON export file"),
+      traces: z.string().optional().describe("Path to JSON traces file (recommended — instant, flexible format)"),
+      langsmith: z.string().optional().describe("LangSmith project name (alternative — requires API key, slower)"),
+      otel: z.string().optional().describe("Path to OTLP/JSON export file (alternative)"),
       policies_path: z.string().optional().describe("Path to policies.json"),
       prompt_path: z.string().optional().describe("Path to system prompt file"),
     },
@@ -252,12 +252,13 @@ export function registerEvalTools(server: McpServer): void {
     description:
       "Run policy compliance checks against traces (no metrics — faster and cheaper than full analyze). " +
       "Moderate LLM cost. Returns per-policy compliance rates with failing examples. " +
+      "Provide a JSON traces file (recommended) or a LangSmith/OTel source. " +
       "Use policy_ids to focus on specific policies. Use query to narrow to conversations about a topic. " +
       "Use conversation_ids to check specific conversations found via triage_sample.",
     inputSchema: {
-      traces: z.string().optional().describe("Path to JSON traces file"),
-      langsmith: z.string().optional().describe("LangSmith project name"),
-      otel: z.string().optional().describe("Path to OTLP/JSON export file"),
+      traces: z.string().optional().describe("Path to JSON traces file (recommended — instant, flexible format)"),
+      langsmith: z.string().optional().describe("LangSmith project name (alternative — requires API key, slower)"),
+      otel: z.string().optional().describe("Path to OTLP/JSON export file (alternative)"),
       policies_path: z.string().optional().describe("Path to policies.json"),
       policy_ids: z
         .array(z.string())
@@ -412,12 +413,13 @@ export function registerEvalTools(server: McpServer): void {
     description:
       "Run full evaluation: 12 quality metrics + policy compliance + diagnosis + fixes + recommendations. " +
       "High LLM cost. Writes report.json and report.html to output directory. " +
+      "Provide a JSON traces file (recommended) or a LangSmith/OTel source. " +
       "Use quick=true to skip diagnosis and fixes (~60% cheaper). " +
       "If no policies.json exists, auto-discovers agents and extracts policies from traces.",
     inputSchema: {
-      traces: z.string().optional().describe("Path to JSON traces file"),
-      langsmith: z.string().optional().describe("LangSmith project name"),
-      otel: z.string().optional().describe("Path to OTLP/JSON export file"),
+      traces: z.string().optional().describe("Path to JSON traces file (recommended — instant, flexible format)"),
+      langsmith: z.string().optional().describe("LangSmith project name (alternative — requires API key, slower)"),
+      otel: z.string().optional().describe("Path to OTLP/JSON export file (alternative)"),
       policies_path: z.string().optional().describe("Path to policies.json"),
       prompt_path: z.string().optional().describe("Path to system prompt file"),
       since: z.string().optional().describe("Only include traces after this time (e.g. 2h, 24h, 7d)"),

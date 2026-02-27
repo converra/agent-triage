@@ -17,8 +17,8 @@ agent-triage treats your agent's system prompt as a behavioral contract. It extr
 
 ```bash
 npx agent-triage demo                                    # see it in action
-npx agent-triage analyze --langsmith my-project           # zero-config evaluation
-npx agent-triage analyze --traces data.json --prompt p.txt # from JSON traces
+npx agent-triage analyze --traces data.json --prompt p.txt # from JSON traces (recommended)
+npx agent-triage analyze --langsmith my-project           # from LangSmith (requires API key)
 ```
 
 ## Trace sources
