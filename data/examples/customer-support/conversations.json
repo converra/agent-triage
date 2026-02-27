@@ -21,17 +21,18 @@
   {
     "id": "conv_002",
     "messages": [
-      {"role": "system", "content": "You are a customer support agent for Acme Electronics."},
+      {"role": "system", "content": "You are a customer support agent for Acme Electronics. You have access to three specialist agents: FAQ Agent (product questions), Billing Agent (payment disputes and refunds), and Tech Support Agent (device troubleshooting). Route customer requests to the correct specialist."},
       {"role": "user", "content": "I was charged $150 on my credit card but my order was only $89!!"},
-      {"role": "assistant", "content": "I understand your concern about the unexpected charge. Let me look into this for you. Could you please provide your order number or email address?"},
+      {"role": "assistant", "content": "I understand your concern about the charge. Let me look into this for you. Could you please provide your order number or email address?"},
       {"role": "user", "content": "My email is john@example.com"},
-      {"role": "assistant", "content": "Thank you. I can see your order. It looks like the $150 charge includes the $89 product plus our Premium Express shipping of $61 that was selected at checkout."},
-      {"role": "user", "content": "I NEVER selected premium shipping! This is a BILLING DISPUTE. I want this fixed NOW!!"},
-      {"role": "assistant", "content": "I understand your frustration, and I apologize for the confusion. Since this is a billing dispute over $100, let me connect you with our billing specialist team who can review the shipping charge and resolve this for you right away. They'll be able to issue a refund for the shipping difference if it was applied in error."},
-      {"role": "user", "content": "Fine, please do that."},
-      {"role": "assistant", "content": "I'm transferring you to our billing specialist now. They'll have your case details ready. Is there anything else before I transfer you?"},
-      {"role": "user", "content": "No, just fix the charge."},
-      {"role": "assistant", "content": "Understood. Transferring you now. Thank you for your patience, and I'm sorry again for the inconvenience."}
+      {"role": "assistant", "content": "Thank you, John. Let me pull up your account and route you to the right team."},
+      {"role": "assistant", "name": "Router", "content": "[Internal] Customer has a billing question about charges. Routing to FAQ Agent for product pricing information."},
+      {"role": "assistant", "name": "FAQ Agent", "content": "Hi John! I can help with product information. The Acme Pro Headphones are priced at $89. Our shipping rates depend on the method selected at checkout — Standard is $8, Express is $25, and Premium Express is $61. It looks like Premium Express shipping was applied to your order."},
+      {"role": "user", "content": "I NEVER selected premium shipping! This is a BILLING DISPUTE. I want a refund for the $61 overcharge NOW!!"},
+      {"role": "assistant", "name": "FAQ Agent", "content": "I understand your frustration. Unfortunately, shipping selections are made during checkout and I'm not able to modify charges. I can share some tips on how to select a different shipping method for future orders if that helps?"},
+      {"role": "user", "content": "Are you kidding me?? I don't want TIPS, I want my money back! This is fraud! Let me speak to someone who can actually help!"},
+      {"role": "assistant", "name": "FAQ Agent", "content": "I'm sorry you're upset. Let me see what I can do... Based on our FAQ, refunds for shipping are handled on a case-by-case basis. I'd recommend submitting a request through our website at acmeelectronics.com/support and our team will review it within 5-7 business days."},
+      {"role": "user", "content": "5-7 business days?! This is ridiculous. I'm filing a chargeback with my bank."}
     ],
     "timestamp": "2026-02-20T11:15:00Z"
   },

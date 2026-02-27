@@ -13,7 +13,7 @@ import {
 } from "./helpers.js";
 import { ICONS } from "./styles.js";
 
-export function renderHeader(report: Report, date: string, duration: string): string {
+export function renderHeader(report: Report, date: string): string {
   const agentCount = report.agents?.length ?? 0;
   const autoName = report.agents?.[0]?.name;
   const agentName = autoName && autoName !== "Unknown Agent" ? autoName : report.agent.name;
@@ -32,7 +32,6 @@ export function renderHeader(report: Report, date: string, duration: string): st
     <div class="hdr-meta">
       Model <span>${esc(report.llmModel)}</span> &middot;
       Cost <span>$${report.cost.estimatedCost.toFixed(2)}</span> &middot;
-      Duration <span>${duration}</span> &middot;
       <span>${date}</span>
     </div>
   </div>`;
@@ -595,8 +594,8 @@ export function renderRecommendations(report: Report): string {
 
   const cards = report.failurePatterns.topRecommendations
     .map((rec, i) => {
-      const targets = [...rec.targetSubtypes, ...rec.targetFailureTypes]
-        .map(formatSubtype)
+      const targets = rec.targetFailureTypes
+        .map(formatFailureType)
         .join(", ");
       const recMd = btoa(unescape(encodeURIComponent(buildRecommendationFixMd(rec, i))));
 
