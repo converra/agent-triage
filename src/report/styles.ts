@@ -200,7 +200,8 @@ details[open] > summary .chev { transform:rotate(180deg); }
 .recs { padding:20px 0; border-top:1px solid var(--border); }
 .recs > summary { list-style:none; cursor:pointer; }
 .recs > summary::-webkit-details-marker { display:none; }
-.recs-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+.recs-header { display:flex; align-items:center; gap:12px; margin-bottom:10px; }
+.recs-header .stitle { flex:1; }
 .recs[open] > .recs-header .chev { transform:rotate(180deg); }
 .patterns[open] > .patterns-summary .chev { transform:rotate(180deg); }
 .recs-cta { display:flex; gap:6px; }
@@ -313,7 +314,8 @@ details[open] > summary .chev { transform:rotate(180deg); }
 .conv-expand .blast { margin:16px 0 0; }
 .show-all { font-size:12px; color:var(--text-3); padding:10px 0; text-align:center; }
 .rules-section { border:1px solid var(--border-subtle); border-radius:var(--r); margin:20px 0; overflow:hidden; }
-.rules-section > summary { padding:12px 14px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.rules-section > summary { padding:12px 14px; display:flex; align-items:center; gap:12px; }
+.rules-section > summary .stitle { flex:1; }
 .rules-section > summary:hover { background:var(--bg-subtle); }
 .rules-summary { font-size:12px; color:var(--text-3); }
 .rules-body { padding:0 14px 14px; }
@@ -487,9 +489,8 @@ function scrollToRecs() {
   var el = document.getElementById('recs-section');
   if (!el) return;
   el.open = true;
-  var first = el.querySelector('details.rec-card');
-  if (first) first.open = true;
-  el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  el.querySelectorAll('details.rec-card').forEach(function(d) { d.open = true; });
+  setTimeout(function() { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 50);
 }
 function jumpToConvById(id) {
   var el = document.getElementById(id);

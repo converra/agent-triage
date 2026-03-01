@@ -426,7 +426,6 @@ function renderConvDive(
     ? `<div class="blast"><span class="blast-icon">${ICONS.alertTriangleSm}</span><span><strong>Blast radius:</strong> Editing may affect ${d.blastRadius.map((r) => `<em>${esc(r)}</em>`).join(", ")}.</span></div>`
     : "";
 
-  const converraLink = `<a href="https://converra.ai" class="diag-link">Test with Converra ${ICONS.externalSm}</a>`;
 
   return `<div class="conv-expand">
     <div class="tl">
@@ -440,9 +439,8 @@ function renderConvDive(
     </div>
     ${blastHtml}
     <div class="diag-cta">
-      <button class="copy-btn" data-fix="${fixMd}" onclick="copyFix(this)">${ICONS.copy} Copy fix instructions</button>
-      <button class="copy-btn" data-fix="${fixMd}" onclick="downloadFix(this, 'fix-${esc(conv.id.slice(0, 10))}')">${ICONS.fileSm} Download .md</button>
-      ${converraLink}
+      <button class="copy-btn" data-fix="${fixMd}" onclick="copyFix(this)">${ICONS.copy} Copy for coding agent</button>
+      ${d.failureType === "prompt_issue" || d.failureType === "retrieval_rag_issue" ? `<a href="https://converra.ai" class="diag-link">Fix in Converra ${ICONS.externalSm}</a>` : ""}
     </div>
   </div>`;
 }
@@ -532,8 +530,8 @@ function renderPatternDetail(
       <div class="subtypes">${subtypesHtml}</div>
       ${convRows ? `<div class="pattern-convs"><div class="pattern-convs-label">Top affected conversations</div>${convRows}</div>` : ""}
       <div class="rec-actions" style="margin-top:12px;">
-        <button class="copy-btn" data-fix="${patternMd}" onclick="copyFix(this)">${ICONS.copy} Copy fix instructions</button>
-        <button class="copy-btn" data-fix="${patternMd}" onclick="downloadFix(this, 'fix-${esc(pattern.type)}')">${ICONS.fileSm} Download .md</button>
+        <button class="copy-btn" data-fix="${patternMd}" onclick="copyFix(this)">${ICONS.copy} Copy for coding agent</button>
+        ${pattern.type === "prompt_issue" || pattern.type === "retrieval_rag_issue" ? `<a href="https://converra.ai" class="diag-link">Fix in Converra ${ICONS.externalSm}</a>` : ""}
       </div>
     </div>
   </details>`;
@@ -570,8 +568,8 @@ export function renderRecommendations(report: Report): string {
         <div class="rec-desc">${esc(rec.description)}</div>
         ${evidenceHtml}
         <div class="rec-actions">
-          <button class="copy-btn" data-fix="${recMd}" onclick="copyFix(this)">${ICONS.copy} Copy instructions</button>
-          <button class="copy-btn" data-fix="${recMd}" onclick="downloadFix(this, 'rec-${i + 1}')">${ICONS.fileSm} Download .md</button>
+          <button class="copy-btn" data-fix="${recMd}" onclick="copyFix(this)">${ICONS.copy} Copy for coding agent</button>
+          ${rec.targetFailureTypes.some((t: string) => t === "prompt_issue" || t === "retrieval_rag_issue") ? `<a href="https://converra.ai" class="diag-link">Fix in Converra ${ICONS.externalSm}</a>` : ""}
         </div>
       </div>
     </details>`;
