@@ -487,6 +487,8 @@ function scrollToRecs() {
   var el = document.getElementById('recs-section');
   if (!el) return;
   el.open = true;
+  var first = el.querySelector('details.rec-card');
+  if (first) first.open = true;
   el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 function jumpToConvById(id) {
