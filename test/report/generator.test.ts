@@ -101,11 +101,10 @@ describe("buildHtml", () => {
     expect(html).toContain("Sentiment");
   });
 
-  it("includes health summary statistics", () => {
+  it("includes health summary verdict", () => {
     const html = buildHtml(makeReport());
-    expect(html).toContain("Conversations");
-    expect(html).toContain("Healthy");
-    expect(html).toContain("evaluated");
+    expect(html).toContain("verdict");
+    expect(html).toContain("conversations are healthy");
   });
 
   it("includes recommendations section", () => {

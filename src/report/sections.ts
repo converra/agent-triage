@@ -28,7 +28,6 @@ export function renderHeader(report: Report, date: string): string {
       <span class="hdr-by">by <a href="https://converra.ai" class="hdr-by-link">Converra</a></span>
     </div>
     <h1>${headerTitle}</h1>
-    <div class="hdr-desc">Evaluated ${report.totalConversations} production conversations${agentCount > 1 ? ` across ${agentCount} agents` : ""} with ${Object.keys(report.metricSummary).length} quality metrics and step-level diagnosis.</div>
     <div class="hdr-meta">
       Model <span>${esc(report.llmModel)}</span> &middot;
       Cost <span>$${report.cost.estimatedCost.toFixed(2)}</span> &middot;
@@ -47,16 +46,9 @@ export function renderHealthSummary(
   const total = report.totalConversations;
   const issues = needsAttention + critical;
 
-  const counts = `<div class="pipe-steps">
-    <div class="pipe-step"><div class="pipe-num">${total}</div><div class="pipe-label"><b>Conversations</b><br>evaluated</div></div>
-    <div class="pipe-step"><div class="pipe-num emerald">${healthy}</div><div class="pipe-label"><b>Healthy</b><br>no issues</div></div>
-    <div class="pipe-step"><div class="pipe-num coral">${needsAttention}</div><div class="pipe-label"><b>Need attention</b><br>low scores or failures</div></div>
-    <div class="pipe-step"><div class="pipe-num red">${critical}</div><div class="pipe-label"><b>Critical</b><br>score below 50</div></div>
-  </div>`;
-
   if (issues === 0) {
-    return `<div class="health-summary">${counts}
-      <div class="verdict" style="background:var(--green-bg);border-color:var(--green-border);margin-top:16px;">
+    return `<div class="health-summary">
+      <div class="verdict" style="background:var(--green-bg);border-color:var(--green-border);">
         <div class="verdict-icon" style="color:var(--green);">${ICONS.checkCircle}</div>
         <div><div class="verdict-text">All ${total} conversations are healthy.</div><div class="verdict-detail">Quality scores above 75 and no policy failures.</div></div>
       </div>
@@ -65,37 +57,23 @@ export function renderHealthSummary(
 
   // Pull top diagnosis summaries — prioritize critical, deduplicate, cap at 2
   const topSummaries = buildTopSummaries(issueConvs);
-  const ctaText = buildAdaptiveCta(issueConvs);
 
   const isAmber = critical === 0;
   const verdictStyle = isAmber
-    ? `background:var(--amber-bg);border-color:var(--amber-border);margin-top:16px;`
-    : `margin-top:16px;`;
+    ? `background:var(--amber-bg);border-color:var(--amber-border);`
+    : ``;
   const iconStyle = isAmber ? ` style="color:var(--amber);"` : "";
 
-  return `<div class="health-summary">${counts}
+  return `<div class="health-summary">
     <div class="verdict" style="${verdictStyle}">
       <div class="verdict-icon"${iconStyle}>${ICONS.alertTriangle}</div>
       <div class="verdict-body">
         <div class="verdict-text">${issues} of ${total} conversations have issues${critical > 0 ? ` — ${critical} critical` : ""}.</div>
         ${topSummaries}
       </div>
-      <a href="https://converra.ai" class="verdict-cta">${ctaText} ${ICONS.externalSm}</a>
+      <a href="#recs-section" class="verdict-cta" onclick="event.preventDefault();scrollToRecs()">See fixes below ${ICONS.chevDownSm}</a>
     </div>
   </div>`;
-}
-
-/** Pick CTA copy based on the dominant issue types present. */
-function buildAdaptiveCta(issueConvs: Report["conversations"]): string {
-  const types = new Set(issueConvs.map((c) => c.diagnosis?.failureType).filter(Boolean));
-  const hasPrompt = types.has("prompt_issue") || types.has("retrieval_rag_issue");
-  const hasCode = types.has("orchestration_issue");
-  const hasModel = types.has("model_limitation");
-
-  if (hasModel && !hasPrompt && !hasCode) return "Assess mitigations";
-  if (hasCode || (hasPrompt && hasCode)) return "Get fix plan & checks";
-  if (hasPrompt) return "Get tested prompt patches";
-  return "Get fix recommendations";
 }
 
 /** Extract top 2 distinct problem descriptions from failing conversations. */
@@ -393,11 +371,9 @@ export function renderAllConversations(
         return `<span class="metric-mini ${color}">${val}</span>`;
       }).join("");
 
-      // First conversation gets full step analysis (expanded), rest get compact view
-      const isFirst = index === 0;
-      const expand = d ? renderConvDive(c, d, report, isFirst) : "";
+      const expand = d ? renderConvDive(c, d, report) : "";
 
-      return `<details class="conv-detail" id="${esc(c.id)}"${isFirst ? " open" : ""}>
+      return `<details class="conv-detail" id="${esc(c.id)}">
         <summary>
           <span class="cid">${esc(c.id.slice(0, 10))}</span>
           ${agentBadge}
@@ -436,7 +412,6 @@ function renderConvDive(
   conv: Report["conversations"][0],
   d: NonNullable<Report["conversations"][0]["diagnosis"]>,
   report: Report,
-  isFirst = false,
 ): string {
   const cascadeMap = new Map<number, string>();
   for (const entry of d.cascadeChain) {
@@ -445,16 +420,13 @@ function renderConvDive(
   }
 
   const fixMd = btoa(unescape(encodeURIComponent(buildConversationFixMd(conv, report))));
-  const maxTurns = isFirst ? 8 : 6;
-  const turns = buildTurnTimeline(conv, report, cascadeMap, fixMd).slice(0, maxTurns);
+  const turns = buildTurnTimeline(conv, report, cascadeMap, fixMd).slice(0, 6);
 
-  const blastHtml = isFirst && d.blastRadius.length > 0
+  const blastHtml = d.blastRadius.length > 0
     ? `<div class="blast"><span class="blast-icon">${ICONS.alertTriangleSm}</span><span><strong>Blast radius:</strong> Editing may affect ${d.blastRadius.map((r) => `<em>${esc(r)}</em>`).join(", ")}.</span></div>`
     : "";
 
-  const converraLink = isFirst
-    ? `<a href="https://converra.ai" class="diag-link">Test with Converra ${ICONS.externalSm}</a>`
-    : "";
+  const converraLink = `<a href="https://converra.ai" class="diag-link">Test with Converra ${ICONS.externalSm}</a>`;
 
   return `<div class="conv-expand">
     <div class="tl">
@@ -485,7 +457,7 @@ export function renderFailurePatterns(report: Report): string {
     (t) => t.type === "orchestration_issue" || t.type === "model_limitation",
   );
 
-  let html = `<div class="patterns"><div class="stitle">Root cause analysis</div>`;
+  let html = `<details class="patterns"><summary class="patterns-summary"><div class="stitle" style="margin:0;">Root cause analysis</div>${ICONS.chevDown}</summary>`;
 
   if (fixable.length > 0) {
     html += `<div class="group-label fixable">${ICONS.checkCircleSm} Fixable — prompt &amp; config <span class="gl-line"></span></div>`;
@@ -502,7 +474,7 @@ export function renderFailurePatterns(report: Report): string {
   }
 
   html += `<div class="trust-note">${ICONS.lock} This report is local-only. No data was uploaded.</div>`;
-  html += `</div>`;
+  html += `</details>`;
   return html;
 }
 
@@ -585,7 +557,7 @@ export function renderRecommendations(report: Report): string {
         .join("<br>");
       const evidenceHtml = evidence ? `<div style="margin-top:8px;padding:8px 10px;background:var(--bg-subtle);border-radius:var(--r);border:1px solid var(--border-subtle);line-height:1.6;">${evidence}</div>` : "";
 
-      return `<details class="rec-card"${i === 0 ? " open" : ""}>
+      return `<details class="rec-card">
       <summary>
         <span class="rec-num">${i + 1}</span>
         <div class="rec-main">
@@ -606,13 +578,14 @@ export function renderRecommendations(report: Report): string {
     })
     .join("");
 
-  return `<div class="recs">
-    <div class="recs-header">
+  return `<details class="recs" id="recs-section">
+    <summary class="recs-header">
       <div class="stitle" style="margin:0;">How to fix it</div>
-      <a href="https://converra.ai" class="verdict-cta">Track fixes over time ${ICONS.externalSm}</a>
-    </div>
+      <a href="https://converra.ai" class="verdict-cta" onclick="event.stopPropagation()">Track fixes over time ${ICONS.externalSm}</a>
+      ${ICONS.chevDown}
+    </summary>
     ${cards}
-  </div>`;
+  </details>`;
 }
 
 export function renderBehavioralRules(report: Report): string {
@@ -624,7 +597,7 @@ export function renderBehavioralRules(report: Report): string {
   const na = report.policies.filter((p) => p.evaluated === 0);
 
   if (failing.length === 0) {
-    return `<div class="rules-section-inline">${ICONS.checkCircleSm} <span>${evaluated.length} behavioral rules evaluated — all passing.</span>${na.length > 0 ? ` <span class="rules-na-inline">${na.length} not applicable.</span>` : ""}</div>`;
+    return `<div class="rules-section-inline">${ICONS.checkCircleSm} <span>${evaluated.length} behavioral rules evaluated — all passing.</span></div>`;
   }
 
   const failingHtml = failing.map((p) => {
@@ -632,15 +605,15 @@ export function renderBehavioralRules(report: Report): string {
     return `<div class="rule-row"><span class="rule-icon ${icon}">${p.complianceRate < 50 ? "×" : "!"}</span><span class="rule-name">${esc(p.name)}</span><span class="rule-stat ${icon}">${p.complianceRate}% (${p.failing}/${p.evaluated} failing)</span></div>`;
   }).join("");
 
-  return `<details class="rules-section" open>
+  return `<details class="rules-section">
     <summary>
       <div class="stitle" style="margin:0;">Behavioral rules</div>
-      <span class="rules-summary">${failing.length} failing · ${passing.length} passing · ${na.length} not applicable</span>
+      <span class="rules-summary">${failing.length} failing · ${passing.length} passing</span>
       ${ICONS.chevDown}
     </summary>
     <div class="rules-body">
       ${failingHtml}
-      <div class="rules-na">${passing.length} rules passing at 100%.${na.length > 0 ? ` ${na.length} not applicable.` : ""}</div>
+      <div class="rules-na">${passing.length} rules passing at 100%.</div>
     </div>
   </details>`;
 }
