@@ -192,6 +192,7 @@ async function diagnoseOnDemand(
     return {
       rootCauseTurn: Number(parsed.rootCauseTurn ?? 1),
       rootCauseAgent: parsed.rootCauseAgent ? String(parsed.rootCauseAgent) : null,
+      shortSummary: String(parsed.shortSummary ?? ""),
       summary: String(parsed.summary ?? ""),
       impact: String(parsed.impact ?? ""),
       cascadeChain: Array.isArray(parsed.cascadeChain) ? parsed.cascadeChain.map(String) : [],
@@ -299,6 +300,7 @@ async function evaluateAndDiagnose(
       result.diagnosis = {
         rootCauseTurn: Number(parsed.rootCauseTurn ?? 1),
         rootCauseAgent: parsed.rootCauseAgent ? String(parsed.rootCauseAgent) : null,
+        shortSummary: String(parsed.shortSummary ?? ""),
         summary: String(parsed.summary ?? ""),
         impact: String(parsed.impact ?? ""),
         cascadeChain: Array.isArray(parsed.cascadeChain) ? parsed.cascadeChain.map(String) : [],

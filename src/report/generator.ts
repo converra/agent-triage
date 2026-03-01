@@ -1,7 +1,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import type { Report } from "../evaluation/types.js";
-import { avgMetrics, conversationHealth, esc, formatDuration } from "./helpers.js";
+import { avgMetrics, conversationHealth, esc } from "./helpers.js";
 import {
   renderAgentHealth,
   renderAllConversations,
@@ -49,7 +49,6 @@ export function buildHtml(report: Report): string {
     .sort((a, b) => a.avg - b.avg)
     .map((s) => s.conv);
 
-  const duration = formatDuration(report.runDuration);
   const date = new Date(report.generatedAt).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
@@ -89,8 +88,8 @@ export function buildHtml(report: Report): string {
 <body>
 <div class="page">
 
-  ${renderHeader(report, date, duration)}
-  ${renderHealthSummary(report, healthy, needsAttention, critical)}
+  ${renderHeader(report, date)}
+  ${renderHealthSummary(report, healthy, needsAttention, critical, issueConvs)}
   ${renderAllConversations(issueConvs, report)}
   ${renderRecommendations(report)}
   ${renderFailurePatterns(report)}

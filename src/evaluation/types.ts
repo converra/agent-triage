@@ -60,6 +60,7 @@ export type PolicyResult = z.infer<typeof PolicyResultSchema>;
 export interface Diagnosis {
   rootCauseTurn: number;
   rootCauseAgent: string | null;
+  shortSummary: string;
   summary: string;
   impact: string;
   cascadeChain: string[];

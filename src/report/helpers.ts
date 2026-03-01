@@ -20,13 +20,6 @@ export function avgMetrics(m: Record<string, number>): number {
   return vals.reduce((s, v) => s + v, 0) / vals.length;
 }
 
-export function formatDuration(seconds: number): string {
-  if (seconds < 60) return `${Math.round(seconds)}s`;
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.round(seconds % 60);
-  return `${mins}m ${secs}s`;
-}
-
 export function conversationHealth(
   metrics: Record<string, number>,
   policyFailures = 0,

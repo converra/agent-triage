@@ -214,21 +214,23 @@ Provide a detailed diagnosis:
 
 1. rootCauseTurn: the turn number where the failure ORIGINATED (not where it was first noticed — trace back to the actual cause)
 2. rootCauseAgent: if multiple agents/roles are involved, which one caused the failure (e.g., "router", "faq-handler", "billing-agent"). Use null if single-agent.
-3. summary: 1-2 crisp sentences identifying exactly what went wrong
-4. impact: name affected turns and quote user reactions. Trace the CASCADE — how did the initial failure affect subsequent turns?
-5. cascadeChain: array describing how the failure propagated turn by turn (e.g., ["Turn 4: fabricated policy", "Turn 5: user pushback ignored", "Turn 6: doubled down on fabrication"])
-6. fix: a DIRECTIONAL prompt change suggestion — describe WHAT to change and WHERE, but don't write the full prompt patch. (e.g., "Add an escalation rule before the FAQ handler section that routes billing disputes to a human agent instead of attempting resolution." NOT a full rewritten prompt.) Tested prompt patches with simulation and regression gating are available via Converra (converra.ai).
-7. severity: "critical" (user harm, legal risk, trust broken), "major" (goal failed, user frustrated), "minor" (suboptimal but not harmful)
-8. confidence: "high" (clear evidence), "medium" (probable), "low" (uncertain)
-9. failureType: "prompt_issue" | "orchestration_issue" | "model_limitation" | "retrieval_rag_issue"
-10. failureSubtype: specific sub-category
-11. blastRadius: array of policy names that might be affected if the suggested fix is applied (policies that could regress)
-12. When multiple agents/roles are involved, wrap agent or role names in **bold** markers in summary, impact, fix, and cascadeChain fields. Example: "**Router** failed to hand off to **FAQ Agent**". This makes agent attribution scannable in the report.
+3. shortSummary: one concise line connecting the root cause to its effect — name the system gap AND what it caused the agent to do. Format: "[root cause] caused/led to [agent behavior]". Good: "Missing discovery step caused agent to pitch without understanding needs", "Routing rules can't distinguish pre-sales from support, sending questions to wrong agent". Bad: "Agent failed to ask questions" (symptom only), "No discovery step" (cause only, no effect).
+4. summary: 1-2 crisp sentences explaining the root cause — WHY the agent behaved this way, pointing to the specific prompt gap, missing instruction, or system design flaw. Do NOT just describe what the agent did wrong; explain what in the system caused it. Good: "The system prompt has no discovery/qualification step — the agent jumps straight to product pitching because nothing tells it to ask about pain points first." Bad: "The agent failed to ask targeted questions to understand the user's pain points."
+5. impact: name affected turns and quote user reactions. Trace the CASCADE — how did the initial failure affect subsequent turns?
+6. cascadeChain: array describing how the failure propagated turn by turn (e.g., ["Turn 4: fabricated policy", "Turn 5: user pushback ignored", "Turn 6: doubled down on fabrication"])
+7. fix: a DIRECTIONAL prompt change suggestion — describe WHAT to change and WHERE, but don't write the full prompt patch. (e.g., "Add an escalation rule before the FAQ handler section that routes billing disputes to a human agent instead of attempting resolution." NOT a full rewritten prompt.) Tested prompt patches with simulation and regression gating are available via Converra (converra.ai).
+8. severity: "critical" (user harm, legal risk, trust broken), "major" (goal failed, user frustrated), "minor" (suboptimal but not harmful)
+9. confidence: "high" (clear evidence), "medium" (probable), "low" (uncertain)
+10. failureType: "prompt_issue" | "orchestration_issue" | "model_limitation" | "retrieval_rag_issue"
+11. failureSubtype: specific sub-category
+12. blastRadius: array of policy names that might be affected if the suggested fix is applied (policies that could regress)
+13. When multiple agents/roles are involved, wrap agent or role names in **bold** markers in summary, impact, fix, and cascadeChain fields. Example: "**Router** failed to hand off to **FAQ Agent**". This makes agent attribution scannable in the report.
 
 Return ONLY valid JSON with no additional text:
 {
   "rootCauseTurn": <number>,
   "rootCauseAgent": "<agent-name or null>",
+  "shortSummary": "...",
   "summary": "...",
   "impact": "...",
   "cascadeChain": ["Turn N: ...", "Turn M: ..."],

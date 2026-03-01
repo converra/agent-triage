@@ -163,7 +163,7 @@ describe("buildHtml", () => {
 
   it("includes reproducibility section", () => {
     const html = buildHtml(makeReport());
-    expect(html).toContain("Re-run analysis");
+    expect(html).toContain("Reproduce this report");
     expect(html).toContain("agent-triage analyze");
   });
 
@@ -254,8 +254,9 @@ describe("buildHtml", () => {
 
     it("shows both message content and cascadeChain diagnosis note", () => {
       const html = buildHtml(makeDeepDiveReport());
-      // CascadeChain descriptions should appear as diagnosis notes
-      expect(html).toContain("Agent lost context and ignored user input");
+      // Root cause turn uses diagnosis summary, not cascade chain entry
+      expect(html).toContain("The agent lost context at turn 3.");
+      // Cascade descriptions for non-root turns appear as diagnosis notes
       expect(html).toContain("User expressed confusion about the loop");
       // Raw message content should ALSO appear (not replaced)
       expect(html).toContain("Raw message content for turn 4");

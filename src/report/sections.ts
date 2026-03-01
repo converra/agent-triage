@@ -42,6 +42,7 @@ export function renderHealthSummary(
   healthy: number,
   needsAttention: number,
   critical: number,
+  issueConvs: Report["conversations"],
 ): string {
   const total = report.totalConversations;
   const issues = needsAttention + critical;
@@ -62,36 +63,60 @@ export function renderHealthSummary(
     </div>`;
   }
 
-  const promptFixable = report.failurePatterns.byType.filter((t) => t.type === "prompt_issue" || t.type === "retrieval_rag_issue").reduce((s, t) => s + t.count, 0);
-  const needsCode = report.failurePatterns.byType.filter((t) => t.type === "orchestration_issue" || t.type === "model_limitation").reduce((s, t) => s + t.count, 0);
-  let detail = `${issues} conversations scored below 75 or have policy failures.`;
-  if (promptFixable > 0 && needsCode > 0) detail = `${promptFixable} root causes fixable via prompt changes, ${needsCode} need code changes.`;
-  else if (promptFixable > 0) detail = "Root causes are fixable via prompt changes.";
-
-  // Bright spot: count passing rules
-  const evaluated = report.policies.filter((p) => p.evaluated > 0);
-  const passingRules = evaluated.filter((p) => p.failing === 0).length;
-  const brightSpot = passingRules > 0
-    ? `<div class="verdict-detail" style="margin-top:2px;color:var(--text-3);">${passingRules} behavioral rule${passingRules !== 1 ? "s" : ""} passing at 100%.</div>`
-    : "";
+  // Pull top diagnosis summaries — prioritize critical, deduplicate, cap at 2
+  const topSummaries = buildTopSummaries(issueConvs);
+  const ctaText = buildAdaptiveCta(issueConvs);
 
   const isAmber = critical === 0;
   const verdictStyle = isAmber
     ? `background:var(--amber-bg);border-color:var(--amber-border);margin-top:16px;`
     : `margin-top:16px;`;
   const iconStyle = isAmber ? ` style="color:var(--amber);"` : "";
-  const ctaClass = isAmber ? ` style="color:var(--amber);border-color:var(--amber-border);"` : "";
 
   return `<div class="health-summary">${counts}
     <div class="verdict" style="${verdictStyle}">
       <div class="verdict-icon"${iconStyle}>${ICONS.alertTriangle}</div>
       <div class="verdict-body">
         <div class="verdict-text">${issues} of ${total} conversations have issues${critical > 0 ? ` — ${critical} critical` : ""}.</div>
-        <div class="verdict-detail">${detail}</div>
-        ${brightSpot}
+        ${topSummaries}
       </div>
+      <a href="https://converra.ai" class="verdict-cta">${ctaText} ${ICONS.externalSm}</a>
     </div>
   </div>`;
+}
+
+/** Pick CTA copy based on the dominant issue types present. */
+function buildAdaptiveCta(issueConvs: Report["conversations"]): string {
+  const types = new Set(issueConvs.map((c) => c.diagnosis?.failureType).filter(Boolean));
+  const hasPrompt = types.has("prompt_issue") || types.has("retrieval_rag_issue");
+  const hasCode = types.has("orchestration_issue");
+  const hasModel = types.has("model_limitation");
+
+  if (hasModel && !hasPrompt && !hasCode) return "Assess mitigations";
+  if (hasCode || (hasPrompt && hasCode)) return "Get fix plan & checks";
+  if (hasPrompt) return "Get tested prompt patches";
+  return "Get fix recommendations";
+}
+
+/** Extract top 2 distinct problem descriptions from failing conversations. */
+function buildTopSummaries(issueConvs: Report["conversations"]): string {
+  const withDiag = issueConvs.filter((c) => c.diagnosis);
+  if (withDiag.length === 0) return "";
+
+  const seen = new Set<string>();
+  const items: string[] = [];
+  for (const c of withDiag) {
+    const d = c.diagnosis!;
+    const text = d.shortSummary || d.summary.split(/\.\s/)[0]!.replace(/\.$/, "");
+    const key = text.slice(0, 30).toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const typeClass = d.failureType === "prompt_issue" ? "prompt" : d.failureType === "orchestration_issue" ? "orch" : "model";
+    items.push(`<li><span class="type-badge sm ${typeClass}">${esc(formatFailureType(d.failureType))}</span> ${escBold(text)}</li>`);
+    if (items.length >= 2) break;
+  }
+
+  return `<ul class="verdict-summaries">${items.join("")}</ul>`;
 }
 
 export function renderMetricsBar(report: Report): string {
@@ -542,55 +567,8 @@ function renderPatternDetail(
   </details>`;
 }
 
-function buildFullFixMd(report: Report): string {
-  const lines: string[] = [];
-  const agent = report.agents?.[0]?.name ?? report.agent.name;
-  const issues = report.conversations.filter((c) => c.diagnosis);
-
-  lines.push(`# Agent Triage — Fix Report for ${agent}`);
-  lines.push(`> ${issues.length} conversations with issues · ${report.failurePatterns.topRecommendations.length} recommendations`);
-  lines.push("");
-
-  // Recommendations
-  if (report.failurePatterns.topRecommendations.length > 0) {
-    lines.push("---");
-    lines.push("## Recommendations");
-    lines.push("");
-    for (const [i, rec] of report.failurePatterns.topRecommendations.entries()) {
-      lines.push(`### ${i + 1}. ${rec.title}`);
-      lines.push(`**Confidence:** ${rec.confidence} · **Affected:** ${rec.affectedConversations} conversations`);
-      lines.push("");
-      lines.push(rec.description);
-      lines.push("");
-    }
-  }
-
-  // Per-conversation diagnosis
-  lines.push("---");
-  lines.push("## Conversation Diagnoses");
-  lines.push("");
-  for (const conv of issues) {
-    const d = conv.diagnosis!;
-    lines.push(`### ${conv.id.slice(0, 10)} — ${d.severity}`);
-    lines.push(`**Root cause:** Step ${d.rootCauseTurn}${d.rootCauseAgent ? ` (${d.rootCauseAgent})` : ""} · ${formatFailureType(d.failureType)} → ${formatSubtype(d.failureSubtype)}`);
-    lines.push("");
-    lines.push(`**What happened:** ${d.summary}`);
-    lines.push("");
-    lines.push(`**Impact:** ${d.impact}`);
-    lines.push("");
-    lines.push(`**Fix:** ${d.fix}`);
-    lines.push("");
-  }
-
-  lines.push("---");
-  lines.push("*Generated by [agent-triage](https://github.com/converra/agent-triage)*");
-  return lines.join("\n");
-}
-
 export function renderRecommendations(report: Report): string {
   if (report.failurePatterns.topRecommendations.length === 0) return "";
-
-  const fullMd = btoa(unescape(encodeURIComponent(buildFullFixMd(report))));
 
   const cards = report.failurePatterns.topRecommendations
     .map((rec, i) => {
@@ -631,10 +609,7 @@ export function renderRecommendations(report: Report): string {
   return `<div class="recs">
     <div class="recs-header">
       <div class="stitle" style="margin:0;">How to fix it</div>
-      <div class="recs-cta">
-        <button class="copy-btn primary" data-fix="${fullMd}" onclick="copyFix(this)">${ICONS.copy} Copy all fixes</button>
-        <button class="copy-btn primary" data-fix="${fullMd}" onclick="downloadFix(this, 'fix-instructions')">${ICONS.fileSm} Download .md</button>
-      </div>
+      <a href="https://converra.ai" class="verdict-cta">Track fixes over time ${ICONS.externalSm}</a>
     </div>
     ${cards}
   </div>`;
@@ -673,7 +648,8 @@ export function renderBehavioralRules(report: Report): string {
 export function renderReproducibility(report: Report): string {
   const cmd = `agent-triage analyze --traces conversations.json --model ${esc(report.llmModel)}`;
   return `<div class="repro">
-    <div class="repro-header">${ICONS.terminal} Re-run analysis</div>
+    <div class="repro-header">${ICONS.terminal} Reproduce this report</div>
+    <div class="repro-desc">Run this CLI command to re-run the same analysis on your machine.</div>
     <div class="repro-body">
       <code class="repro-cmd">${cmd}</code>
       <button class="repro-copy" onclick="copyText(this, '${cmd}')">${ICONS.refresh} Copy command</button>

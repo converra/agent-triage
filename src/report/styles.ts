@@ -129,6 +129,8 @@ details[open] > summary .chev { transform:rotate(180deg); }
 .verdict-text { font-size:14px; font-weight:600; color:var(--text); font-family:'Space Grotesk',sans-serif; margin-bottom:2px; }
 .verdict-body { flex:1; }
 .verdict-detail { font-size:13px; color:var(--text-2); }
+.verdict-summaries { margin:6px 0 0; padding-left:18px; list-style:disc; }
+.verdict-summaries li { font-size:13px; color:var(--text-2); line-height:1.5; margin-bottom:2px; }
 .verdict-cta { flex-shrink:0; font-size:12px; font-weight:600; color:var(--coral); text-decoration:none; display:inline-flex; align-items:center; gap:4px; padding:6px 12px; border:1px solid var(--coral-border); border-radius:var(--r); white-space:nowrap; transition:all 0.15s; align-self:center; }
 .verdict-cta:hover { background:var(--coral-50); border-color:var(--coral); }
 .stitle { font-family:'Space Grotesk',sans-serif; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.1em; color:var(--text-3); margin-bottom:6px; }
@@ -345,6 +347,7 @@ details[open] > summary .chev { transform:rotate(180deg); }
 .agent-arrow { font-size:11px; color:var(--text-4); margin:0 2px; }
 .repro { border:1px solid var(--border); border-radius:var(--r); margin-bottom:20px; overflow:hidden; }
 .repro-header { padding:8px 14px; background:var(--bg-subtle); border-bottom:1px solid var(--border-subtle); font-size:11px; font-weight:600; color:var(--text-3); text-transform:uppercase; letter-spacing:0.06em; display:flex; align-items:center; gap:6px; }
+.repro-desc { padding:6px 14px 0; font-size:12px; color:var(--text-3); }
 .repro-body { padding:10px 14px; font-family:'SF Mono','Fira Code','Consolas',monospace; font-size:12px; color:var(--text-2); line-height:1.5; display:flex; align-items:center; justify-content:space-between; }
 .repro-cmd { flex:1; }
 .repro-copy { font-size:11px; color:var(--text-3); cursor:pointer; background:none; border:1px solid var(--border); border-radius:4px; padding:3px 8px; display:flex; align-items:center; gap:4px; transition:all 0.15s; }
@@ -467,10 +470,17 @@ function viewConv(e, btn) {
   e.preventDefault();
   var id = btn.getAttribute('data-conv-id');
   if (!id) return;
+  jumpToConvById(id);
+}
+function jumpToConv(e, id) {
+  e.preventDefault();
+  jumpToConvById(id);
+}
+function jumpToConvById(id) {
   var el = document.getElementById(id);
   if (!el) return;
   el.open = true;
-  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   el.classList.remove('highlight');
   void el.offsetWidth;
   el.classList.add('highlight');
