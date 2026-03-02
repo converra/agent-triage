@@ -385,8 +385,9 @@ export function renderAllConversations(
       }).join("");
 
       const expand = d ? renderConvDive(c, d, report) : "";
+      const openAttr = index === 0 ? " open" : "";
 
-      return `<details class="conv-detail" id="${esc(c.id)}">
+      return `<details class="conv-detail" id="${esc(c.id)}"${openAttr}>
         <summary>
           <span class="cid">${esc(c.id.slice(0, 10))}</span>
           ${agentBadge}
