@@ -225,6 +225,7 @@ Provide a detailed diagnosis:
 11. failureSubtype: specific sub-category
 12. blastRadius: array of policy names that might be affected if the suggested fix is applied (policies that could regress)
 13. When multiple agents/roles are involved, wrap agent or role names in **bold** markers in summary, impact, fix, and cascadeChain fields. Example: "**Router** failed to hand off to **FAQ Agent**". This makes agent attribution scannable in the report.
+14. turnDescriptions: object mapping each turn number to a one-line semantic description (~15 words). For user turns: describe intent/mood. For assistant turns: describe action and appropriateness. Cover ALL turns in the conversation.
 
 Return ONLY valid JSON with no additional text:
 {
@@ -239,7 +240,8 @@ Return ONLY valid JSON with no additional text:
   "confidence": "high|medium|low",
   "failureType": "...",
   "failureSubtype": "...",
-  "blastRadius": ["policy-name-1", "policy-name-2"]
+  "blastRadius": ["policy-name-1", "policy-name-2"],
+  "turnDescriptions": {"1": "Clear user question about billing", "2": "Agent provided accurate billing info", "3": "..."}
 }`;
 }
 

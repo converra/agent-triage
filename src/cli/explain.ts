@@ -12,6 +12,7 @@ import { evaluateConversation } from "../evaluation/evaluator.js";
 import { checkPolicies } from "../evaluation/policy-checker.js";
 import { buildDiagnosisPrompt } from "../llm/prompts.js";
 import { parseJsonResponse } from "../llm/json.js";
+import { parseTurnDescriptions } from "../evaluation/diagnosis.js";
 import type { ConversationResult, Diagnosis, Report } from "../evaluation/types.js";
 import { parseDuration, createLogger } from "./filters.js";
 
@@ -202,6 +203,7 @@ async function diagnoseOnDemand(
       failureType: validateEnum(parsed.failureType, ["prompt_issue", "orchestration_issue", "model_limitation", "retrieval_rag_issue"], "prompt_issue") as Diagnosis["failureType"],
       failureSubtype: String(parsed.failureSubtype ?? ""),
       blastRadius: Array.isArray(parsed.blastRadius) ? parsed.blastRadius.map(String) : [],
+      turnDescriptions: parseTurnDescriptions(parsed.turnDescriptions),
     };
   } catch (error) {
     log.warn(`Warning: Could not generate diagnosis: ${error}`);
@@ -310,6 +312,7 @@ async function evaluateAndDiagnose(
         failureType: validateEnum(parsed.failureType, ["prompt_issue", "orchestration_issue", "model_limitation", "retrieval_rag_issue"], "prompt_issue") as Diagnosis["failureType"],
         failureSubtype: String(parsed.failureSubtype ?? ""),
         blastRadius: Array.isArray(parsed.blastRadius) ? parsed.blastRadius.map(String) : [],
+        turnDescriptions: parseTurnDescriptions(parsed.turnDescriptions),
       };
     } catch (error) {
       log.warn(`Warning: Could not generate diagnosis: ${error}`);

@@ -23,6 +23,7 @@ import type {
 
 import { PoliciesFileSchema } from "../policy/types.js";
 import { buildDiagnosisPrompt } from "../llm/prompts.js";
+import { parseTurnDescriptions } from "../evaluation/diagnosis.js";
 import type { Diagnosis, ConversationResult } from "../evaluation/types.js";
 
 // ---------------------------------------------------------------------------
@@ -225,6 +226,7 @@ export async function generateDiagnosisForResult(
       failureType: validateEnum(parsed.failureType, ["prompt_issue", "orchestration_issue", "model_limitation", "retrieval_rag_issue"], "prompt_issue") as Diagnosis["failureType"],
       failureSubtype: String(parsed.failureSubtype ?? ""),
       blastRadius: Array.isArray(parsed.blastRadius) ? parsed.blastRadius.map(String) : [],
+      turnDescriptions: parseTurnDescriptions(parsed.turnDescriptions),
     };
   } catch (error) {
     console.error(`[agent-triage] Diagnosis generation failed: ${error}`);
