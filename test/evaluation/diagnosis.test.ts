@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { generateDiagnoses } from "../../src/evaluation/diagnosis.js";
+import { generateDiagnoses, parseTurnDescriptions } from "../../src/evaluation/diagnosis.js";
 import { createMockLlm, makeConversation, makeResult, VALID_METRICS } from "../helpers.js";
 import type { LlmClient } from "../../src/llm/client.js";
 import type { ConversationResult } from "../../src/evaluation/types.js";
@@ -18,6 +18,10 @@ const diagnosisResponse = JSON.stringify({
   failureType: "prompt_issue",
   failureSubtype: "hallucination",
   blastRadius: ["tone-policy", "escalation-policy"],
+  turnDescriptions: {
+    "1": "User asks about order refund",
+    "2": "Agent acknowledges the request",
+  },
 });
 
 describe("generateDiagnoses", () => {
@@ -57,6 +61,10 @@ describe("generateDiagnoses", () => {
     expect(d.failureType).toBe("prompt_issue");
     expect(d.cascadeChain).toHaveLength(2);
     expect(d.blastRadius).toContain("tone-policy");
+    expect(d.turnDescriptions).toEqual({
+      1: "User asks about order refund",
+      2: "Agent acknowledges the request",
+    });
   });
 
   it("skips conversations with no policy failures and good scores", async () => {
@@ -238,5 +246,71 @@ describe("generateDiagnoses", () => {
     );
 
     expect(results[0]!.diagnosis).toBeUndefined();
+  });
+
+  it("returns undefined turnDescriptions when LLM omits the field", async () => {
+    const responseWithout = JSON.stringify({
+      rootCauseTurn: 3,
+      rootCauseAgent: null,
+      summary: "Issue found.",
+      impact: "User frustrated.",
+      cascadeChain: [],
+      fix: "Fix the prompt.",
+      severity: "major",
+      confidence: "medium",
+      failureType: "prompt_issue",
+      failureSubtype: "hallucination",
+      blastRadius: [],
+    });
+    const llm = createMockLlm(() => responseWithout);
+    const conversations = [makeConversation("conv-1")];
+    const results: ConversationResult[] = [
+      makeResult("conv-1", {
+        metrics: { ...VALID_METRICS, successScore: 20 },
+        policyResults: [
+          { policyId: "p1", passed: false, evidence: "Fail", failureType: "prompt_issue" },
+        ],
+      }),
+    ];
+
+    await generateDiagnoses(llm as unknown as LlmClient, results, conversations, systemPrompt);
+
+    expect(results[0]!.diagnosis).toBeDefined();
+    expect(results[0]!.diagnosis!.turnDescriptions).toBeUndefined();
+  });
+});
+
+describe("parseTurnDescriptions", () => {
+  it("converts string keys to numeric keys", () => {
+    const result = parseTurnDescriptions({ "1": "hello", "2": "world" });
+    expect(result).toEqual({ 1: "hello", 2: "world" });
+  });
+
+  it("returns undefined for null/undefined input", () => {
+    expect(parseTurnDescriptions(null)).toBeUndefined();
+    expect(parseTurnDescriptions(undefined)).toBeUndefined();
+  });
+
+  it("returns undefined for empty object", () => {
+    expect(parseTurnDescriptions({})).toBeUndefined();
+  });
+
+  it("skips non-numeric keys", () => {
+    const result = parseTurnDescriptions({ "1": "valid", "abc": "invalid", "2": "also valid" });
+    expect(result).toEqual({ 1: "valid", 2: "also valid" });
+  });
+
+  it("skips entries with non-string values", () => {
+    const result = parseTurnDescriptions({ "1": "valid", "2": 42, "3": "also valid" });
+    expect(result).toEqual({ 1: "valid", 3: "also valid" });
+  });
+
+  it("skips empty string values", () => {
+    const result = parseTurnDescriptions({ "1": "valid", "2": "  ", "3": "ok" });
+    expect(result).toEqual({ 1: "valid", 3: "ok" });
+  });
+
+  it("returns undefined for arrays", () => {
+    expect(parseTurnDescriptions(["a", "b"])).toBeUndefined();
   });
 });

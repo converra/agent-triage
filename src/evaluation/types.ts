@@ -70,6 +70,7 @@ export interface Diagnosis {
   failureType: FailureType;
   failureSubtype: string;
   blastRadius: string[];
+  turnDescriptions?: Record<number, string>;
 }
 
 export interface ConversationResult {

@@ -219,6 +219,13 @@ describe("buildHtml", () => {
               failureType: "prompt_issue",
               failureSubtype: "context_loss",
               blastRadius: ["other-policy"],
+              turnDescriptions: {
+                1: "Friendly user greeting",
+                2: "Agent responds with standard welcome",
+                3: "User states billing support need",
+                4: "Agent lost context and gave irrelevant response",
+                5: "Frustrated user pushback",
+              },
             },
             messages: [
               { role: "user", content: "Hi there" },
@@ -262,10 +269,29 @@ describe("buildHtml", () => {
     });
 
     it("falls back to raw content when no cascadeChain entry for a turn", () => {
-      const html = buildHtml(makeDeepDiveReport());
+      const report = makeDeepDiveReport();
+      // Remove turnDescriptions to test pure fallback
+      report.conversations[0]!.diagnosis!.turnDescriptions = undefined;
+      const html = buildHtml(report);
       // Turns 1 and 2 have no cascadeChain entry — should show raw message
       expect(html).toContain("Hi there");
       expect(html).toContain("Hello! How can I help?");
+    });
+
+    it("renders OK turns with tc-narrative when turnDescriptions present", () => {
+      const html = buildHtml(makeDeepDiveReport());
+      // Turn 1 ("Hi there") is an OK turn before root cause — should use turnDescription
+      expect(html).toContain("Friendly user greeting");
+      expect(html).toContain("Agent responds with standard welcome");
+    });
+
+    it("falls back to tc-text when turnDescriptions absent", () => {
+      const report = makeDeepDiveReport();
+      report.conversations[0]!.diagnosis!.turnDescriptions = undefined;
+      const html = buildHtml(report);
+      // Without turnDescriptions, OK turns should use tc-text with raw content
+      expect(html).toContain("tc-text");
+      expect(html).toContain("Hi there");
     });
   });
 });

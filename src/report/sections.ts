@@ -173,6 +173,7 @@ function findOrchestratorName(report: Report): string | undefined {
 /** Classify each turn for visual hierarchy. */
 interface TurnClassification {
   turnNum: number;
+  originalTurn: number;
   isRoot: boolean;
   isFailing: boolean;
   isCascade: boolean;
@@ -184,13 +185,27 @@ function classifyTurns(
   conv: Report["conversations"][0],
   d: NonNullable<Report["conversations"][0]["diagnosis"]>,
 ): TurnClassification[] {
-  const visible = conv.messages.filter((m) => m.role === "user" || m.role === "assistant");
-  return visible.map((msg, i) => {
+  // Build a map from original 1-based message index to visible step number.
+  // The LLM numbers ALL messages (including system/tool) so failingTurns uses
+  // that global numbering. We need to translate when matching against visible steps.
+  const visibleSteps: { msg: Report["conversations"][0]["messages"][0]; originalTurn: number }[] = [];
+  for (let i = 0; i < conv.messages.length; i++) {
+    const m = conv.messages[i];
+    if (m.role === "user" || m.role === "assistant") {
+      visibleSteps.push({ msg: m, originalTurn: i + 1 });
+    }
+  }
+
+  return visibleSteps.map(({ msg, originalTurn }, i) => {
     const turnNum = i + 1;
-    const isRoot = turnNum === d.rootCauseTurn;
-    const isFailing = conv.policyResults.some((pr) => !pr.passed && pr.failingTurns?.includes(turnNum));
-    const isCascade = !isRoot && !isFailing && turnNum > d.rootCauseTurn;
-    return { turnNum, isRoot, isFailing, isCascade, isUser: msg.role === "user", msg };
+    const isUser = msg.role === "user";
+    const isRoot = originalTurn === d.rootCauseTurn;
+    // Violations can only be attributed to assistant turns
+    const isFailing = !isUser && conv.policyResults.some(
+      (pr) => !pr.passed && pr.failingTurns?.includes(originalTurn),
+    );
+    const isCascade = !isRoot && !isFailing && originalTurn > d.rootCauseTurn;
+    return { turnNum, originalTurn, isRoot, isFailing, isCascade, isUser, msg };
   });
 }
 
@@ -254,14 +269,14 @@ function buildTurnTimeline(
       return `<div class="turn turn-summary"><div class="tdot summary"></div><div class="tc"><div class="tc-summary">Steps ${entry.startStep}–${entry.endStep}: OK (${entry.count} steps)</div></div></div>`;
     }
 
-    const { turnNum, isRoot, isFailing, isCascade, isUser, msg } = entry.turn;
+    const { turnNum, originalTurn, isRoot, isFailing, isCascade, isUser, msg } = entry.turn;
     const dotClass = isRoot || isFailing ? "f" : isCascade ? "w" : "p";
 
     // Policy violations — collapsed behind a count pill
     let failBadges = "";
     let fixCta = "";
     const failingPolicies = (isRoot || isFailing)
-      ? conv.policyResults.filter((pr) => !pr.passed && pr.failingTurns?.includes(turnNum))
+      ? conv.policyResults.filter((pr) => !pr.passed && pr.failingTurns?.includes(originalTurn))
       : [];
     if (failingPolicies.length > 0) {
       const allBadges = failingPolicies
@@ -297,17 +312,21 @@ function buildTurnTimeline(
     const rcTag = isRoot
       ? `<span class="rc-label">root cause</span><span class="type-badge sm ${rcTypeClass}">${esc(formatFailureType(d.failureType))}</span>`
       : "";
-    const cascadeDesc = cascadeMap.get(turnNum);
+    const cascadeDesc = cascadeMap.get(originalTurn);
     const plain = stripHtml(msg.content);
+    const turnDesc = d.turnDescriptions?.[originalTurn];
 
-    // Narrative-first for root cause and failing turns: diagnosis is primary, message is secondary
+    // Narrative-first: diagnosis/description is primary, message is secondary
     const diagText = isRoot ? d.summary : (isFailing || isCascade) ? cascadeDesc : undefined;
     let contentHtml: string;
     if (diagText && (isRoot || isFailing || isCascade)) {
-      // Narrative as primary text, actual message dimmed below
       const maxLen = isRoot ? 200 : 120;
       const content = summarizeTurnContent(plain, maxLen);
       contentHtml = `<div class="tc-narrative">${escBold(diagText)}</div><div class="tc-msg">${escBold(content)}</div>`;
+    } else if (turnDesc) {
+      const maxLen = isUser ? 80 : 120;
+      const content = summarizeTurnContent(plain, maxLen);
+      contentHtml = `<div class="tc-narrative">${escBold(turnDesc)}</div><div class="tc-msg">${escBold(content)}</div>`;
     } else {
       const maxLen = isUser ? 80 : 120;
       const content = summarizeTurnContent(plain, maxLen);

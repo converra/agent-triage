@@ -6,6 +6,21 @@ import type { NormalizedConversation } from "../ingestion/types.js";
 
 const TOP_N_WORST = 10;
 
+/** Defensively parse turnDescriptions from LLM output into Record<number, string>. */
+export function parseTurnDescriptions(val: unknown): Record<number, string> | undefined {
+  if (val == null || typeof val !== "object" || Array.isArray(val)) return undefined;
+
+  const result: Record<number, string> = {};
+  for (const [key, desc] of Object.entries(val as Record<string, unknown>)) {
+    const num = Number(key);
+    if (!Number.isFinite(num) || num < 1) continue;
+    if (typeof desc !== "string" || desc.trim() === "") continue;
+    result[num] = desc.trim();
+  }
+
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
 /**
  * Generate step-level diagnosis for the worst conversations.
  * Selects bottom N by aggregate metric score, runs 1 LLM call per conversation.
@@ -93,6 +108,7 @@ async function diagnoseSingle(
     blastRadius: Array.isArray(parsed.blastRadius)
       ? parsed.blastRadius.map(String)
       : [],
+    turnDescriptions: parseTurnDescriptions(parsed.turnDescriptions),
   };
 }
 
