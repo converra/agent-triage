@@ -266,13 +266,11 @@ details[open] > summary .chev { transform:rotate(180deg); }
 .tc-msg { font-size:11px; color:var(--text-3); line-height:1.4; margin-top:2px; opacity:0.7; }
 .step-num { font-size:12px; font-weight:600; color:var(--text-3); min-width:14px; }
 .rc-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--red); margin-left:2px; }
+.rc-type { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; }
+.rc-type.prompt { color:var(--coral); }
+.rc-type.orch { color:var(--amber); }
+.rc-type.model { color:var(--text-3); }
 .type-badge.sm { font-size:10px; padding:1px 7px; }
-/* Collapsed violation count pill */
-.tb-count { cursor:pointer; transition:opacity 0.15s; }
-.tb-count:hover { opacity:0.8; }
-.tb-count.expanded { opacity:0.5; font-size:10px; }
-.tb-overflow { display:none; }
-.tb-overflow.show { display:contents; }
 .tc-badges { display:flex; gap:5px; margin-top:4px; flex-wrap:wrap; align-items:center; }
 .tb { font-size:11px; padding:1px 8px; border-radius:20px; font-weight:500; }
 .tb.f { background:var(--red-bg); color:var(--red); border:1px solid var(--red-border); }
