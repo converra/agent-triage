@@ -254,7 +254,6 @@ function buildTurnTimeline(
   conv: Report["conversations"][0],
   report: Report,
   cascadeMap: Map<number, string>,
-  fixMd?: string,
 ): string[] {
   const d = conv.diagnosis!;
   const orchestrator = findOrchestratorName(report);
@@ -272,23 +271,18 @@ function buildTurnTimeline(
     const { turnNum, originalTurn, isRoot, isFailing, isCascade, isUser, msg } = entry.turn;
     const dotClass = isRoot || isFailing ? "f" : isCascade ? "w" : "p";
 
-    // Policy violations — collapsed behind a count pill
+    // Policy violations — show names directly
     let failBadges = "";
-    let fixCta = "";
     const failingPolicies = (isRoot || isFailing)
       ? conv.policyResults.filter((pr) => !pr.passed && pr.failingTurns?.includes(originalTurn))
       : [];
     if (failingPolicies.length > 0) {
-      const allBadges = failingPolicies
+      failBadges = failingPolicies
         .map((pr) => {
           const policy = report.policies.find((p) => p.id === pr.policyId);
-          return `<span class="tb f">${esc(policy?.name ?? pr.policyId)} ×</span>`;
+          return `<span class="tb f">${esc(policy?.name ?? pr.policyId)}</span>`;
         })
         .join("");
-      failBadges = `<span class="tb f tb-count" onclick="this.nextElementSibling.classList.toggle('show');this.classList.toggle('expanded')">${failingPolicies.length} violation${failingPolicies.length !== 1 ? "s" : ""}</span><span class="tb-overflow">${allBadges}</span>`;
-      if (isRoot && fixMd) {
-        fixCta = `<button class="copy-btn" style="padding:2px 8px;font-size:11px;" data-fix="${fixMd}" onclick="copyFix(this)">${ICONS.copy} Copy fix</button>`;
-      }
     }
 
     // Routing chain: show on first assistant turn, then only when agent changes
@@ -310,14 +304,14 @@ function buildTurnTimeline(
     const stepLabel = `<span class="step-num">Step ${turnNum}</span>`;
     const rcTypeClass = d.failureType === "prompt_issue" ? "prompt" : d.failureType === "orchestration_issue" ? "orch" : "model";
     const rcTag = isRoot
-      ? `<span class="rc-label">root cause</span><span class="type-badge sm ${rcTypeClass}">${esc(formatFailureType(d.failureType))}</span>`
+      ? `<span class="rc-label">root cause:</span> <span class="rc-type ${rcTypeClass}">${esc(formatFailureType(d.failureType))}</span>`
       : "";
     const cascadeDesc = cascadeMap.get(originalTurn);
     const plain = stripHtml(msg.content);
     const turnDesc = d.turnDescriptions?.[originalTurn];
 
     // Narrative-first: diagnosis/description is primary, message is secondary
-    const diagText = isRoot ? d.summary : (isFailing || isCascade) ? cascadeDesc : undefined;
+    const diagText = isRoot ? (d.shortSummary || d.summary) : (isFailing || isCascade) ? cascadeDesc : undefined;
     let contentHtml: string;
     if (diagText && (isRoot || isFailing || isCascade)) {
       const maxLen = isRoot ? 200 : 120;
@@ -340,7 +334,7 @@ function buildTurnTimeline(
     else if (isFailing) turnClasses.push("turn-failing");
     else if (isCascade) turnClasses.push("turn-cascade");
 
-    return `<div class="${turnClasses.join(" ")}"><div class="tdot ${dotClass}"></div><div class="tc"><div class="tc-label">${stepLabel}${agentTag}${rcTag}</div>${contentHtml}${failBadges || fixCta ? `<div class="tc-badges">${failBadges}${fixCta}</div>` : ""}</div></div>`;
+    return `<div class="${turnClasses.join(" ")}"><div class="tdot ${dotClass}"></div><div class="tc"><div class="tc-label">${stepLabel}${agentTag}${rcTag}</div>${contentHtml}${failBadges ? `<div class="tc-badges">${failBadges}</div>` : ""}</div></div>`;
   });
 }
 
@@ -439,7 +433,7 @@ function renderConvDive(
   }
 
   const fixMd = btoa(unescape(encodeURIComponent(buildConversationFixMd(conv, report))));
-  const turns = buildTurnTimeline(conv, report, cascadeMap, fixMd).slice(0, 6);
+  const turns = buildTurnTimeline(conv, report, cascadeMap).slice(0, 6);
 
   const blastHtml = d.blastRadius.length > 0
     ? `<div class="blast"><span class="blast-icon">${ICONS.alertTriangleSm}</span><span><strong>Blast radius:</strong> Editing may affect ${d.blastRadius.map((r) => `<em>${esc(r)}</em>`).join(", ")}.</span></div>`
