@@ -78,9 +78,16 @@ export function renderHealthSummary(
         <div class="verdict-text">${issues} of ${total} conversations have issues${critical > 0 ? ` — ${critical} critical` : ""}.</div>
         ${topSummaries}
       </div>
-      ${report.failurePatterns.topRecommendations.length > 0
-        ? `<a href="#recs-section" class="verdict-cta" onclick="event.preventDefault();scrollToRecs()">See fixes below ${ICONS.chevDownSm}</a>`
-        : ""}
+      ${(() => {
+        const recs = report.failurePatterns.topRecommendations;
+        if (recs.length === 0) return "";
+        const allRecsMd = recs.map((rec, i) => buildRecommendationFixMd(rec, i)).join("\n\n---\n\n");
+        const allRecsB64 = btoa(unescape(encodeURIComponent(allRecsMd)));
+        return `<div class="verdict-actions">
+          <button class="copy-btn primary" data-fix="${allRecsB64}" onclick="copyFix(this)">${ICONS.copy} Copy all ${recs.length} fixes</button>
+          <a href="#recs-section" class="verdict-cta" onclick="event.preventDefault();scrollToRecs()">See details ${ICONS.chevDownSm}</a>
+        </div>`;
+      })()}
     </div>
   </div>`;
 }
