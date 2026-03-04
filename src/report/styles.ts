@@ -287,8 +287,8 @@ details[open] > summary .chev { transform:rotate(180deg); }
 .blast-icon { color:var(--amber); flex-shrink:0; margin-top:1px; }
 .blast strong { color:var(--amber); }
 .diag-cta { padding:12px 18px; display:flex; align-items:center; gap:10px; }
-.diag-link { color:var(--coral); font-size:13px; font-weight:600; text-decoration:none; display:inline-flex; align-items:center; gap:5px; }
-.diag-link:hover { text-decoration:underline; }
+.diag-link { color:#fff; font-size:12px; font-weight:600; background:var(--coral); border:1px solid var(--coral); border-radius:var(--r); padding:5px 12px; text-decoration:none; display:inline-flex; align-items:center; gap:5px; transition:all 0.15s; font-family:inherit; }
+.diag-link:hover { background:var(--coral-dark); border-color:var(--coral-dark); text-decoration:none; }
 .metrics-bar { display:flex; gap:0; border:1px solid var(--border); border-radius:var(--r); overflow:hidden; margin:12px 0; }
 .mb-cell { flex:1; padding:12px 12px; border-right:1px solid var(--border-subtle); text-align:center; min-width:0; }
 .mb-cell:last-child { border-right:none; }

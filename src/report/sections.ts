@@ -1,5 +1,5 @@
 import type { Report } from "../evaluation/types.js";
-import { buildConversationFixMd, buildPatternFixMd, buildRecommendationFixMd } from "./fix-instructions.js";
+import { buildConversationFixMd, buildRecommendationFixMd } from "./fix-instructions.js";
 import {
   avgMetrics,
   buildConvAgentMap,
@@ -469,87 +469,34 @@ export function renderFailurePatterns(report: Report): string {
     (t) => t.type === "orchestration_issue" || t.type === "model_limitation",
   );
 
-  let html = `<details class="patterns"><summary class="patterns-summary"><div class="stitle" style="margin:0;">Root cause analysis</div>${ICONS.chevDown}</summary>`;
+  const renderGroupLine = (
+    patterns: Report["failurePatterns"]["byType"],
+    label: string,
+    icon: string,
+    cssClass: string,
+  ): string => {
+    const subtypes = patterns.flatMap((p) =>
+      p.subtypes.map((s) => `${esc(formatSubtype(s.name))} ${s.count} (${s.percentage}%)`),
+    );
+    return `<div class="group-label ${cssClass}">${icon} ${label}: ${subtypes.join(", ")}</div>`;
+  };
+
+  let html = `<div class="patterns" style="border-bottom:1px solid var(--border-subtle);padding:12px 0 8px;">`;
+  html += `<div class="stitle">Root cause analysis</div>`;
 
   if (fixable.length > 0) {
-    html += `<div class="group-label fixable">${ICONS.checkCircleSm} Fixable — prompt &amp; config <span class="gl-line"></span></div>`;
-    for (const pattern of fixable) {
-      html += renderPatternDetail(pattern, report);
-    }
+    html += renderGroupLine(fixable, "Fixable — prompt &amp; config", ICONS.checkCircleSm, "fixable");
   }
 
   if (needsCode.length > 0) {
-    html += `<div class="group-label needs-code">${ICONS.code} Needs code change — routing &amp; infrastructure <span class="gl-line"></span></div>`;
-    for (const pattern of needsCode) {
-      html += renderPatternDetail(pattern, report);
-    }
+    html += renderGroupLine(needsCode, "Needs code change", ICONS.code, "needs-code");
   }
 
   html += `<div class="trust-note">${ICONS.lock} This report is local-only. No data was uploaded.</div>`;
-  html += `</details>`;
+  html += `</div>`;
   return html;
 }
 
-function renderPatternDetail(
-  pattern: Report["failurePatterns"]["byType"][0],
-  report: Report,
-): string {
-  const typeClass =
-    pattern.type === "prompt_issue"
-      ? "prompt"
-      : pattern.type === "orchestration_issue"
-        ? "orch"
-        : "model";
-  const label = formatFailureType(pattern.type);
-
-  const subtypesHtml = pattern.subtypes
-    .map(
-      (s) =>
-        `<div class="subtype"><div class="sdot ctx"></div>${esc(formatSubtype(s.name))} ${s.count} <span class="spct">(${s.percentage}%)</span></div>`,
-    )
-    .join("");
-
-  const affected = report.conversations
-    .filter((c) =>
-      c.policyResults.some(
-        (pr) => !pr.passed && pr.failureType === pattern.type,
-      ),
-    )
-    .slice(0, 3);
-
-  const convRows = affected
-    .map((c) => {
-      const severity = c.diagnosis?.severity ?? "major";
-      const sevClass = severity === "critical" ? "crit" : "major";
-      const cause = c.diagnosis?.summary ?? "Quality issue detected";
-      return `<div class="mini-row"><span class="mini-id">${esc(c.id.slice(0, 10))}</span><span class="mini-cause">${escBold(cause)}</span><span class="sev-badge ${sevClass}">${severity}</span><button class="mini-link" data-conv-id="${esc(c.id)}" onclick="viewConv(event, this)">View ${ICONS.chevRight}</button></div>`;
-    })
-    .join("");
-
-  const criticalTag =
-    pattern.criticalCount > 0
-      ? `<span class="critical-tag">${ICONS.alertTriangleSm} ${pattern.criticalCount} critical</span>`
-      : "";
-
-  const patternMd = btoa(unescape(encodeURIComponent(buildPatternFixMd(pattern, affected))));
-
-  return `<details class="pattern">
-    <summary>
-      <span class="type-badge ${typeClass}">${label}</span>
-      <span class="pattern-count">${pattern.count}</span>
-      ${criticalTag}
-      ${ICONS.chevDown}
-    </summary>
-    <div class="pattern-body">
-      <div class="subtypes">${subtypesHtml}</div>
-      ${convRows ? `<div class="pattern-convs"><div class="pattern-convs-label">Top affected conversations</div>${convRows}</div>` : ""}
-      <div class="rec-actions" style="margin-top:12px;">
-        <button class="copy-btn" data-fix="${patternMd}" onclick="copyFix(this)">${ICONS.copy} Copy for coding agent</button>
-        ${pattern.type === "prompt_issue" || pattern.type === "retrieval_rag_issue" ? `<a href="https://converra.ai" class="diag-link">Fix in Converra ${ICONS.externalSm}</a>` : ""}
-      </div>
-    </div>
-  </details>`;
-}
 
 export function renderRecommendations(report: Report): string {
   if (report.failurePatterns.topRecommendations.length === 0) return "";
@@ -569,7 +516,7 @@ export function renderRecommendations(report: Report): string {
         .join("<br>");
       const evidenceHtml = evidence ? `<div style="margin-top:8px;padding:8px 10px;background:var(--bg-subtle);border-radius:var(--r);border:1px solid var(--border-subtle);line-height:1.6;">${evidence}</div>` : "";
 
-      return `<details class="rec-card">
+      return `<details class="rec-card"${i === 0 ? " open" : ""}>
       <summary>
         <span class="rec-num">${i + 1}</span>
         <div class="rec-main">
@@ -590,7 +537,7 @@ export function renderRecommendations(report: Report): string {
     })
     .join("");
 
-  return `<details class="recs" id="recs-section">
+  return `<details class="recs" id="recs-section" open>
     <summary class="recs-header">
       <div class="stitle" style="margin:0;">How to fix it</div>
       <a href="https://converra.ai" class="verdict-cta" onclick="event.stopPropagation()">Track fixes over time ${ICONS.externalSm}</a>
