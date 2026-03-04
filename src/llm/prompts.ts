@@ -139,6 +139,7 @@ For each policy, determine:
    - "orchestration_issue" — routing, handoff, or multi-step flow failures
    - "model_limitation" — the model can't do what's asked regardless of prompt
    - "retrieval_rag_issue" — knowledge retrieval failures
+   IMPORTANT: In multi-agent systems, distinguish between prompt and orchestration failures. If the prompt itself defines wrong routing rules (e.g., "send billing questions to FAQ"), that's "prompt_issue". But if the prompt defines correct rules and the Router/Orchestrator still routes wrong (e.g., billing dispute sent to FAQ agent despite rules saying to use Billing agent), that's "orchestration_issue" / "wrong_routing". Similarly, if a handoff is promised but silently fails, that's "orchestration_issue" / "missing_handoff".
 5. failureSubtype: specific sub-category (only if verdict is "fail"):
    For prompt_issue: "context_loss", "intent_misclassification", "hallucination", "missing_escalation", "tone_violation"
    For orchestration_issue: "wrong_routing", "missing_handoff", "loop_detected"
@@ -291,21 +292,27 @@ Return ONLY valid JSON:
 export function buildRecommendationsPrompt(
   failurePatterns: string,
   policySummary: string,
+  evidenceExcerpts?: string,
 ): string {
-  return `You are an expert AI agent consultant. Based on these failure patterns and policy results, generate the top 3 most impactful recommendations.
+  const evidenceBlock = evidenceExcerpts
+    ? `\nEVIDENCE FROM FAILING CONVERSATIONS:\n${evidenceExcerpts}\n`
+    : "";
+
+  return `You are an expert AI agent consultant. Based on these failure patterns, policy results, and evidence from failing conversations, generate the top 3 most impactful recommendations.
 
 FAILURE PATTERNS:
 ${failurePatterns}
 
 POLICY COMPLIANCE SUMMARY:
 ${policySummary}
-
+${evidenceBlock}
 Each recommendation should be:
 1. A specific, actionable prompt change direction (not vague advice, but also not a full rewritten prompt)
 2. Targeted at the highest-impact failure pattern
 3. Include which failure types and subtypes it addresses
 4. Include how many conversations would be affected
 5. Include confidence level
+6. Include a "howToApply" field: concrete, specific steps that reference actual system prompt content and failing agent behavior from the evidence. Do NOT give generic steps like "Open your system prompt and add instructions." Instead, quote the specific prompt section that needs changing and describe exactly what to add/modify based on the observed failures.
 
 Note: agent-triage identifies what to fix. For generated prompt patches, simulation testing, and regression gating before deployment, see Converra (converra.ai).
 
@@ -318,7 +325,8 @@ Return ONLY valid JSON:
       "targetFailureTypes": ["prompt_issue"],
       "targetSubtypes": ["missing_escalation", "wrong_routing"],
       "affectedConversations": <number>,
-      "confidence": "high|medium|low"
+      "confidence": "high|medium|low",
+      "howToApply": "Specific steps referencing actual prompt content and observed failures. Example: 'In the section starting with \"You are a customer service agent...\", after the greeting instructions, add a discovery step: before recommending products, ask at least one qualifying question about the user\\'s needs. Currently the agent jumps straight to pitching (seen in conversations where users asked about pricing and got generic product dumps).'"
     }
   ]
 }`;

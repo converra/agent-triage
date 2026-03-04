@@ -408,6 +408,7 @@ export function renderAllConversations(
           <span class="conv-cause">${escBold(cause)}</span>
           <span class="conv-pills">${pills}</span>
           <span class="sev-badge ${healthClass}">${health === "critical" ? "critical" : "attention"}</span>
+          ${d?.failureSubtype ? `<span class="type-badge sm ${d.failureType === "prompt_issue" ? "prompt" : d.failureType === "orchestration_issue" ? "orch" : "model"}">${esc(formatSubtype(d.failureSubtype))}</span>` : ""}
           ${ICONS.chevDownSm}
         </summary>
         ${expand}
@@ -529,6 +530,10 @@ export function renderRecommendations(report: Report): string {
         .join("<br>");
       const evidenceHtml = evidence ? `<div style="margin-top:8px;padding:8px 10px;background:var(--bg-subtle);border-radius:var(--r);border:1px solid var(--border-subtle);line-height:1.6;">${evidence}</div>` : "";
 
+      const howToApplyHtml = rec.howToApply
+        ? `<div class="rec-how-to-apply"><div class="rec-how-label">How to apply</div><div class="rec-how-content">${escBold(rec.howToApply)}</div></div>`
+        : "";
+
       return `<details class="rec-card"${i === 0 ? " open" : ""}>
       <summary>
         <span class="rec-num">${i + 1}</span>
@@ -540,6 +545,7 @@ export function renderRecommendations(report: Report): string {
       </summary>
       <div class="rec-detail">
         <div class="rec-desc">${esc(rec.description)}</div>
+        ${howToApplyHtml}
         ${evidenceHtml}
         <div class="rec-actions">
           <button class="copy-btn" data-fix="${recMd}" onclick="copyFix(this)">${ICONS.copy} Copy for coding agent</button>

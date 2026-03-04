@@ -118,7 +118,8 @@ export async function generateRecommendations(
     })
     .join("\n");
 
-  const prompt = buildRecommendationsPrompt(patternSummary, policySummary);
+  const evidenceExcerpts = buildEvidenceExcerpts(failurePatterns, results);
+  const prompt = buildRecommendationsPrompt(patternSummary, policySummary, evidenceExcerpts);
   const response = await llm.call(prompt, {
     temperature: 0.3,
     maxTokens: 2048,
@@ -143,7 +144,82 @@ export async function generateRecommendations(
       : [],
     affectedConversations: Number(rec.affectedConversations ?? 0),
     confidence: String(rec.confidence ?? "medium"),
+    howToApply: rec.howToApply ? String(rec.howToApply) : undefined,
   }));
+}
+
+/**
+ * Build evidence excerpts from worst failing conversations, grouped by failure type.
+ * Gives the LLM real content to reference in recommendations.
+ */
+function buildEvidenceExcerpts(
+  patterns: FailurePattern[],
+  results: ConversationResult[],
+): string {
+  const sections: string[] = [];
+
+  for (const pattern of patterns) {
+    // Find conversations with this failure type, sorted worst-first by avg metric
+    const matching = results
+      .filter((r) =>
+        r.policyResults.some(
+          (pr) => !pr.passed && pr.failureType === pattern.type,
+        ),
+      )
+      .sort((a, b) => {
+        const aAvg =
+          Object.values(a.metrics).reduce((s, v) => s + v, 0) /
+          Object.values(a.metrics).length;
+        const bAvg =
+          Object.values(b.metrics).reduce((s, v) => s + v, 0) /
+          Object.values(b.metrics).length;
+        return aAvg - bAvg;
+      })
+      .slice(0, 2);
+
+    if (matching.length === 0) continue;
+
+    const excerpts = matching.map((conv) => {
+      const lines: string[] = [];
+
+      // System prompt snippet
+      const systemMsg = conv.messages.find((m) => m.role === "system");
+      if (systemMsg) {
+        const snippet = systemMsg.content.slice(0, 300);
+        lines.push(`  System prompt: "${snippet}${systemMsg.content.length > 300 ? "..." : ""}"`);
+      }
+
+      // Failing policy evidence
+      const failingPolicies = conv.policyResults.filter(
+        (pr) => !pr.passed && pr.failureType === pattern.type,
+      );
+      for (const pr of failingPolicies.slice(0, 2)) {
+        lines.push(`  Policy violation: ${pr.policyId} — ${pr.evidence}`);
+      }
+
+      // Worst failing turn content
+      const failingTurns = failingPolicies.flatMap((pr) => pr.failingTurns ?? []);
+      const uniqueTurns = [...new Set(failingTurns)].sort((a, b) => a - b).slice(0, 2);
+      for (const turnNum of uniqueTurns) {
+        const msg = conv.messages[turnNum - 1];
+        if (msg) {
+          const content = msg.content.slice(0, 200);
+          lines.push(`  Turn ${turnNum} [${msg.role}]: "${content}${msg.content.length > 200 ? "..." : ""}"`);
+        }
+      }
+
+      // Diagnosis summary if available
+      if (conv.diagnosis) {
+        lines.push(`  Diagnosis: ${conv.diagnosis.shortSummary || conv.diagnosis.summary}`);
+      }
+
+      return `  Conversation ${conv.id}:\n${lines.join("\n")}`;
+    });
+
+    sections.push(`${pattern.type}:\n${excerpts.join("\n\n")}`);
+  }
+
+  return sections.join("\n\n---\n\n");
 }
 
 function formatPatternSummary(patterns: FailurePattern[]): string {

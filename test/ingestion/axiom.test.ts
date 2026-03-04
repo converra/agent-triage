@@ -125,8 +125,9 @@ describe("readAxiomTraces", () => {
     });
 
     expect(convs).toHaveLength(1);
-    expect(convs[0].id).toBe("trace-001");
+    expect(convs[0].id).toBe("span-001");
     expect(convs[0].metadata.source).toBe("axiom");
+    expect(convs[0].metadata.traceId).toBe("trace-001");
   });
 
   it("extracts model from flattened attributes", async () => {
@@ -190,27 +191,14 @@ describe("readAxiomTraces", () => {
     expect(msgs.find((m) => m.role === "assistant")?.content).toBe("The weather is sunny today.");
   });
 
-  it("sums tokens across spans in same trace (input_tokens/output_tokens)", async () => {
-    const span1 = makeSpanRow({
-      span_id: "span-001",
+  it("extracts tokens from single span (input_tokens/output_tokens)", async () => {
+    const span = makeSpanRow({
       "attributes.gen_ai.usage.input_tokens": 100,
       "attributes.gen_ai.usage.output_tokens": 50,
     });
-    const span2 = makeSpanRow({
-      span_id: "span-002",
-      _time: "2024-03-01T10:00:01.000Z",
-      "attributes.gen_ai.usage.input_tokens": 80,
-      "attributes.gen_ai.usage.output_tokens": 30,
-      "attributes.gen_ai.input.messages": [
-        { role: "user", content: "Follow up" },
-      ],
-      "attributes.gen_ai.output.messages": [
-        { role: "assistant", content: "Follow up answer" },
-      ],
-    });
 
     globalThis.fetch = mockFetch([
-      { status: 200, body: makeTabularResponse([span1, span2]) },
+      { status: 200, body: makeTabularResponse([span]) },
     ]);
 
     const convs = await readAxiomTraces({
@@ -218,7 +206,7 @@ describe("readAxiomTraces", () => {
       dataset: "test-dataset",
     });
 
-    expect(convs[0].metadata.totalTokens).toBe(260); // 100+50+80+30
+    expect(convs[0].metadata.totalTokens).toBe(150); // 100+50
   });
 
   it("sums tokens using prompt_tokens/completion_tokens fallback", async () => {
@@ -241,10 +229,10 @@ describe("readAxiomTraces", () => {
     expect(convs[0].metadata.totalTokens).toBe(150);
   });
 
-  it("groups spans by trace_id", async () => {
-    const span1 = makeSpanRow({ trace_id: "trace-001" });
+  it("treats each span as its own conversation (no trace grouping)", async () => {
+    const span1 = makeSpanRow({ trace_id: "trace-001", span_id: "span-001" });
     const span2 = makeSpanRow({
-      trace_id: "trace-002",
+      trace_id: "trace-001",
       span_id: "span-002",
       _time: "2024-03-01T11:00:00.000Z",
       "attributes.gen_ai.input.messages": [{ role: "user", content: "Hello" }],
@@ -260,8 +248,30 @@ describe("readAxiomTraces", () => {
       dataset: "test-dataset",
     });
 
+    // Two spans with same trace_id → two separate conversations
     expect(convs).toHaveLength(2);
-    expect(convs.map((c) => c.id).sort()).toEqual(["trace-001", "trace-002"]);
+    expect(convs[0].id).toBe("span-001");
+    expect(convs[1].id).toBe("span-002");
+    expect(convs[0].metadata.traceId).toBe("trace-001");
+    expect(convs[1].metadata.traceId).toBe("trace-001");
+  });
+
+  it("uses spanId-operationName as conversation ID when operation name exists", async () => {
+    const span = makeSpanRow({
+      span_id: "abcdef123456789",
+      "attributes.gen_ai.operation.name": "chat",
+    });
+
+    globalThis.fetch = mockFetch([
+      { status: 200, body: makeTabularResponse([span]) },
+    ]);
+
+    const convs = await readAxiomTraces({
+      apiKey: "test-key",
+      dataset: "test-dataset",
+    });
+
+    expect(convs[0].id).toBe("abcdef123456-chat");
   });
 
   it("handles plain-text prompts in events", async () => {

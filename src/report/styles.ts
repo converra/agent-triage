@@ -219,6 +219,9 @@ details[open] > summary .chev { transform:rotate(180deg); }
 .rec-meta .fix-target { color:var(--coral); font-weight:500; }
 .rec-detail { padding:0 12px 12px 28px; }
 .rec-desc { font-size:13px; color:var(--text-2); line-height:1.6; }
+.rec-how-to-apply { margin-top:10px; padding:10px 12px; background:var(--bg-subtle); border-radius:var(--r); border:1px solid var(--border-subtle); }
+.rec-how-label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-3); margin-bottom:4px; }
+.rec-how-content { font-size:13px; color:var(--text-1); line-height:1.6; }
 .cta { display:inline-flex; align-items:center; gap:6px; background:var(--coral); color:#fff; border:none; border-radius:var(--r); padding:8px 16px; font-size:13px; font-weight:600; font-family:'Space Grotesk',sans-serif; cursor:pointer; text-decoration:none; transition:all 0.15s; }
 .cta:hover { background:var(--coral-dark); transform:translateY(-1px); box-shadow:0 4px 12px rgba(237,123,101,0.2); }
 .next-step { border:1px solid var(--coral-border); border-radius:var(--r); margin:20px 0; overflow:hidden; background:var(--coral-50); }
