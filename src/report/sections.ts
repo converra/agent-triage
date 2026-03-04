@@ -331,7 +331,7 @@ function buildTurnTimeline(
     const turnDesc = d.turnDescriptions?.[originalTurn];
 
     // Narrative-first: diagnosis/description is primary, message is secondary
-    const diagText = isRoot ? (d.shortSummary || d.summary) : (isFailing || isCascade) ? cascadeDesc : undefined;
+    const diagText = isRoot ? (turnDesc || summarizeTurnContent(plain, 120)) : (isFailing || isCascade) ? cascadeDesc : undefined;
     let contentHtml: string;
     if (diagText && (isRoot || isFailing || isCascade)) {
       const maxLen = isRoot ? 200 : 120;
@@ -367,7 +367,7 @@ function buildMetricBadges(metrics: Record<string, number>): string {
   ].map((m) => {
     const val = metrics[m.key] ?? 0;
     const color = val >= 80 ? "green" : val >= 60 ? "amber" : "red";
-    return `<span class="metric-pill ${color}">${m.label} ${val}</span>`;
+    return `<span class="metric-pill ${color}">${m.label} ${val}<span class="metric-scale">/100</span></span>`;
   }).join("");
 }
 
@@ -387,34 +387,21 @@ export function renderAllConversations(
       const health = conversationHealth(c.metrics, failures);
       const healthClass = health === "critical" ? "crit" : "major";
       const d = c.diagnosis;
-      const cause = d?.summary ?? describeWeakMetrics(c.metrics as Record<string, number>);
+      const cause = d?.shortSummary || (d?.summary ? truncate(d.summary, 80) : describeWeakMetrics(c.metrics as Record<string, number>));
       const agentName = convAgentMap.get(c.id);
       const agentBadge = agentName && (report.agents?.length ?? 0) > 1
         ? `<span class="agent-badge">${esc(agentName)}</span>`
         : "";
-
-      // Metric mini-pills
-      const pills = [
-        { key: "successScore" },
-        { key: "sentiment" },
-        { key: "clarity" },
-      ].map((m) => {
-        const val = (c.metrics as Record<string, number>)[m.key] ?? 0;
-        const color = val >= 80 ? "green" : val >= 60 ? "amber" : "red";
-        return `<span class="metric-mini ${color}">${val}</span>`;
-      }).join("");
 
       const expand = d ? renderConvDive(c, d, report) : "";
       const openAttr = index === 0 ? " open" : "";
 
       return `<details class="conv-detail" id="${esc(c.id)}"${openAttr}>
         <summary>
-          <span class="cid">${esc(c.id.slice(0, 10))}</span>
+          <span class="sev-badge ${healthClass}">${health === "critical" ? "critical" : "attention"}</span>
           ${agentBadge}
           <span class="conv-score ${healthClass}">${avg}</span>
           <span class="conv-cause">${escBold(cause)}</span>
-          <span class="conv-pills">${pills}</span>
-          <span class="sev-badge ${healthClass}">${health === "critical" ? "critical" : "attention"}</span>
           ${d?.failureSubtype ? `<span class="type-badge sm ${d.failureType === "prompt_issue" ? "prompt" : d.failureType === "orchestration_issue" ? "orch" : "model"}">${esc(formatSubtype(d.failureSubtype))}</span>` : ""}
           ${ICONS.chevDownSm}
         </summary>
@@ -429,10 +416,9 @@ export function renderAllConversations(
       : "";
 
   const colHeader = `<div class="conv-colhdr">
-    <span class="colhdr-id">ID</span>
+    <span class="colhdr-sev">Severity</span>
     <span class="colhdr-score">Score</span>
     <span class="colhdr-cause">Diagnosis</span>
-    <span class="colhdr-metrics"><span>Success</span><span>Sentiment</span><span>Clarity</span></span>
   </div>`;
 
   return `<div class="convs">
@@ -455,6 +441,7 @@ function renderConvDive(
   }
 
   const fixMd = btoa(unescape(encodeURIComponent(buildConversationFixMd(conv, report))));
+  const visibleStepCount = conv.messages.filter(m => m.role === "user" || m.role === "assistant").length;
   const turns = buildTurnTimeline(conv, report, cascadeMap).slice(0, 6);
 
   const blastHtml = d.blastRadius.length > 0
@@ -462,21 +449,29 @@ function renderConvDive(
     : "";
 
 
-  return `<div class="conv-expand">
-    <div class="tl">
-      <div class="tl-header"><div class="tl-label">Step Timeline</div><div class="tl-filter">${turns.length} of ${conv.messages.length} steps</div></div>
+  const timelineHtml = visibleStepCount > 1
+    ? `<div class="tl">
+      <div class="tl-header"><div class="tl-label">Step Timeline</div><div class="tl-filter">${turns.length} of ${visibleStepCount} steps</div></div>
       ${turns.join("")}
-    </div>
+    </div>`
+    : "";
+
+  const metricBadgesHtml = buildMetricBadges(conv.metrics as Record<string, number>);
+
+  return `<div class="conv-expand">
+    <div class="conv-id-label">${esc(conv.id)}</div>
+    <div class="conv-metrics-detail">${metricBadgesHtml}</div>
+    ${timelineHtml}
     <div class="wif">
       <div class="wif-s"><div class="wif-l">What happened</div><div class="wif-t">${escBold(truncate(d.summary, 300))}</div></div>
+      <div class="diag-cta">
+        <button class="copy-btn" data-fix="${fixMd}" onclick="copyFix(this)">${ICONS.copy} Copy for coding agent</button>
+        ${d.failureType === "prompt_issue" || d.failureType === "retrieval_rag_issue" ? `<a href="https://converra.ai" class="diag-link">Fix in Converra ${ICONS.externalSm}</a>` : ""}
+      </div>
       <div class="wif-s"><div class="wif-l impact">Impact</div><div class="wif-t">${escBold(truncate(d.impact, 300))}</div></div>
       <div class="wif-s"><div class="wif-l fix">Fix</div><div class="wif-t">${escBold(truncate(d.fix, 250))} <span class="wif-conf">(${d.confidence} confidence)</span></div></div>
     </div>
     ${blastHtml}
-    <div class="diag-cta">
-      <button class="copy-btn" data-fix="${fixMd}" onclick="copyFix(this)">${ICONS.copy} Copy for coding agent</button>
-      ${d.failureType === "prompt_issue" || d.failureType === "retrieval_rag_issue" ? `<a href="https://converra.ai" class="diag-link">Fix in Converra ${ICONS.externalSm}</a>` : ""}
-    </div>
   </div>`;
 }
 
