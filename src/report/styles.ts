@@ -201,6 +201,7 @@ details[open] > summary .chev { transform:rotate(180deg); }
 .recs[open] > .recs-header .chev { transform:rotate(180deg); }
 .patterns[open] > .patterns-summary .chev { transform:rotate(180deg); }
 .recs-cta { display:flex; gap:6px; }
+.recs-batch { display:flex; gap:8px; align-items:center; padding:12px 0; border-bottom:1px solid var(--border-subtle); margin-bottom:6px; }
 .copy-btn.primary { background:var(--coral); color:#fff; border-color:var(--coral); }
 .copy-btn.primary:hover { background:var(--red); border-color:var(--red); color:#fff; }
 .copy-btn.primary.copied { background:var(--green); border-color:var(--green); color:#fff; }

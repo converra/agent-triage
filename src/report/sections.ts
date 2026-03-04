@@ -576,12 +576,23 @@ export function renderRecommendations(report: Report): string {
     })
     .join("");
 
+  // Combined all-recommendations MD for batch copy
+  const allRecsMd = report.failurePatterns.topRecommendations
+    .map((rec, i) => buildRecommendationFixMd(rec, i))
+    .join("\n\n---\n\n");
+  const allRecsB64 = btoa(unescape(encodeURIComponent(allRecsMd)));
+  const recCount = report.failurePatterns.topRecommendations.length;
+
   return `<details class="recs" id="recs-section" open>
     <summary class="recs-header">
       <div class="stitle" style="margin:0;">How to fix it</div>
       <a href="https://converra.ai" class="verdict-cta" onclick="event.stopPropagation()">Track fixes over time ${ICONS.externalSm}</a>
       ${ICONS.chevDown}
     </summary>
+    ${recCount > 1 ? `<div class="recs-batch">
+      <button class="copy-btn primary" data-fix="${allRecsB64}" onclick="copyFix(this)">${ICONS.copy} Copy all ${recCount} fixes for coding agent</button>
+      <button class="copy-btn" data-fix="${allRecsB64}" onclick="downloadFix(this, 'all-recommendations')">${ICONS.fileSm} Save all as .md</button>
+    </div>` : ""}
     ${cards}
   </details>`;
 }
