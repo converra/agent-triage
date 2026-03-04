@@ -26,7 +26,7 @@ export const NormalizedConversationSchema = z.object({
     model: z.string().optional(),
     totalTokens: z.number().optional(),
     duration: z.number().optional(),
-    source: z.enum(["json", "langsmith", "langfuse", "otel"]),
+    source: z.enum(["json", "langsmith", "langfuse", "otel", "axiom"]),
     tags: z.array(z.string()).optional(),
     agentName: z.string().optional(),
     promptHash: z.string().optional(),

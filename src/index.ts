@@ -2,6 +2,10 @@
 export { readJsonTraces } from "./ingestion/json.js";
 export { readLangSmithTraces } from "./ingestion/langsmith.js";
 export { readOtelTraces, OTEL_SEMCONV_VERSION } from "./ingestion/otel.js";
+export { readAxiomTraces } from "./ingestion/axiom.js";
+export type { AxiomConfig } from "./ingestion/axiom.js";
+export { readLangfuseTraces } from "./ingestion/langfuse.js";
+export type { LangfuseConfig } from "./ingestion/langfuse.js";
 export { autoExtractPolicies, discoverAgents } from "./ingestion/auto-discovery.js";
 export type { DiscoveredAgent, DiscoveryResult } from "./ingestion/auto-discovery.js";
 export type { NormalizedConversation, Message } from "./ingestion/types.js";

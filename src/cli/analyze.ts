@@ -6,6 +6,8 @@ import { createLlmClient } from "../llm/client.js";
 import { readJsonTraces } from "../ingestion/json.js";
 import { readLangSmithTraces } from "../ingestion/langsmith.js";
 import { readOtelTraces } from "../ingestion/otel.js";
+import { readAxiomTraces } from "../ingestion/axiom.js";
+import { readLangfuseTraces } from "../ingestion/langfuse.js";
 import type { NormalizedConversation } from "../ingestion/types.js";
 import { PoliciesFileSchema, type Policy } from "../policy/types.js";
 import { DEFAULT_MAX_CONVERSATIONS, estimateCost } from "../config/defaults.js";
@@ -35,6 +37,13 @@ export interface AnalyzeOptions {
   traces?: string;
   langsmith?: string;
   otel?: string;
+  axiom?: string;
+  axiomApiKey?: string;
+  axiomOrgId?: string;
+  langfuse?: boolean;
+  langfusePublicKey?: string;
+  langfuseSecretKey?: string;
+  langfuseHost?: string;
   policies?: string;
   prompt?: string;
   provider?: string;
@@ -63,8 +72,8 @@ export async function analyzeCommand(options: AnalyzeOptions): Promise<void> {
 
   // Apply post-ingestion filters (agent name, time for non-LangSmith sources)
   const filtered = applyFilters(conversations, {
-    since: options.langsmith ? undefined : options.since, // LangSmith handles time server-side
-    until: options.langsmith ? undefined : options.until,
+    since: (options.langsmith || options.axiom || options.langfuse) ? undefined : options.since, // LangSmith/Axiom/Langfuse handle time server-side
+    until: (options.langsmith || options.axiom || options.langfuse) ? undefined : options.until,
     agent: options.agent,
   });
 
@@ -93,7 +102,7 @@ export async function analyzeCommand(options: AnalyzeOptions): Promise<void> {
   log.log(`\nLoaded ${limited.length} conversations.`);
 
   // Cache normalized conversations so subsequent runs can use --traces instead of re-fetching
-  if (options.langsmith || options.otel) {
+  if (options.langsmith || options.otel || options.axiom || options.langfuse) {
     const outDir = resolve(process.cwd(), options.output ?? ".");
     await mkdir(outDir, { recursive: true });
     const cachePath = resolve(outDir, "conversations.json");
@@ -490,12 +499,56 @@ async function ingestTraces(
     return readOtelTraces(options.otel);
   }
 
+  if (options.axiom) {
+    const apiKey = options.axiomApiKey ?? process.env.AXIOM_API_KEY;
+    if (!apiKey) {
+      console.error(
+        "Error: No Axiom API key found.\n" +
+          "Set AXIOM_API_KEY environment variable or pass --axiom-api-key.",
+      );
+      process.exit(1);
+    }
+    log.log(`Reading traces from Axiom dataset: ${options.axiom}...`);
+    return readAxiomTraces({
+      apiKey,
+      dataset: options.axiom,
+      orgId: options.axiomOrgId,
+      startTime: options.since ? parseDuration(options.since) : undefined,
+      endTime: options.until ? parseDuration(options.until) : undefined,
+      limit: options.maxConversations ? parseInt(options.maxConversations, 10) || undefined : undefined,
+    });
+  }
+
+  if (options.langfuse) {
+    const publicKey = options.langfusePublicKey ?? process.env.LANGFUSE_PUBLIC_KEY;
+    const secretKey = options.langfuseSecretKey ?? process.env.LANGFUSE_SECRET_KEY;
+    if (!publicKey || !secretKey) {
+      console.error(
+        "Error: Langfuse credentials required.\n" +
+          "Set LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY environment variables,\n" +
+          "or pass --langfuse-public-key and --langfuse-secret-key.",
+      );
+      process.exit(1);
+    }
+    log.log("Reading traces from Langfuse...");
+    return readLangfuseTraces({
+      publicKey,
+      secretKey,
+      host: options.langfuseHost ?? process.env.LANGFUSE_HOST,
+      startTime: options.since ? parseDuration(options.since) : undefined,
+      endTime: options.until ? parseDuration(options.until) : undefined,
+      limit: options.maxConversations ? parseInt(options.maxConversations, 10) || undefined : undefined,
+    });
+  }
+
   console.error(
     "Error: No trace source specified.\n" +
       "Use one of:\n" +
       "  --traces ./conversations.json     (JSON file)\n" +
       "  --langsmith <project-name>        (LangSmith)\n" +
-      "  --otel ./otel-export.json         (OpenTelemetry OTLP/JSON)",
+      "  --otel ./otel-export.json         (OpenTelemetry OTLP/JSON)\n" +
+      "  --axiom <dataset-name>            (Axiom)\n" +
+      "  --langfuse                        (Langfuse)",
   );
   process.exit(1);
 }

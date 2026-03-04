@@ -7,6 +7,8 @@ import {
   readJsonTraces,
   readLangSmithTraces,
   readOtelTraces,
+  readAxiomTraces,
+  readLangfuseTraces,
   loadConfig,
   resolveApiKey,
   createLlmClient,
@@ -82,6 +84,12 @@ export async function ingestTraces(params: {
   traces?: string;
   langsmith?: string;
   otel?: string;
+  axiom?: string;
+  axiom_org_id?: string;
+  langfuse?: boolean;
+  langfuse_public_key?: string;
+  langfuse_secret_key?: string;
+  langfuse_host?: string;
   since?: string;
   until?: string;
 }): Promise<NormalizedConversation[]> {
@@ -111,8 +119,41 @@ export async function ingestTraces(params: {
     return readOtelTraces(resolve(process.cwd(), params.otel));
   }
 
+  if (params.axiom) {
+    const apiKey = process.env.AXIOM_API_KEY;
+    if (!apiKey) {
+      throw new Error(
+        "No Axiom API key found. Set AXIOM_API_KEY environment variable.",
+      );
+    }
+    return readAxiomTraces({
+      apiKey,
+      dataset: params.axiom,
+      orgId: params.axiom_org_id,
+      startTime: params.since ? parseDuration(params.since) : undefined,
+      endTime: params.until ? parseDuration(params.until) : undefined,
+    });
+  }
+
+  if (params.langfuse) {
+    const publicKey = params.langfuse_public_key ?? process.env.LANGFUSE_PUBLIC_KEY;
+    const secretKey = params.langfuse_secret_key ?? process.env.LANGFUSE_SECRET_KEY;
+    if (!publicKey || !secretKey) {
+      throw new Error(
+        "Langfuse credentials required. Set LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY environment variables.",
+      );
+    }
+    return readLangfuseTraces({
+      publicKey,
+      secretKey,
+      host: params.langfuse_host ?? process.env.LANGFUSE_HOST,
+      startTime: params.since ? parseDuration(params.since) : undefined,
+      endTime: params.until ? parseDuration(params.until) : undefined,
+    });
+  }
+
   throw new Error(
-    "No trace source specified. Provide traces (path to a JSON file — recommended, instant, flexible format) or alternatively langsmith (project name) or otel (OTLP/JSON file path).",
+    "No trace source specified. Provide traces (path to a JSON file — recommended, instant, flexible format) or alternatively langsmith (project name), otel (OTLP/JSON file path), axiom (dataset name), or langfuse (boolean).",
   );
 }
 

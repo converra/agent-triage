@@ -6,6 +6,8 @@ import { createLlmClient } from "../llm/client.js";
 import { readJsonTraces } from "../ingestion/json.js";
 import { readLangSmithTraces } from "../ingestion/langsmith.js";
 import { readOtelTraces } from "../ingestion/otel.js";
+import { readAxiomTraces } from "../ingestion/axiom.js";
+import { readLangfuseTraces } from "../ingestion/langfuse.js";
 import type { NormalizedConversation } from "../ingestion/types.js";
 import { PoliciesFileSchema, type Policy } from "../policy/types.js";
 import { DEFAULT_MAX_CONVERSATIONS } from "../config/defaults.js";
@@ -17,6 +19,13 @@ interface CheckOptions {
   traces?: string;
   langsmith?: string;
   otel?: string;
+  axiom?: string;
+  axiomApiKey?: string;
+  axiomOrgId?: string;
+  langfuse?: boolean;
+  langfusePublicKey?: string;
+  langfuseSecretKey?: string;
+  langfuseHost?: string;
   policies?: string;
   policy?: string[];
   prompt?: string;
@@ -85,8 +94,8 @@ export async function checkCommand(options: CheckOptions): Promise<void> {
 
   // Apply filters
   const filtered = applyFilters(conversations, {
-    since: options.langsmith ? undefined : options.since,
-    until: options.langsmith ? undefined : options.until,
+    since: (options.langsmith || options.axiom || options.langfuse) ? undefined : options.since,
+    until: (options.langsmith || options.axiom || options.langfuse) ? undefined : options.until,
     agent: options.agent,
   });
 
@@ -293,9 +302,49 @@ async function ingestTraces(
     return readOtelTraces(options.otel);
   }
 
+  if (options.axiom) {
+    const apiKey = options.axiomApiKey ?? process.env.AXIOM_API_KEY;
+    if (!apiKey) {
+      console.error(
+        "Error: No Axiom API key found.\n" +
+          "Set AXIOM_API_KEY environment variable or pass --axiom-api-key.",
+      );
+      process.exit(1);
+    }
+    log.log(`Reading traces from Axiom dataset: ${options.axiom}...`);
+    return readAxiomTraces({
+      apiKey,
+      dataset: options.axiom,
+      orgId: options.axiomOrgId,
+      startTime: options.since ? parseDuration(options.since) : undefined,
+      endTime: options.until ? parseDuration(options.until) : undefined,
+    });
+  }
+
+  if (options.langfuse) {
+    const publicKey = options.langfusePublicKey ?? process.env.LANGFUSE_PUBLIC_KEY;
+    const secretKey = options.langfuseSecretKey ?? process.env.LANGFUSE_SECRET_KEY;
+    if (!publicKey || !secretKey) {
+      console.error(
+        "Error: Langfuse credentials required.\n" +
+          "Set LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY environment variables,\n" +
+          "or pass --langfuse-public-key and --langfuse-secret-key.",
+      );
+      process.exit(1);
+    }
+    log.log("Reading traces from Langfuse...");
+    return readLangfuseTraces({
+      publicKey,
+      secretKey,
+      host: options.langfuseHost ?? process.env.LANGFUSE_HOST,
+      startTime: options.since ? parseDuration(options.since) : undefined,
+      endTime: options.until ? parseDuration(options.until) : undefined,
+    });
+  }
+
   console.error(
     "Error: No trace source specified.\n" +
-      "Use --traces, --langsmith, or --otel.",
+      "Use --traces, --langsmith, --otel, --axiom, or --langfuse.",
   );
   process.exit(1);
 }

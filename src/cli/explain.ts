@@ -6,6 +6,8 @@ import { createLlmClient } from "../llm/client.js";
 import { readLangSmithTraces } from "../ingestion/langsmith.js";
 import { readJsonTraces } from "../ingestion/json.js";
 import { readOtelTraces } from "../ingestion/otel.js";
+import { readAxiomTraces } from "../ingestion/axiom.js";
+import { readLangfuseTraces } from "../ingestion/langfuse.js";
 import type { NormalizedConversation } from "../ingestion/types.js";
 import { PoliciesFileSchema, type Policy } from "../policy/types.js";
 import { evaluateConversation } from "../evaluation/evaluator.js";
@@ -20,6 +22,13 @@ interface ExplainOptions {
   langsmith?: string;
   traces?: string;
   otel?: string;
+  axiom?: string;
+  axiomApiKey?: string;
+  axiomOrgId?: string;
+  langfuse?: boolean;
+  langfusePublicKey?: string;
+  langfuseSecretKey?: string;
+  langfuseHost?: string;
   policies?: string;
   prompt?: string;
   provider?: string;
@@ -71,10 +80,10 @@ export async function explainCommand(
   }
 
   // Not in report — fetch from trace source, evaluate, diagnose
-  if (!options.langsmith && !options.traces && !options.otel) {
+  if (!options.langsmith && !options.traces && !options.otel && !options.axiom && !options.langfuse) {
     console.error(
       `Error: Conversation "${conversationId}" not found in report.json.\n` +
-        "Provide a trace source to fetch it: --langsmith, --traces, or --otel.",
+        "Provide a trace source to fetch it: --langsmith, --traces, --otel, or --axiom.",
     );
     process.exit(1);
   }
@@ -236,6 +245,33 @@ async function fetchConversation(
     conversations = await readJsonTraces(options.traces);
   } else if (options.otel) {
     conversations = await readOtelTraces(options.otel);
+  } else if (options.axiom) {
+    const apiKey = options.axiomApiKey ?? process.env.AXIOM_API_KEY;
+    if (!apiKey) {
+      console.error("Error: No Axiom API key found.");
+      process.exit(1);
+    }
+    log.log(`Fetching from Axiom dataset: ${options.axiom}...`);
+    conversations = await readAxiomTraces({
+      apiKey,
+      dataset: options.axiom,
+      orgId: options.axiomOrgId,
+      limit: 200,
+    });
+  } else if (options.langfuse) {
+    const publicKey = options.langfusePublicKey ?? process.env.LANGFUSE_PUBLIC_KEY;
+    const secretKey = options.langfuseSecretKey ?? process.env.LANGFUSE_SECRET_KEY;
+    if (!publicKey || !secretKey) {
+      console.error("Error: Langfuse credentials required.");
+      process.exit(1);
+    }
+    log.log("Fetching from Langfuse...");
+    conversations = await readLangfuseTraces({
+      publicKey,
+      secretKey,
+      host: options.langfuseHost ?? process.env.LANGFUSE_HOST,
+      limit: 200,
+    });
   }
 
   return conversations.find((c) => c.id === id);
