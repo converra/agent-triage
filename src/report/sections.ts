@@ -13,6 +13,13 @@ import {
 } from "./helpers.js";
 import { ICONS } from "./styles.js";
 
+/** Truncate text at the last space before `max` characters and append "…". */
+function truncate(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const cut = text.lastIndexOf(" ", max);
+  return (cut > 0 ? text.slice(0, cut) : text.slice(0, max)) + "…";
+}
+
 export function renderHeader(report: Report, date: string): string {
   const agentCount = report.agents?.length ?? 0;
   const autoName = report.agents?.[0]?.name;
@@ -71,7 +78,9 @@ export function renderHealthSummary(
         <div class="verdict-text">${issues} of ${total} conversations have issues${critical > 0 ? ` — ${critical} critical` : ""}.</div>
         ${topSummaries}
       </div>
-      <a href="#recs-section" class="verdict-cta" onclick="event.preventDefault();scrollToRecs()">See fixes below ${ICONS.chevDownSm}</a>
+      ${report.failurePatterns.topRecommendations.length > 0
+        ? `<a href="#recs-section" class="verdict-cta" onclick="event.preventDefault();scrollToRecs()">See fixes below ${ICONS.chevDownSm}</a>`
+        : ""}
     </div>
   </div>`;
 }
@@ -323,8 +332,8 @@ function buildTurnTimeline(
     const plain = stripHtml(msg.content);
     const turnDesc = d.turnDescriptions?.[originalTurn];
 
-    // Narrative-first: diagnosis/description is primary, message is secondary
-    const diagText = isRoot ? (d.shortSummary || d.summary) : (isFailing || isCascade) ? cascadeDesc : undefined;
+    // Narrative-first: use turnDesc for root cause (not diagnosis summary), cascade uses cascadeDesc
+    const diagText = isRoot ? (turnDesc || summarizeTurnContent(plain, 120)) : (isFailing || isCascade) ? cascadeDesc : undefined;
     let contentHtml: string;
     if (diagText && (isRoot || isFailing || isCascade)) {
       const maxLen = isRoot ? 200 : 120;
@@ -360,7 +369,7 @@ function buildMetricBadges(metrics: Record<string, number>): string {
   ].map((m) => {
     const val = metrics[m.key] ?? 0;
     const color = val >= 80 ? "green" : val >= 60 ? "amber" : "red";
-    return `<span class="metric-pill ${color}">${m.label} ${val}</span>`;
+    return `<span class="metric-pill ${color}">${m.label} ${val}<span class="metric-scale">/100</span></span>`;
   }).join("");
 }
 
@@ -380,34 +389,21 @@ export function renderAllConversations(
       const health = conversationHealth(c.metrics, failures);
       const healthClass = health === "critical" ? "crit" : "major";
       const d = c.diagnosis;
-      const cause = d?.summary ?? describeWeakMetrics(c.metrics as Record<string, number>);
+      const cause = d?.shortSummary || (d?.summary ? truncate(d.summary, 80) : describeWeakMetrics(c.metrics as Record<string, number>));
       const agentName = convAgentMap.get(c.id);
       const agentBadge = agentName && (report.agents?.length ?? 0) > 1
         ? `<span class="agent-badge">${esc(agentName)}</span>`
         : "";
-
-      // Metric mini-pills
-      const pills = [
-        { key: "successScore" },
-        { key: "sentiment" },
-        { key: "clarity" },
-      ].map((m) => {
-        const val = (c.metrics as Record<string, number>)[m.key] ?? 0;
-        const color = val >= 80 ? "green" : val >= 60 ? "amber" : "red";
-        return `<span class="metric-mini ${color}">${val}</span>`;
-      }).join("");
 
       const expand = d ? renderConvDive(c, d, report) : "";
       const openAttr = index === 0 ? " open" : "";
 
       return `<details class="conv-detail" id="${esc(c.id)}"${openAttr}>
         <summary>
-          <span class="cid">${esc(c.id.slice(0, 10))}</span>
+          <span class="sev-badge ${healthClass}">${health === "critical" ? "critical" : "attention"}</span>
           ${agentBadge}
           <span class="conv-score ${healthClass}">${avg}</span>
           <span class="conv-cause">${escBold(cause)}</span>
-          <span class="conv-pills">${pills}</span>
-          <span class="sev-badge ${healthClass}">${health === "critical" ? "critical" : "attention"}</span>
           ${d?.failureSubtype ? `<span class="type-badge sm ${d.failureType === "prompt_issue" ? "prompt" : d.failureType === "orchestration_issue" ? "orch" : "model"}">${esc(formatSubtype(d.failureSubtype))}</span>` : ""}
           ${ICONS.chevDownSm}
         </summary>
@@ -416,20 +412,34 @@ export function renderAllConversations(
     })
     .join("");
 
+  // Build combined fix MD for "Copy all fixes" button
+  const allFixesMd = shown
+    .filter((c) => c.diagnosis)
+    .map((c) => buildConversationFixMd(c, report))
+    .join("\n\n---\n\n");
+  const allFixesB64 = btoa(unescape(encodeURIComponent(allFixesMd)));
+
   const moreText =
     issues.length > 50
       ? `<div class="show-all">Showing 50 of ${issues.length} conversations with issues</div>`
       : "";
 
   const colHeader = `<div class="conv-colhdr">
-    <span class="colhdr-id">ID</span>
+    <span class="colhdr-sev">Severity</span>
     <span class="colhdr-score">Score</span>
     <span class="colhdr-cause">Diagnosis</span>
-    <span class="colhdr-metrics"><span>Success</span><span>Sentiment</span><span>Clarity</span></span>
   </div>`;
 
+  const diagCount = shown.filter((c) => c.diagnosis).length;
+
   return `<div class="convs">
-    <div class="stitle">Step analysis</div>
+    <div class="convs-header">
+      <div class="stitle">Step analysis</div>
+      ${diagCount > 1 ? `<div class="convs-actions">
+        <button class="copy-btn" data-fix="${allFixesB64}" onclick="copyFix(this)">${ICONS.copy} Copy all ${diagCount} fixes</button>
+        <button class="copy-btn" data-fix="${allFixesB64}" onclick="downloadFix(this, 'all-fixes')">${ICONS.fileSm} Save all as .md</button>
+      </div>` : ""}
+    </div>
     ${colHeader}
     ${convHtml}
     ${moreText}
@@ -448,28 +458,36 @@ function renderConvDive(
   }
 
   const fixMd = btoa(unescape(encodeURIComponent(buildConversationFixMd(conv, report))));
+  const visibleStepCount = conv.messages.filter(m => m.role === "user" || m.role === "assistant").length;
   const turns = buildTurnTimeline(conv, report, cascadeMap).slice(0, 6);
 
   const blastHtml = d.blastRadius.length > 0
     ? `<div class="blast"><span class="blast-icon">${ICONS.alertTriangleSm}</span><span><strong>Blast radius:</strong> Editing may affect ${d.blastRadius.map((r) => `<em>${esc(r)}</em>`).join(", ")}.</span></div>`
     : "";
 
+  const metricBadgesHtml = buildMetricBadges(conv.metrics as Record<string, number>);
+
+  const timelineHtml = visibleStepCount > 1
+    ? `<div class="tl">
+      <div class="tl-header"><div class="tl-label">Step Timeline</div><div class="tl-filter">${turns.length} of ${visibleStepCount} steps</div></div>
+      ${turns.join("")}
+    </div>`
+    : "";
 
   return `<div class="conv-expand">
-    <div class="tl">
-      <div class="tl-header"><div class="tl-label">Step Timeline</div><div class="tl-filter">${turns.length} of ${conv.messages.length} steps</div></div>
-      ${turns.join("")}
-    </div>
+    <div class="conv-id-label">${esc(conv.id)}</div>
+    <div class="conv-metrics-detail">${metricBadgesHtml}</div>
+    ${timelineHtml}
     <div class="wif">
-      <div class="wif-s"><div class="wif-l">What happened</div><div class="wif-t">${escBold(d.summary)}</div></div>
-      <div class="wif-s"><div class="wif-l impact">Impact</div><div class="wif-t">${escBold(d.impact)}</div></div>
-      <div class="wif-s"><div class="wif-l fix">Fix</div><div class="wif-t">${escBold(d.fix)} <span class="wif-conf">(${d.confidence} confidence)</span></div></div>
+      <div class="wif-s"><div class="wif-l">What happened</div><div class="wif-t">${escBold(truncate(d.summary, 300))}</div></div>
+      <div class="diag-cta">
+        <button class="copy-btn" data-fix="${fixMd}" onclick="copyFix(this)">${ICONS.copy} Copy for coding agent</button>
+        <button class="copy-btn" data-fix="${fixMd}" onclick="downloadFix(this, '${esc(conv.id.slice(0, 20))}')">${ICONS.fileSm} Save as .md</button>
+      </div>
+      <div class="wif-s"><div class="wif-l impact">Impact</div><div class="wif-t">${escBold(truncate(d.impact, 300))}</div></div>
+      <div class="wif-s"><div class="wif-l fix">Fix</div><div class="wif-t">${escBold(truncate(d.fix, 250))} <span class="wif-conf">(${d.confidence} confidence)</span></div></div>
     </div>
     ${blastHtml}
-    <div class="diag-cta">
-      <button class="copy-btn" data-fix="${fixMd}" onclick="copyFix(this)">${ICONS.copy} Copy for coding agent</button>
-      ${d.failureType === "prompt_issue" || d.failureType === "retrieval_rag_issue" ? `<a href="https://converra.ai" class="diag-link">Fix in Converra ${ICONS.externalSm}</a>` : ""}
-    </div>
   </div>`;
 }
 
@@ -531,7 +549,7 @@ export function renderRecommendations(report: Report): string {
       const evidenceHtml = evidence ? `<div style="margin-top:8px;padding:8px 10px;background:var(--bg-subtle);border-radius:var(--r);border:1px solid var(--border-subtle);line-height:1.6;">${evidence}</div>` : "";
 
       const howToApplyHtml = rec.howToApply
-        ? `<div class="rec-how-to-apply"><div class="rec-how-label">How to apply</div><div class="rec-how-content">${escBold(rec.howToApply)}</div></div>`
+        ? `<div class="rec-how-to-apply"><div class="rec-how-label">How to apply</div><div class="rec-how-content">${escBold(truncate(rec.howToApply, 400))}</div></div>`
         : "";
 
       return `<details class="rec-card"${i === 0 ? " open" : ""}>
@@ -549,12 +567,18 @@ export function renderRecommendations(report: Report): string {
         ${evidenceHtml}
         <div class="rec-actions">
           <button class="copy-btn" data-fix="${recMd}" onclick="copyFix(this)">${ICONS.copy} Copy for coding agent</button>
-          ${rec.targetFailureTypes.some((t: string) => t === "prompt_issue" || t === "retrieval_rag_issue") ? `<a href="https://converra.ai" class="diag-link">Fix in Converra ${ICONS.externalSm}</a>` : ""}
         </div>
       </div>
     </details>`;
     })
     .join("");
+
+  // Combined all-recommendations MD for batch copy
+  const allRecsMd = report.failurePatterns.topRecommendations
+    .map((rec, i) => buildRecommendationFixMd(rec, i))
+    .join("\n\n---\n\n");
+  const allRecsB64 = btoa(unescape(encodeURIComponent(allRecsMd)));
+  const recCount = report.failurePatterns.topRecommendations.length;
 
   return `<details class="recs" id="recs-section" open>
     <summary class="recs-header">
@@ -562,6 +586,10 @@ export function renderRecommendations(report: Report): string {
       <a href="https://converra.ai" class="verdict-cta" onclick="event.stopPropagation()">Track fixes over time ${ICONS.externalSm}</a>
       ${ICONS.chevDown}
     </summary>
+    ${recCount > 1 ? `<div class="recs-batch">
+      <button class="copy-btn" data-fix="${allRecsB64}" onclick="copyFix(this)">${ICONS.copy} Copy all ${recCount} fixes</button>
+      <button class="copy-btn" data-fix="${allRecsB64}" onclick="downloadFix(this, 'all-recommendations')">${ICONS.fileSm} Save all as .md</button>
+    </div>` : ""}
     ${cards}
   </details>`;
 }
@@ -610,5 +638,5 @@ export function renderReproducibility(report: Report): string {
 }
 
 export function renderFooter(): string {
-  return `<div class="ftr"><div class="ftr-brand"><div class="ftr-mark">${ICONS.check}</div><span class="ftr-text">Powered by <a href="https://converra.ai" class="ftr-name">Converra</a></span> — for when you're done fixing agents manually. <a href="https://converra.ai" class="ftr-link">Learn more ${ICONS.externalSm}</a></span></div><div class="helpful">Was this report useful? <button class="hbtn">${ICONS.thumbUp}</button> <button class="hbtn">${ICONS.thumbDown}</button></div></div>`;
+  return `<div class="ftr"><div class="ftr-brand"><div class="ftr-mark">${ICONS.check}</div><span class="ftr-text">Powered by <a href="https://converra.ai" class="ftr-name">Converra</a> — for when you're done fixing agents manually. <a href="https://converra.ai" class="ftr-link">Learn more ${ICONS.externalSm}</a></span></div><div class="helpful">Was this report useful? <button class="hbtn">${ICONS.thumbUp}</button> <button class="hbtn">${ICONS.thumbDown}</button></div></div>`;
 }
