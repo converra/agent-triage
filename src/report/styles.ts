@@ -298,6 +298,8 @@ details[open] > summary .chev { transform:rotate(180deg); }
 .mb-val.amber { color:var(--amber); }
 .mb-val.red { color:var(--red); }
 .convs { padding:0 0 16px; }
+.convs-header { display:flex; align-items:center; justify-content:space-between; }
+.convs-actions { display:flex; gap:6px; }
 .conv-detail { border-bottom:1px solid var(--border-subtle); }
 .conv-detail > summary { display:flex; align-items:baseline; gap:8px; padding:10px 8px; margin:0 -8px; border-radius:4px; flex-wrap:wrap; }
 .conv-detail > summary:hover { background:var(--bg-subtle); }
