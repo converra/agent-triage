@@ -78,16 +78,9 @@ export function renderHealthSummary(
         <div class="verdict-text">${issues} of ${total} conversations have issues${critical > 0 ? ` — ${critical} critical` : ""}.</div>
         ${topSummaries}
       </div>
-      ${(() => {
-        const recs = report.failurePatterns.topRecommendations;
-        if (recs.length === 0) return "";
-        const allRecsMd = recs.map((rec, i) => buildRecommendationFixMd(rec, i)).join("\n\n---\n\n");
-        const allRecsB64 = btoa(unescape(encodeURIComponent(allRecsMd)));
-        return `<div class="verdict-actions">
-          <button class="copy-btn primary" data-fix="${allRecsB64}" onclick="copyFix(this)">${ICONS.copy} Copy all ${recs.length} fixes</button>
-          <a href="#recs-section" class="verdict-cta" onclick="event.preventDefault();scrollToRecs()">See details ${ICONS.chevDownSm}</a>
-        </div>`;
-      })()}
+      ${report.failurePatterns.topRecommendations.length > 0
+        ? `<a href="#recs-section" class="verdict-cta" onclick="event.preventDefault();scrollToRecs()">See fixes below ${ICONS.chevDownSm}</a>`
+        : ""}
     </div>
   </div>`;
 }
@@ -419,13 +412,6 @@ export function renderAllConversations(
     })
     .join("");
 
-  // Build combined fix MD for "Copy all fixes" button
-  const allFixesMd = shown
-    .filter((c) => c.diagnosis)
-    .map((c) => buildConversationFixMd(c, report))
-    .join("\n\n---\n\n");
-  const allFixesB64 = btoa(unescape(encodeURIComponent(allFixesMd)));
-
   const moreText =
     issues.length > 50
       ? `<div class="show-all">Showing 50 of ${issues.length} conversations with issues</div>`
@@ -437,16 +423,8 @@ export function renderAllConversations(
     <span class="colhdr-cause">Diagnosis</span>
   </div>`;
 
-  const diagCount = shown.filter((c) => c.diagnosis).length;
-
   return `<div class="convs">
-    <div class="convs-header">
-      <div class="stitle">Step analysis</div>
-      ${diagCount > 1 ? `<div class="convs-actions">
-        <button class="copy-btn" data-fix="${allFixesB64}" onclick="copyFix(this)">${ICONS.copy} Copy all ${diagCount} fixes</button>
-        <button class="copy-btn" data-fix="${allFixesB64}" onclick="downloadFix(this, 'all-fixes')">${ICONS.fileSm} Save all as .md</button>
-      </div>` : ""}
-    </div>
+    <div class="stitle">Step analysis</div>
     ${colHeader}
     ${convHtml}
     ${moreText}

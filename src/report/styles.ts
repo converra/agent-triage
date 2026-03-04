@@ -131,7 +131,6 @@ details[open] > summary .chev { transform:rotate(180deg); }
 .verdict-detail { font-size:13px; color:var(--text-2); }
 .verdict-summaries { margin:6px 0 0; padding-left:18px; list-style:disc; }
 .verdict-summaries li { font-size:13px; color:var(--text-2); line-height:1.5; margin-bottom:2px; }
-.verdict-actions { flex-shrink:0; display:flex; flex-direction:column; gap:6px; align-self:center; }
 .verdict-cta { flex-shrink:0; font-size:12px; font-weight:600; color:var(--coral); text-decoration:none; display:inline-flex; align-items:center; gap:4px; padding:6px 12px; border:1px solid var(--coral-border); border-radius:var(--r); white-space:nowrap; transition:all 0.15s; align-self:center; }
 .verdict-cta:hover { background:var(--coral-50); border-color:var(--coral); }
 .stitle { font-family:'Space Grotesk',sans-serif; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.1em; color:var(--text-3); margin-bottom:6px; }
@@ -298,8 +297,6 @@ details[open] > summary .chev { transform:rotate(180deg); }
 .mb-val.amber { color:var(--amber); }
 .mb-val.red { color:var(--red); }
 .convs { padding:0 0 16px; }
-.convs-header { display:flex; align-items:center; justify-content:space-between; }
-.convs-actions { display:flex; gap:6px; }
 .conv-detail { border-bottom:1px solid var(--border-subtle); }
 .conv-detail > summary { display:flex; align-items:baseline; gap:8px; padding:10px 8px; margin:0 -8px; border-radius:4px; flex-wrap:wrap; }
 .conv-detail > summary:hover { background:var(--bg-subtle); }

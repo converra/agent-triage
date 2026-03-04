@@ -107,15 +107,18 @@ export async function generateRecommendations(
 > {
   const patternSummary = formatPatternSummary(failurePatterns);
 
+  // Only include failing policies to keep the prompt focused
   const policySummary = policies
     .map((p) => {
       const total = results.length;
       const failing = results.filter((r) =>
         r.policyResults.some((pr) => pr.policyId === p.id && !pr.passed),
       ).length;
+      if (failing === 0) return null;
       const rate = total > 0 ? Math.round(((total - failing) / total) * 100) : 100;
       return `- ${p.name}: ${rate}% compliance (${failing} failures)`;
     })
+    .filter(Boolean)
     .join("\n");
 
   const evidenceExcerpts = buildEvidenceExcerpts(failurePatterns, results);
