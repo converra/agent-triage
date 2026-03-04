@@ -587,7 +587,7 @@ export function renderRecommendations(report: Report): string {
       ${ICONS.chevDown}
     </summary>
     ${recCount > 1 ? `<div class="recs-batch">
-      <button class="copy-btn" data-fix="${allRecsB64}" onclick="copyFix(this)">${ICONS.copy} Copy all ${recCount} fixes</button>
+      <button class="copy-btn primary" data-fix="${allRecsB64}" onclick="copyFix(this)">${ICONS.copy} Copy all ${recCount} fixes</button>
       <button class="copy-btn" data-fix="${allRecsB64}" onclick="downloadFix(this, 'all-recommendations')">${ICONS.fileSm} Save all as .md</button>
     </div>` : ""}
     ${cards}
