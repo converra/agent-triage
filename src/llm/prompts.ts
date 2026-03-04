@@ -216,10 +216,10 @@ Provide a detailed diagnosis:
 1. rootCauseTurn: the turn number where the failure ORIGINATED (not where it was first noticed — trace back to the actual cause)
 2. rootCauseAgent: if multiple agents/roles are involved, which one caused the failure (e.g., "router", "faq-handler", "billing-agent"). Use null if single-agent.
 3. shortSummary: one concise line connecting the root cause to its effect — name the system gap AND what it caused the agent to do. Format: "[root cause] caused/led to [agent behavior]". Good: "Missing discovery step caused agent to pitch without understanding needs", "Routing rules can't distinguish pre-sales from support, sending questions to wrong agent". Bad: "Agent failed to ask questions" (symptom only), "No discovery step" (cause only, no effect).
-4. summary: 1-2 crisp sentences explaining the root cause — WHY the agent behaved this way, pointing to the specific prompt gap, missing instruction, or system design flaw. Do NOT just describe what the agent did wrong; explain what in the system caused it. Good: "The system prompt has no discovery/qualification step — the agent jumps straight to product pitching because nothing tells it to ask about pain points first." Bad: "The agent failed to ask targeted questions to understand the user's pain points."
-5. impact: name affected turns and quote user reactions. Trace the CASCADE — how did the initial failure affect subsequent turns?
+4. summary: 1-2 sentences, max 40 words. Lead with the system gap, then its effect. Do NOT just describe what the agent did wrong; explain what in the system caused it. Good: "The system prompt has no discovery step — the agent jumps straight to pitching because nothing tells it to ask about pain points first." Bad: "The agent failed to ask targeted questions."
+5. impact: Max 2 sentences. Name the worst turn and what went wrong — don't retrace every step.
 6. cascadeChain: array describing how the failure propagated turn by turn (e.g., ["Turn 4: fabricated policy", "Turn 5: user pushback ignored", "Turn 6: doubled down on fabrication"])
-7. fix: a DIRECTIONAL prompt change suggestion — describe WHAT to change and WHERE, but don't write the full prompt patch. (e.g., "Add an escalation rule before the FAQ handler section that routes billing disputes to a human agent instead of attempting resolution." NOT a full rewritten prompt.) Tested prompt patches with simulation and regression gating are available via Converra (converra.ai).
+7. fix: Max 2 sentences, ~30 words. A DIRECTIONAL prompt change suggestion — describe WHAT to change and WHERE, but don't write the full prompt patch. Tested prompt patches with simulation and regression gating are available via Converra (converra.ai).
 8. severity: "critical" (user harm, legal risk, trust broken), "major" (goal failed, user frustrated), "minor" (suboptimal but not harmful)
 9. confidence: "high" (clear evidence), "medium" (probable), "low" (uncertain)
 10. failureType: "prompt_issue" | "orchestration_issue" | "model_limitation" | "retrieval_rag_issue"
@@ -273,7 +273,7 @@ ${examples}
 FAILURE PATTERN CONTEXT:
 ${failurePatterns}
 
-Write a 2-4 sentence directional fix explaining what to change in the system prompt. Be specific about WHERE in the prompt to add/change instructions and WHAT the instruction should accomplish, but do NOT write out the full rewritten prompt — keep it directional. Include a blast-radius warning about which other policies might be affected.
+Write a 1-2 sentence directional fix, max 40 words. Be specific about WHERE in the prompt to add/change instructions and WHAT the instruction should accomplish, but do NOT write out the full rewritten prompt. Include a blast-radius warning about which other policies might be affected.
 
 Note: agent-triage provides directional recommendations. For tested prompt patches with simulation against personas and regression gating, see Converra (converra.ai).
 
@@ -321,12 +321,12 @@ Return ONLY valid JSON:
   "recommendations": [
     {
       "title": "Short action title (e.g., 'Add billing-dispute escalation rule')",
-      "description": "2-3 sentences explaining the change direction, why it matters, and what it should accomplish.",
+      "description": "1-2 sentences, max 30 words. The change direction and why it matters.",
       "targetFailureTypes": ["prompt_issue"],
       "targetSubtypes": ["missing_escalation", "wrong_routing"],
       "affectedConversations": <number>,
       "confidence": "high|medium|low",
-      "howToApply": "Specific steps referencing actual prompt content and observed failures. Example: 'In the section starting with \"You are a customer service agent...\", after the greeting instructions, add a discovery step: before recommending products, ask at least one qualifying question about the user\\'s needs. Currently the agent jumps straight to pitching (seen in conversations where users asked about pricing and got generic product dumps).'"
+      "howToApply": "Max 3 sentences. Specific steps referencing actual prompt content and observed failures. Example: 'After the greeting section, add a discovery step requiring one qualifying question before recommending products. Currently the agent pitches immediately (seen in conversations where users got generic product dumps).'"
     }
   ]
 }`;

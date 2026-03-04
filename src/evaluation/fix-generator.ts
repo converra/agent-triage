@@ -64,7 +64,7 @@ export async function generateFixes(
       const prompt = buildFixGeneratorPrompt(policy, examples, patternSummary);
       const response = await llm.call(prompt, {
         temperature: 0.3,
-        maxTokens: 1024,
+        maxTokens: 512,
       });
 
       const parsed = parseJsonResponse(response.content) as Record<
@@ -122,7 +122,7 @@ export async function generateRecommendations(
   const prompt = buildRecommendationsPrompt(patternSummary, policySummary, evidenceExcerpts);
   const response = await llm.call(prompt, {
     temperature: 0.3,
-    maxTokens: 2048,
+    maxTokens: 1024,
   });
 
   const parsed = parseJsonResponse(response.content) as Record<

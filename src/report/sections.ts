@@ -13,6 +13,13 @@ import {
 } from "./helpers.js";
 import { ICONS } from "./styles.js";
 
+/** Truncate text at the last space before `max` characters and append "…". */
+function truncate(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const cut = text.lastIndexOf(" ", max);
+  return (cut > 0 ? text.slice(0, cut) : text.slice(0, max)) + "…";
+}
+
 export function renderHeader(report: Report, date: string): string {
   const agentCount = report.agents?.length ?? 0;
   const autoName = report.agents?.[0]?.name;
@@ -461,9 +468,9 @@ function renderConvDive(
       ${turns.join("")}
     </div>
     <div class="wif">
-      <div class="wif-s"><div class="wif-l">What happened</div><div class="wif-t">${escBold(d.summary)}</div></div>
-      <div class="wif-s"><div class="wif-l impact">Impact</div><div class="wif-t">${escBold(d.impact)}</div></div>
-      <div class="wif-s"><div class="wif-l fix">Fix</div><div class="wif-t">${escBold(d.fix)} <span class="wif-conf">(${d.confidence} confidence)</span></div></div>
+      <div class="wif-s"><div class="wif-l">What happened</div><div class="wif-t">${escBold(truncate(d.summary, 300))}</div></div>
+      <div class="wif-s"><div class="wif-l impact">Impact</div><div class="wif-t">${escBold(truncate(d.impact, 300))}</div></div>
+      <div class="wif-s"><div class="wif-l fix">Fix</div><div class="wif-t">${escBold(truncate(d.fix, 250))} <span class="wif-conf">(${d.confidence} confidence)</span></div></div>
     </div>
     ${blastHtml}
     <div class="diag-cta">
@@ -531,7 +538,7 @@ export function renderRecommendations(report: Report): string {
       const evidenceHtml = evidence ? `<div style="margin-top:8px;padding:8px 10px;background:var(--bg-subtle);border-radius:var(--r);border:1px solid var(--border-subtle);line-height:1.6;">${evidence}</div>` : "";
 
       const howToApplyHtml = rec.howToApply
-        ? `<div class="rec-how-to-apply"><div class="rec-how-label">How to apply</div><div class="rec-how-content">${escBold(rec.howToApply)}</div></div>`
+        ? `<div class="rec-how-to-apply"><div class="rec-how-label">How to apply</div><div class="rec-how-content">${escBold(truncate(rec.howToApply, 400))}</div></div>`
         : "";
 
       return `<details class="rec-card"${i === 0 ? " open" : ""}>
