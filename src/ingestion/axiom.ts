@@ -57,19 +57,14 @@ export async function readAxiomTraces(
 
   if (allSpans.length === 0) return [];
 
-  // Group by trace_id
-  const traceMap = new Map<string, SpanRow[]>();
-  for (const span of allSpans) {
-    const traceId = span.trace_id as string | undefined;
-    if (!traceId) continue;
-    if (!traceMap.has(traceId)) traceMap.set(traceId, []);
-    traceMap.get(traceId)!.push(span);
-  }
-
+  // Normalize each span as its own conversation.
+  // OTel gen_ai spans carry full input/output messages — each span is a
+  // complete LLM interaction. Grouping by trace_id would merge hundreds
+  // of spans into one massive conversation that exceeds context limits.
   const conversations: NormalizedConversation[] = [];
-  for (const [traceId, spans] of traceMap) {
+  for (const span of allSpans) {
     if (conversations.length >= limit) break;
-    const conv = normalizeTrace(traceId, spans);
+    const conv = normalizeSpan(span);
     if (conv) conversations.push(conv);
   }
 
@@ -174,90 +169,79 @@ export function parseTabularResponse(response: AxiomResponse): SpanRow[] {
   return rows;
 }
 
-// ─── Trace Normalization ─────────────────────────────────────────────
+// ─── Span Normalization ──────────────────────────────────────────────
 
-function normalizeTrace(
-  traceId: string,
-  spans: SpanRow[],
-): NormalizedConversation | null {
-  // Sort by time
-  spans.sort((a, b) =>
-    new Date(a._time as string).getTime() - new Date(b._time as string).getTime(),
-  );
+function normalizeSpan(span: SpanRow): NormalizedConversation | null {
+  const spanId = (span.span_id as string) ?? (span.trace_id as string);
+  const traceId = span.trace_id as string | undefined;
+  if (!spanId) return null;
 
   const messages: Message[] = [];
-  let model: string | undefined;
-  let totalTokens = 0;
   let systemPrompt: string | undefined;
 
-  for (const span of spans) {
-    // Extract model — Axiom flattens to dotted column names
-    if (!model) {
-      model = (getField(span, "attributes.gen_ai.request.model") as string) ?? undefined;
-    }
+  const model = (getField(span, "attributes.gen_ai.request.model") as string) ?? undefined;
 
-    // Extract tokens — try both semconv naming conventions
-    const inputTokens = Number(
-      getField(span, "attributes.gen_ai.usage.input_tokens") ??
-      getField(span, "attributes.gen_ai.usage.prompt_tokens") ?? 0,
-    );
-    const outputTokens = Number(
-      getField(span, "attributes.gen_ai.usage.output_tokens") ??
-      getField(span, "attributes.gen_ai.usage.completion_tokens") ?? 0,
-    );
-    totalTokens += inputTokens + outputTokens;
+  // Extract tokens — try both semconv naming conventions
+  const inputTokens = Number(
+    getField(span, "attributes.gen_ai.usage.input_tokens") ??
+    getField(span, "attributes.gen_ai.usage.prompt_tokens") ?? 0,
+  );
+  const outputTokens = Number(
+    getField(span, "attributes.gen_ai.usage.output_tokens") ??
+    getField(span, "attributes.gen_ai.usage.completion_tokens") ?? 0,
+  );
+  const totalTokens = inputTokens + outputTokens;
 
-    // Strategy 1: gen_ai.input.messages / gen_ai.output.messages (newer semconv)
-    const inputMsgs = getField(span, "attributes.gen_ai.input.messages");
-    const outputMsgs = getField(span, "attributes.gen_ai.output.messages");
+  // Strategy 1: gen_ai.input.messages / gen_ai.output.messages (newer semconv)
+  const inputMsgs = getField(span, "attributes.gen_ai.input.messages");
+  const outputMsgs = getField(span, "attributes.gen_ai.output.messages");
 
-    if (Array.isArray(inputMsgs)) {
-      for (const msg of inputMsgs as Array<{ role?: string; content?: string }>) {
-        if (!msg || typeof msg !== "object") continue;
-        const role = msg.role ?? "user";
-        const content = msg.content ?? "";
-        if (role === "system" && !systemPrompt && content) {
-          systemPrompt = content;
-        }
-        messages.push({ role: normalizeRole(role), content });
+  if (Array.isArray(inputMsgs)) {
+    for (const msg of inputMsgs as Array<{ role?: string; content?: string }>) {
+      if (!msg || typeof msg !== "object") continue;
+      const role = msg.role ?? "user";
+      const content = msg.content ?? "";
+      if (role === "system" && !systemPrompt && content) {
+        systemPrompt = content;
       }
+      messages.push({ role: normalizeRole(role), content });
     }
+  }
 
-    if (Array.isArray(outputMsgs)) {
-      for (const msg of outputMsgs as Array<{ role?: string; content?: string }>) {
-        if (!msg || typeof msg !== "object") continue;
-        messages.push({
-          role: normalizeRole(msg.role ?? "assistant"),
-          content: msg.content ?? "",
-        });
-      }
+  if (Array.isArray(outputMsgs)) {
+    for (const msg of outputMsgs as Array<{ role?: string; content?: string }>) {
+      if (!msg || typeof msg !== "object") continue;
+      messages.push({
+        role: normalizeRole(msg.role ?? "assistant"),
+        content: msg.content ?? "",
+      });
     }
+  }
 
-    // Strategy 2: events array with gen_ai.content.prompt / gen_ai.content.completion
-    const events = span.events as Array<{
-      name: string;
-      attributes?: Record<string, unknown>;
-    }> | undefined;
+  // Strategy 2: events array with gen_ai.content.prompt / gen_ai.content.completion
+  const events = span.events as Array<{
+    name: string;
+    attributes?: Record<string, unknown>;
+  }> | undefined;
 
-    if (Array.isArray(events) && !Array.isArray(inputMsgs)) {
-      for (const event of events) {
-        if (!event || typeof event !== "object") continue;
-        const eventAttrs = event.attributes ?? {};
+  if (Array.isArray(events) && !Array.isArray(inputMsgs)) {
+    for (const event of events) {
+      if (!event || typeof event !== "object") continue;
+      const eventAttrs = event.attributes ?? {};
 
-        if (event.name === "gen_ai.content.prompt") {
-          const content = (eventAttrs["gen_ai.prompt"] as string) ?? undefined;
-          if (content) {
-            parsePromptContent(content, messages, (sp) => {
-              if (!systemPrompt) systemPrompt = sp;
-            });
-          }
+      if (event.name === "gen_ai.content.prompt") {
+        const content = (eventAttrs["gen_ai.prompt"] as string) ?? undefined;
+        if (content) {
+          parsePromptContent(content, messages, (sp) => {
+            if (!systemPrompt) systemPrompt = sp;
+          });
         }
+      }
 
-        if (event.name === "gen_ai.content.completion") {
-          const content = (eventAttrs["gen_ai.completion"] as string) ?? undefined;
-          if (content) {
-            messages.push({ role: "assistant", content });
-          }
+      if (event.name === "gen_ai.content.completion") {
+        const content = (eventAttrs["gen_ai.completion"] as string) ?? undefined;
+        if (content) {
+          messages.push({ role: "assistant", content });
         }
       }
     }
@@ -265,37 +249,33 @@ function normalizeTrace(
 
   if (messages.length === 0) return null;
 
-  // Compute duration from first and last span
-  const firstTime = new Date(spans[0]._time as string).getTime();
-  const lastSpan = spans[spans.length - 1];
-  const durationField = lastSpan.duration;
-  let lastTime: number;
+  // Parse span duration
+  const durationField = span.duration;
+  let durationSec: number | undefined;
 
   if (typeof durationField === "string" && durationField.endsWith("s")) {
-    // Axiom returns duration as "38.037s" string
     const secs = parseFloat(durationField);
-    lastTime = new Date(lastSpan._time as string).getTime() + (isNaN(secs) ? 0 : secs * 1000);
-  } else if (typeof durationField === "number") {
-    // Nanoseconds
-    lastTime = new Date(lastSpan._time as string).getTime() + durationField / 1_000_000;
-  } else {
-    lastTime = new Date(lastSpan._time as string).getTime();
+    if (!isNaN(secs) && secs > 0) durationSec = secs;
+  } else if (typeof durationField === "number" && durationField > 0) {
+    durationSec = durationField / 1_000_000_000; // nanoseconds to seconds
   }
 
-  const durationSec = (lastTime - firstTime) / 1000;
+  // Use span_id as conversation id for uniqueness, with operation name for context
+  const opName = (getField(span, "attributes.gen_ai.operation.name") as string) ?? undefined;
+  const displayId = opName ? `${spanId.slice(0, 12)}-${opName}` : spanId;
 
   return {
-    id: traceId,
+    id: displayId,
     messages,
     systemPrompt,
     metadata: {
       model,
       totalTokens: totalTokens > 0 ? totalTokens : undefined,
-      duration: durationSec > 0 ? durationSec : undefined,
+      duration: durationSec,
       source: "axiom",
-      traceId,
+      traceId: traceId ?? spanId,
     },
-    timestamp: spans[0]._time as string,
+    timestamp: span._time as string,
   };
 }
 
