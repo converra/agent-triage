@@ -129,6 +129,7 @@ export interface Report {
       targetSubtypes: string[];
       affectedConversations: number;
       confidence: string;
+      howToApply?: string;
     }>;
     totalFailures: number;
   };
