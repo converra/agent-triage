@@ -12,6 +12,18 @@ export function buildConversationFixMd(
   const d = conv.diagnosis;
   if (!d) return "";
 
+  // If root cause is on a user turn, shift to previous assistant turn
+  let effectiveRootTurn = d.rootCauseTurn;
+  const rootMsg = conv.messages[d.rootCauseTurn - 1];
+  if (rootMsg?.role === "user") {
+    for (let j = d.rootCauseTurn - 2; j >= 0; j--) {
+      if (conv.messages[j].role === "assistant") {
+        effectiveRootTurn = j + 1;
+        break;
+      }
+    }
+  }
+
   const lines: string[] = [];
   const headline = d.summary.split(".")[0] ?? d.summary;
 
@@ -19,7 +31,7 @@ export function buildConversationFixMd(
   lines.push("");
   lines.push("## Problem");
   lines.push(`- **Severity:** ${d.severity}`);
-  lines.push(`- **Root cause:** Step ${d.rootCauseTurn}${d.rootCauseAgent ? ` (${d.rootCauseAgent})` : ""}`);
+  lines.push(`- **Root cause:** Step ${effectiveRootTurn}${d.rootCauseAgent ? ` (${d.rootCauseAgent})` : ""}`);
   lines.push(`- **Type:** ${formatFailureType(d.failureType)} → ${formatSubtype(d.failureSubtype)}`);
   lines.push(`- **Confidence:** ${d.confidence}`);
   lines.push(`- **Conversation:** ${conv.id}`);
@@ -43,6 +55,33 @@ export function buildConversationFixMd(
   lines.push("");
   lines.push("## Recommended Fix");
   lines.push(d.fix);
+
+  // Conversation transcript around root cause
+  lines.push("");
+  lines.push("## Conversation Transcript");
+  const rootTurn = effectiveRootTurn;
+  const startIdx = Math.max(0, rootTurn - 3);
+  const endIdx = Math.min(conv.messages.length - 1, rootTurn + 2);
+  for (let i = startIdx; i <= endIdx; i++) {
+    const m = conv.messages[i];
+    if (!m) continue;
+    const role = m.role.charAt(0).toUpperCase() + m.role.slice(1);
+    const marker = i + 1 === rootTurn ? " ← ROOT CAUSE" : "";
+    const content = m.content.length > 300 ? m.content.slice(0, 300) + "..." : m.content;
+    lines.push(`**Turn ${i + 1} (${role})${marker}:**`);
+    lines.push(`> ${content.replace(/\n/g, "\n> ")}`);
+    lines.push("");
+  }
+
+  // System prompt context if available
+  const systemMsg = conv.messages.find((m) => m.role === "system");
+  if (systemMsg) {
+    const snippet = systemMsg.content.length > 500 ? systemMsg.content.slice(0, 500) + "..." : systemMsg.content;
+    lines.push("## System Prompt");
+    lines.push("```");
+    lines.push(snippet);
+    lines.push("```");
+  }
 
   // Evidence from failing policy results
   const failingPolicies = conv.policyResults.filter((pr) => !pr.passed && pr.evidence);

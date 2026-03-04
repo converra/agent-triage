@@ -196,15 +196,28 @@ function classifyTurns(
     }
   }
 
+  // If the LLM marked a user turn as root cause, shift to the previous assistant turn.
+  // The root cause is always the agent's action, not the user's reaction.
+  let effectiveRootTurn = d.rootCauseTurn;
+  const rootMsg = conv.messages[d.rootCauseTurn - 1];
+  if (rootMsg?.role === "user") {
+    for (let j = d.rootCauseTurn - 2; j >= 0; j--) {
+      if (conv.messages[j].role === "assistant") {
+        effectiveRootTurn = j + 1;
+        break;
+      }
+    }
+  }
+
   return visibleSteps.map(({ msg, originalTurn }, i) => {
     const turnNum = i + 1;
     const isUser = msg.role === "user";
-    const isRoot = originalTurn === d.rootCauseTurn;
+    const isRoot = originalTurn === effectiveRootTurn;
     // Violations can only be attributed to assistant turns
     const isFailing = !isUser && conv.policyResults.some(
       (pr) => !pr.passed && pr.failingTurns?.includes(originalTurn),
     );
-    const isCascade = !isRoot && !isFailing && originalTurn > d.rootCauseTurn;
+    const isCascade = !isRoot && !isFailing && originalTurn > effectiveRootTurn;
     return { turnNum, originalTurn, isRoot, isFailing, isCascade, isUser, msg };
   });
 }

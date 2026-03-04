@@ -197,21 +197,20 @@ describe("buildHtml", () => {
                 policyId: "greet",
                 verdict: "fail" as const,
                 passed: false,
-                evidence: "Turn 3: Agent lost context",
-                failingTurns: [3],
+                evidence: "Turn 4: Agent lost context",
+                failingTurns: [4],
                 failureType: "prompt_issue",
                 failureSubtype: "context_loss",
               },
             ],
             diagnosis: {
-              rootCauseTurn: 3,
+              rootCauseTurn: 4,
               rootCauseAgent: "Orchestrator Agent",
-              summary: "The agent lost context at turn 3.",
+              summary: "The agent lost context at turn 4.",
               impact: "Affected turns 4, 5. User became frustrated.",
               cascadeChain: [
-                "Turn 3: Agent lost context and ignored user input",
-                "Turn 4: User expressed confusion about the loop",
-                "Turn 5: Agent continued down incorrect path",
+                "Turn 4: Agent lost context and ignored user input",
+                "Turn 5: User expressed confusion about the loop",
               ],
               fix: "Add context retention instructions.",
               severity: "critical",
@@ -261,7 +260,7 @@ describe("buildHtml", () => {
     it("shows both message content and cascadeChain diagnosis note", () => {
       const html = buildHtml(makeDeepDiveReport());
       // Root cause turn uses diagnosis summary, not cascade chain entry
-      expect(html).toContain("The agent lost context at turn 3.");
+      expect(html).toContain("The agent lost context at turn 4.");
       // Cascade descriptions for non-root turns appear as diagnosis notes
       expect(html).toContain("User expressed confusion about the loop");
       // Raw message content should ALSO appear (not replaced)
