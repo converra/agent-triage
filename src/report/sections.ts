@@ -460,7 +460,7 @@ function renderConvDive(
     : "";
 
   return `<div class="conv-expand">
-    <div class="conv-id-label">${esc(conv.id)}</div>
+    <div class="conv-id-label" title="${esc(conv.id)}">${esc(conv.id.length > 12 ? conv.id.slice(0, 12) + "…" : conv.id)}</div>
     <div class="conv-metrics-detail">${metricBadgesHtml}</div>
     ${timelineHtml}
     <div class="wif">
