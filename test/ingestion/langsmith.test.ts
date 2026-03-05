@@ -860,14 +860,15 @@ describe("resolveAgentName", () => {
     expect(name).toBe("Sales Assistant");
   });
 
-  it("falls back to run name for generic names", () => {
+  it("returns empty string for generic run names without identifiable prompt agent", () => {
     const run = {
       id: "r3", name: "ChatOpenAI", run_type: "llm", trace_id: "t3",
       inputs: {}, outputs: null, start_time: "", end_time: null,
-      extra: {}, parent_run_id: null, total_tokens: null, status: "success",
+      extra: {}, parent_run_id: null, total_tokens: null,
+      prompt_tokens: null, completion_tokens: null, status: "success",
     };
     const name = resolveAgentName(run, "Answer the user's questions.");
-    expect(name).toBe("ChatOpenAI");
+    expect(name).toBe("");
   });
 
   it("extracts name from markdown heading", () => {

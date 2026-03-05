@@ -43,6 +43,8 @@ export interface LangSmithRun {
   extra: Record<string, unknown>;
   parent_run_id: string | null;
   total_tokens: number | null;
+  prompt_tokens: number | null;
+  completion_tokens: number | null;
   status: string;
   tags?: string[];
 }
@@ -52,6 +54,35 @@ type IngestionStrategy = "trace-based" | "session-based";
 interface ExtractedMessages {
   systemPrompt: string | undefined;
   messages: Message[];
+}
+
+/**
+ * Extract per-run token count. Prefers prompt_tokens + completion_tokens
+ * (which are always per-run) over total_tokens (which can be cumulative).
+ */
+function getRunTokens(run: LangSmithRun): number {
+  const perRun = (run.prompt_tokens ?? 0) + (run.completion_tokens ?? 0);
+  if (perRun > 0) return perRun;
+  return run.total_tokens ?? 0;
+}
+
+/**
+ * Sum tokens from a set of LLM runs, deduplicating parent/child pairs.
+ * LangSmith often returns both a wrapper run (e.g. "process_chunks") and its
+ * child LLM run (e.g. "ChatOpenAI") with identical token counts. We only
+ * count leaf runs — those whose ID is not the parent of another run in the set.
+ */
+function sumTokens(runs: LangSmithRun[]): number {
+  const parentIds = new Set(
+    runs.map((r) => r.parent_run_id).filter(Boolean),
+  );
+  let total = 0;
+  for (const run of runs) {
+    // Skip runs that are parents of other runs in this set (they aggregate children)
+    if (parentIds.has(run.id)) continue;
+    total += getRunTokens(run);
+  }
+  return total;
 }
 
 // ─── Public API ──────────────────────────────────────────────────────
@@ -209,7 +240,6 @@ function composeMultiAgentTrace(
   let primarySystemPrompt: string | undefined;
   let primaryAgentName: string | undefined;
   let model: string | undefined;
-  let totalTokens = 0;
 
   // Collect sub-agent system prompts (distinct from primary)
   const subAgentPrompts = new Map<string, { name: string; systemPrompt: string; promptHash: string }>();
@@ -239,7 +269,6 @@ function composeMultiAgentTrace(
       }
     }
 
-    if (run.total_tokens) totalTokens += run.total_tokens;
     if (!model) model = extractModel(run);
 
     runInfos.push({ run, extracted, agentName });
@@ -291,7 +320,7 @@ function composeMultiAgentTrace(
     systemPrompt: primarySystemPrompt,
     metadata: {
       model,
-      totalTokens: totalTokens || undefined,
+      totalTokens: sumTokens(runs) || undefined,
       duration: duration && duration > 0 ? duration : undefined,
       source: "langsmith",
       agentName: primaryAgentName,
@@ -313,7 +342,9 @@ function resolveAgentNameFromRun(run: LangSmithRun): string {
   if (!GENERIC_RUN_NAMES.has(run.name.toLowerCase())) {
     return run.name;
   }
-  return run.name;
+  // Generic run name (e.g. "ChatOpenAI") — return empty so callers
+  // fall back to system-prompt-based name extraction
+  return "";
 }
 
 // ─── Session-Based Ingestion ─────────────────────────────────────────
@@ -378,8 +409,8 @@ async function ingestSessionBased(
     const allMessages: Message[] = [];
     let systemPrompt: string | undefined;
     let model: string | undefined;
-    let totalTokens = 0;
     let agentName: string | undefined;
+    const allChildRuns: LangSmithRun[] = [];
 
     // Collect all sub-agent system prompts across the session
     const subAgentPrompts = new Map<string, { name: string; systemPrompt: string; promptHash: string }>();
@@ -387,11 +418,11 @@ async function ingestSessionBased(
     for (const rootRun of runs) {
       // Use pre-fetched child LLM runs (cache hit, no API call)
       const childRuns = llmRunsByTrace.get(rootRun.trace_id) ?? [];
+      allChildRuns.push(...childRuns);
 
       // Extract system prompts and agent names from ALL child LLM runs
       for (const child of childRuns) {
         const extracted = extractMessagesFromRun(child);
-        if (child.total_tokens) totalTokens += child.total_tokens;
 
         if (!extracted.systemPrompt) continue;
 
@@ -452,7 +483,7 @@ async function ingestSessionBased(
       systemPrompt,
       metadata: {
         model,
-        totalTokens: totalTokens || undefined,
+        totalTokens: sumTokens(allChildRuns) || undefined,
         duration: extractSessionDuration(runs),
         source: "langsmith",
         agentName,
@@ -865,7 +896,9 @@ export function resolveAgentName(
     return normalizeAgentName(run.name);
   }
 
-  return normalizeAgentName(run.name);
+  // Generic name — still return it as last resort, but callers
+  // should prefer system-prompt-based names when available
+  return "";
 }
 
 /**

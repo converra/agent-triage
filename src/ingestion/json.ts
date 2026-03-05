@@ -50,6 +50,7 @@ const FlexibleMessageSchema = z.object({
   text: z.string().optional(),
   message: z.string().optional(),
   timestamp: z.string().optional(),
+  name: z.string().optional(),
   tool_calls: z.any().optional(),
   toolCalls: z.any().optional(),
   tool_call_id: z.string().optional(),
@@ -123,11 +124,13 @@ function normalizeMessage(raw: unknown): Message {
   const content = parsed.content ?? parsed.text ?? parsed.message ?? "";
   const toolCalls = parsed.toolCalls ?? parsed.tool_calls ?? undefined;
   const toolCallId = parsed.toolCallId ?? parsed.tool_call_id ?? undefined;
+  const agent = parsed.name ?? undefined;
 
   return {
     role,
     content,
     timestamp: parsed.timestamp,
+    ...(agent ? { agent } : {}),
     ...(toolCalls ? { toolCalls } : {}),
     ...(toolCallId ? { toolCallId } : {}),
   };

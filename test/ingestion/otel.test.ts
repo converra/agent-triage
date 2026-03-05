@@ -50,10 +50,12 @@ describe("readOtelTraces", () => {
     const convs = await readOtelTraces(otelFixture);
     const trace1 = convs.find((c) => c.id === "abc123def456")!;
 
-    // The first trace's prompt is a JSON array with system + user messages
+    // System messages are hoisted to systemPrompt and excluded from messages
     const systemMsg = trace1.messages.find((m) => m.role === "system");
-    expect(systemMsg).toBeDefined();
-    expect(systemMsg!.content).toBe("You are a helpful assistant.");
+    expect(systemMsg).toBeUndefined();
+    expect(trace1.systemPrompt).toBe("You are a helpful assistant.");
+    // Only user + assistant messages remain
+    expect(trace1.messages.length).toBe(2);
   });
 
   it("extracts system prompt", async () => {

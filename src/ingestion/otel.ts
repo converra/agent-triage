@@ -147,6 +147,7 @@ function normalizeTrace(
                   const role = msg.role ?? "user";
                   if (role === "system" && !systemPrompt) {
                     systemPrompt = msg.content;
+                    continue;
                   }
                   messages.push({
                     role: normalizeRole(role),
@@ -196,6 +197,7 @@ function normalizeTrace(
       totalTokens: totalTokens > 0 ? totalTokens : undefined,
       duration: durationMs > 0 ? durationMs / 1000 : undefined,
       source: "otel",
+      traceId,
     },
     timestamp: new Date(earliestTime / 1_000_000).toISOString(),
   };
