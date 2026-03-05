@@ -1,4 +1,6 @@
 import type { NormalizedConversation, Message } from "./types.js";
+import { normalizeRole } from "./normalize-role.js";
+import { getLogger } from "../logger.js";
 
 const DEFAULT_BASE_URL = "https://api.axiom.co";
 const MAX_RETRIES = 3;
@@ -330,14 +332,6 @@ function getField(row: SpanRow, key: string): unknown {
   return current;
 }
 
-function normalizeRole(role: string): "user" | "assistant" | "system" | "tool" {
-  const lower = role.toLowerCase();
-  if (lower === "user" || lower === "human") return "user";
-  if (lower === "assistant" || lower === "ai") return "assistant";
-  if (lower === "system") return "system";
-  if (lower === "tool" || lower === "function") return "tool";
-  return "user";
-}
 
 function buildHeaders(apiKey: string, orgId?: string): Record<string, string> {
   const headers: Record<string, string> = {
@@ -363,7 +357,7 @@ async function fetchWithRetry(
       const delayMs = retryAfter
         ? parseInt(retryAfter, 10) * 1000
         : RATE_LIMIT_DELAY_MS * Math.pow(2, attempt);
-      console.warn(
+      getLogger().warn(
         `Axiom rate limited. Retrying in ${(delayMs / 1000).toFixed(1)}s...`,
       );
       await new Promise((r) => setTimeout(r, delayMs));

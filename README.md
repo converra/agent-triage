@@ -1,6 +1,6 @@
 [![CI](https://github.com/converra/agent-triage/actions/workflows/ci.yml/badge.svg)](https://github.com/converra/agent-triage/actions/workflows/ci.yml)
 [![npm version](https://img.shields.io/npm/v/agent-triage.svg)](https://www.npmjs.com/package/agent-triage)
-[![License: FSL-1.1-Apache-2.0](https://img.shields.io/badge/license-FSL--1.1--Apache--2.0-blue.svg)](./LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
 # agent-triage
 
@@ -383,7 +383,7 @@ See [src/index.ts](src/index.ts) for all available exports.
 | Zero-config LangSmith | Yes | No | No | No |
 | CI compliance gates | Yes | No | Yes | Yes |
 | No infrastructure required | Yes | Yes | No (server) | Yes |
-| License | FSL-1.1 | MIT | Apache 2.0 | MIT |
+| License | MIT | MIT | Apache 2.0 | MIT |
 
 > Comparison accurate as of February 2026. [Open an issue](https://github.com/converra/agent-triage/issues) if any entry needs updating.
 
@@ -401,7 +401,7 @@ agent-triage is a standalone diagnostic tool. It gives you a complete picture of
 
 ## License
 
-[FSL-1.1-Apache-2.0](./LICENSE) — Free to use and self-host. Cannot be offered as a competing hosted service. Converts to Apache 2.0 after 2 years.
+[MIT License](./LICENSE)
 
 ## Contributing
 

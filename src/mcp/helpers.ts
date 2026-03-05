@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { readFileSync } from "node:fs";
+import { getLogger } from "../logger.js";
 
 import {
   readJsonTraces,
@@ -27,6 +28,7 @@ import { PoliciesFileSchema } from "../policy/types.js";
 import { buildDiagnosisPrompt } from "../llm/prompts.js";
 import { parseTurnDescriptions } from "../evaluation/diagnosis.js";
 import type { Diagnosis, ConversationResult } from "../evaluation/types.js";
+import { formatTranscript, validateEnum } from "../evaluation/shared.js";
 
 // ---------------------------------------------------------------------------
 // Response helpers
@@ -187,11 +189,7 @@ export function loadPoliciesFromFile(path?: string): Policy[] {
 // Diagnosis helpers
 // ---------------------------------------------------------------------------
 
-export function averageMetrics(metrics: Record<string, number>): number {
-  const values = Object.values(metrics);
-  if (values.length === 0) return 0;
-  return values.reduce((sum, v) => sum + v, 0) / values.length;
-}
+export { averageMetrics } from "../evaluation/shared.js";
 
 export function formatExplanation(result: ConversationResult) {
   const d = result.diagnosis;
@@ -234,19 +232,12 @@ export function formatExplanation(result: ConversationResult) {
   };
 }
 
-function validateEnum(val: unknown, valid: string[], fallback: string): string {
-  const s = String(val).toLowerCase();
-  return valid.includes(s) ? s : fallback;
-}
-
 export async function generateDiagnosisForResult(
   llm: LlmClient,
   result: ConversationResult,
   systemPrompt: string,
 ): Promise<Diagnosis | undefined> {
-  const transcript = result.messages
-    .map((msg, i) => `Turn ${i + 1} [${msg.role}]: ${msg.content}`)
-    .join("\n\n");
+  const transcript = formatTranscript(result);
 
   const prompt = buildDiagnosisPrompt(systemPrompt, transcript, result.policyResults);
 
@@ -270,7 +261,7 @@ export async function generateDiagnosisForResult(
       turnDescriptions: parseTurnDescriptions(parsed.turnDescriptions),
     };
   } catch (error) {
-    console.error(`[agent-triage] Diagnosis generation failed: ${error}`);
+    getLogger().error(`[agent-triage] Diagnosis generation failed: ${error}`);
     return undefined;
   }
 }

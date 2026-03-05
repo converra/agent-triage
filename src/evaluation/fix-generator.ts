@@ -6,6 +6,7 @@ import {
 import { parseJsonResponse } from "../llm/json.js";
 import type { Policy } from "../policy/types.js";
 import type { ConversationResult, FailurePattern } from "./types.js";
+import { getLogger } from "../logger.js";
 
 interface FixResult {
   fix: string;
@@ -78,7 +79,7 @@ export async function generateFixes(
           : [],
       });
     } catch (error) {
-      console.warn(
+      getLogger().warn(
         `  Warning: Could not generate fix for "${policy.name}": ${error}`,
       );
     }

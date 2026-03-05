@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
 import type { NormalizedConversation, Message } from "./types.js";
+import { normalizeRole } from "./normalize-role.js";
+import { getLogger } from "../logger.js";
 
 const DEFAULT_HOST = "https://cloud.langfuse.com";
 const TRACE_PAGE_SIZE = 50;
@@ -354,14 +356,6 @@ function buildAuthHeader(publicKey: string, secretKey: string): string {
   return `Basic ${encoded}`;
 }
 
-function normalizeRole(role: string): "user" | "assistant" | "system" | "tool" {
-  const lower = role.toLowerCase();
-  if (lower === "user" || lower === "human") return "user";
-  if (lower === "assistant" || lower === "ai") return "assistant";
-  if (lower === "system") return "system";
-  if (lower === "tool" || lower === "function") return "tool";
-  return "user";
-}
 
 function hashPrompt(prompt: string): string {
   const normalized = prompt.replace(/\s+/g, " ").trim().toLowerCase();
@@ -381,7 +375,7 @@ async function fetchWithRetry(
       const delayMs = retryAfter
         ? parseInt(retryAfter, 10) * 1000
         : RATE_LIMIT_DELAY_MS * Math.pow(2, attempt);
-      console.warn(
+      getLogger().warn(
         `Langfuse rate limited. Retrying in ${(delayMs / 1000).toFixed(1)}s...`,
       );
       await new Promise((r) => setTimeout(r, delayMs));

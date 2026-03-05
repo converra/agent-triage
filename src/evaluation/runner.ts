@@ -5,6 +5,7 @@ import type { ConversationResult } from "./types.js";
 import { evaluateConversation } from "./evaluator.js";
 import { checkPolicies } from "./policy-checker.js";
 import { saveProgress } from "./progress.js";
+import { getLogger } from "../logger.js";
 
 interface RunnerOptions {
   concurrency: number;
@@ -38,7 +39,7 @@ export async function evaluateAll(
   }
 
   if (previousResults && previousResults.size > 0) {
-    console.log(
+    getLogger().log(
       `  Resuming: ${previousResults.size} already completed, ${pending.length} remaining.\n`,
     );
   }
@@ -64,7 +65,7 @@ export async function evaluateAll(
       if (outcome.status === "fulfilled") {
         results.set(conv.id, outcome.value);
       } else {
-        console.warn(
+        getLogger().warn(
           `  Error evaluating ${conv.id}: ${outcome.reason}. Skipping.`,
         );
       }

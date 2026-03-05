@@ -17,6 +17,7 @@ import { parseJsonResponse } from "../llm/json.js";
 import { parseTurnDescriptions } from "../evaluation/diagnosis.js";
 import type { ConversationResult, Diagnosis, Report } from "../evaluation/types.js";
 import { parseDuration, createLogger } from "./filters.js";
+import { formatTranscript, averageMetrics, validateEnum } from "../evaluation/shared.js";
 
 interface ExplainOptions {
   langsmith?: string;
@@ -188,9 +189,7 @@ async function diagnoseOnDemand(
   const llm = createLlmClient(config.llm.provider, apiKey, config.llm.model, config.llm.baseUrl);
 
   const systemPrompt = report.agent.promptContent ?? "";
-  const transcript = conv.messages
-    .map((msg, i) => `Turn ${i + 1} [${msg.role}]: ${msg.content}`)
-    .join("\n\n");
+  const transcript = formatTranscript(conv);
 
   const prompt = buildDiagnosisPrompt(systemPrompt, transcript, result.policyResults);
 
@@ -327,9 +326,7 @@ async function evaluateAndDiagnose(
   const hasFailures = policyResults.some((pr) => !pr.passed);
   if (hasFailures) {
     log.log("Generating diagnosis...");
-    const transcript = conv.messages
-      .map((msg, i) => `Turn ${i + 1} [${msg.role}]: ${msg.content}`)
-      .join("\n\n");
+    const transcript = formatTranscript(conv);
 
     const prompt = buildDiagnosisPrompt(systemPrompt, transcript, policyResults);
     try {
@@ -444,13 +441,3 @@ function outputExplanation(
   console.log("");
 }
 
-function averageMetrics(metrics: Record<string, number>): number {
-  const values = Object.values(metrics);
-  if (values.length === 0) return 0;
-  return values.reduce((sum, v) => sum + v, 0) / values.length;
-}
-
-function validateEnum(val: unknown, valid: string[], fallback: string): string {
-  const s = String(val).toLowerCase();
-  return valid.includes(s) ? s : fallback;
-}

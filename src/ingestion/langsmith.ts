@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
 import type { NormalizedConversation, Message } from "./types.js";
+import { normalizeRole } from "./normalize-role.js";
+import { getLogger } from "../logger.js";
 
 const DEFAULT_BASE_URL = "https://api.smith.langchain.com";
 const PAGE_SIZE = 100;
@@ -97,7 +99,7 @@ export async function readLangSmithTraces(
 
   // Detect strategy by sampling 5 root runs
   const strategy = await detectStrategy(baseUrl, headers, projectId);
-  console.log(
+  getLogger().log(
     `Detected ${strategy} agent architecture`,
   );
 
@@ -140,7 +142,7 @@ async function detectStrategy(
   );
 
   if (withSessionId.length > 0) {
-    console.log(
+    getLogger().log(
       `  (${withSessionId.length}/${runs.length} root runs have session_id)`,
     );
     return "session-based";
@@ -372,7 +374,7 @@ async function ingestSessionBased(
     sessionMap.get(sessionId)!.push(run);
   }
 
-  console.log(`Fetching sessions... found ${sessionMap.size} sessions.`);
+  getLogger().log(`Fetching sessions... found ${sessionMap.size} sessions.`);
 
   // Collect unique trace IDs only for sessions we'll actually process (capped at limit)
   const traceIds = new Set<string>();
@@ -386,14 +388,14 @@ async function ingestSessionBased(
   }
 
   // Pre-fetch all LLM runs for these traces (bounded by limit, not full project)
-  console.log(`Fetching LLM runs for ${traceIds.size} traces...`);
+  getLogger().log(`Fetching LLM runs for ${traceIds.size} traces...`);
   const llmRunsByTrace = await prefetchLlmRunsByTrace(
     baseUrl,
     headers,
     projectId,
     traceIds,
   );
-  console.log(`Fetched LLM runs for ${llmRunsByTrace.size} traces.`);
+  getLogger().log(`Fetched LLM runs for ${llmRunsByTrace.size} traces.`);
 
   const conversations: NormalizedConversation[] = [];
 
@@ -523,7 +525,7 @@ async function prefetchLlmRunsByTrace(
     }
     fetched++;
     if (fetched % 10 === 0) {
-      console.log(`  Fetched LLM runs for ${fetched}/${traceIds.size} traces...`);
+      getLogger().log(`  Fetched LLM runs for ${fetched}/${traceIds.size} traces...`);
     }
     // Throttle to avoid rate limiting on large trace sets
     if (fetched < traceIds.size) {
@@ -776,49 +778,6 @@ function extractResponseFromRun(run: LangSmithRun): string | null {
   return raw;
 }
 
-function extractAssistantResponseFromChildren(
-  childRuns: LangSmithRun[],
-): string | null {
-  // Try to find the "response generator" LLM run (usually the last one)
-  // Search from last to first since the response generator is typically the final LLM call
-  for (let i = childRuns.length - 1; i >= 0; i--) {
-    const run = childRuns[i];
-    if (!run.outputs) continue;
-
-    const outputs = run.outputs;
-
-    // Try specific response fields first
-    for (const field of [
-      "html_response",
-      "response",
-      "content",
-      "message",
-    ]) {
-      if (typeof outputs[field] === "string") {
-        return outputs[field] as string;
-      }
-    }
-
-    // Try JSON-parsing the output for response fields
-    if (typeof outputs.output === "string") {
-      try {
-        const parsed = JSON.parse(outputs.output) as Record<string, unknown>;
-        if (typeof parsed.html_response === "string") return parsed.html_response;
-        if (typeof parsed.message_to_user === "string") return parsed.message_to_user;
-        if (typeof parsed.response === "string") return parsed.response;
-      } catch {
-        // Not JSON — use as-is
-        return outputs.output;
-      }
-    }
-
-    // Standard output extraction
-    const content = extractOutputContent(outputs);
-    if (content) return content;
-  }
-
-  return null;
-}
 
 function parseHistory(rootRun: LangSmithRun): Message[] {
   const history = rootRun.inputs?.history;
@@ -1073,19 +1032,6 @@ async function fetchChildLlmRuns(
   return runs;
 }
 
-export function normalizeRole(
-  type: string,
-): "user" | "assistant" | "system" | "tool" {
-  const lower = type.toLowerCase();
-  if (lower === "human" || lower === "humanmessage" || lower === "user")
-    return "user";
-  if (lower === "ai" || lower === "aimessage" || lower === "assistant")
-    return "assistant";
-  if (lower === "system" || lower === "systemmessage") return "system";
-  if (lower === "tool" || lower === "toolmessage" || lower === "function")
-    return "tool";
-  return "user";
-}
 
 function extractModel(run: LangSmithRun): string | undefined {
   const extra = run.extra as Record<string, unknown>;
@@ -1119,7 +1065,7 @@ async function fetchWithRetry(
       const delayMs = retryAfter
         ? parseInt(retryAfter, 10) * 1000
         : RATE_LIMIT_DELAY_MS * Math.pow(2, attempt);
-      console.warn(
+      getLogger().warn(
         `LangSmith rate limited. Retrying in ${(delayMs / 1000).toFixed(1)}s...`,
       );
       await new Promise((r) => setTimeout(r, delayMs));

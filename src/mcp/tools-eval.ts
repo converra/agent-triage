@@ -1,8 +1,9 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { readFile, writeFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import {
   extractPolicies,
@@ -29,6 +30,9 @@ import type { ConversationResult } from "../evaluation/types.js";
 
 import { PoliciesFileSchema } from "../policy/types.js";
 import { computePoliciesHash, loadProgress, cleanupProgress } from "../evaluation/progress.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const pkg = JSON.parse(readFileSync(resolve(__dirname, "../../package.json"), "utf-8")) as { version: string };
 
 import {
   jsonResult,
@@ -560,7 +564,7 @@ export function registerEvalTools(server: McpServer): void {
       const runDuration = (Date.now() - startTime) / 1000;
 
       const report: Report = {
-        agentTriageVersion: "0.1.0",
+        agentTriageVersion: pkg.version,
         llmProvider: config.llm.provider,
         llmModel: config.llm.model,
         policiesHash,
