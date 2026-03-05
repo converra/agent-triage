@@ -3,6 +3,7 @@ import { buildEvaluationPrompt } from "../llm/prompts.js";
 import { parseJsonResponse } from "../llm/json.js";
 import { MetricScoresSchema, type MetricScores } from "./types.js";
 import type { NormalizedConversation } from "../ingestion/types.js";
+import { formatTranscript } from "./shared.js";
 
 /**
  * Evaluate a single conversation across 12 quality metrics.
@@ -44,10 +45,4 @@ export async function evaluateConversation(
     throw new Error(`Metrics validation failed. Missing or invalid: ${missing}`);
   }
   return result.data;
-}
-
-function formatTranscript(conversation: NormalizedConversation): string {
-  return conversation.messages
-    .map((msg, i) => `Turn ${i + 1} [${msg.role}]: ${msg.content}`)
-    .join("\n\n");
 }
