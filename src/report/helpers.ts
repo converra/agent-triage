@@ -10,6 +10,18 @@ export function esc(s: string): string {
     .replace(/'/g, "&#39;");
 }
 
+/** Escape a string for safe use inside a JS string literal within an HTML attribute. */
+export function escJs(s: string): string {
+  return s
+    .replace(/\\/g, "\\\\")
+    .replace(/'/g, "\\'")
+    .replace(/"/g, '\\"')
+    .replace(/</g, "\\x3c")
+    .replace(/>/g, "\\x3e")
+    .replace(/\n/g, "\\n")
+    .replace(/\r/g, "\\r");
+}
+
 /** HTML-escape then convert **bold** markers to <strong> for agent name emphasis. */
 export function escBold(s: string): string {
   return esc(s).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');

@@ -1,8 +1,20 @@
 import { readFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { readFileSync } from "node:fs";
 import { getLogger } from "../logger.js";
+
+/**
+ * Ensure a resolved path stays within the CWD boundary.
+ * Prevents MCP clients from reading/writing arbitrary files via path traversal.
+ */
+export function safePath(userPath: string): string {
+  const cwd = process.cwd();
+  const resolved = resolve(cwd, userPath);
+  if (!resolved.startsWith(cwd + "/") && resolved !== cwd) {
+    throw new Error(`Path "${userPath}" resolves outside the working directory.`);
+  }
+  return resolved;
+}
 
 import {
   readJsonTraces,
@@ -96,7 +108,7 @@ export async function ingestTraces(params: {
   until?: string;
 }): Promise<NormalizedConversation[]> {
   if (params.traces) {
-    return readJsonTraces(resolve(process.cwd(), params.traces));
+    return readJsonTraces(safePath(params.traces));
   }
 
   if (params.langsmith) {
@@ -118,7 +130,7 @@ export async function ingestTraces(params: {
   }
 
   if (params.otel) {
-    return readOtelTraces(resolve(process.cwd(), params.otel));
+    return readOtelTraces(safePath(params.otel));
   }
 
   if (params.axiom) {
@@ -174,7 +186,7 @@ export function filterByQuery(
 }
 
 export function loadPoliciesFromFile(path?: string): Policy[] {
-  const policiesPath = resolve(process.cwd(), path ?? "policies.json");
+  const policiesPath = safePath(path ?? "policies.json");
   if (!existsSync(policiesPath)) {
     throw new Error(
       `No policies.json found at ${policiesPath}. Run triage_init or triage_analyze first.`,

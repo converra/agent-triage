@@ -7,6 +7,7 @@ import {
   describeWeakMetrics,
   esc,
   escBold,
+  escJs,
   formatFailureType,
   formatSubtype,
   stripHtml,
@@ -465,7 +466,7 @@ function renderConvDive(
       <div class="wif-s"><div class="wif-l">What happened</div><div class="wif-t">${escBold(truncate(d.summary, 300))}</div></div>
       <div class="diag-cta">
         <button class="copy-btn" data-fix="${fixMd}" onclick="copyFix(this)">${ICONS.copy} Copy for coding agent</button>
-        <button class="copy-btn" data-fix="${fixMd}" onclick="downloadFix(this, '${esc(conv.id.slice(0, 20))}')">${ICONS.fileSm} Save as .md</button>
+        <button class="copy-btn" data-fix="${fixMd}" onclick="downloadFix(this, '${escJs(conv.id.slice(0, 20))}')">${ICONS.fileSm} Save as .md</button>
       </div>
       <div class="wif-s"><div class="wif-l impact">Impact</div><div class="wif-t">${escBold(truncate(d.impact, 300))}</div></div>
       <div class="wif-s"><div class="wif-l fix">Fix</div><div class="wif-t">${escBold(truncate(d.fix, 250))} <span class="wif-conf">(${d.confidence} confidence)</span></div></div>
