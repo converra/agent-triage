@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import type { NormalizedConversation, Message } from "./types.js";
+import { normalizeRole } from "./normalize-role.js";
 
 /**
  * OpenTelemetry OTLP/JSON reader
@@ -219,13 +220,3 @@ function parseAttributes(
   return result;
 }
 
-function normalizeRole(
-  role: string,
-): "user" | "assistant" | "system" | "tool" {
-  const lower = role.toLowerCase();
-  if (lower === "user" || lower === "human") return "user";
-  if (lower === "assistant" || lower === "ai") return "assistant";
-  if (lower === "system") return "system";
-  if (lower === "tool" || lower === "function") return "tool";
-  return "user";
-}
