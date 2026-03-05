@@ -53,3 +53,6 @@ export type { FilterSpec } from "./cli/filters.js";
 
 export { appendHistory, readHistory, extractHistoryEntry } from "./history.js";
 export type { HistoryEntry } from "./history.js";
+
+export { setLogger, getLogger, silentLogger, consoleLogger } from "./logger.js";
+export type { Logger } from "./logger.js";

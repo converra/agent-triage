@@ -13,6 +13,9 @@ import { explainCommand } from "./explain.js";
 import { checkCommand } from "./check.js";
 import { statusCommand } from "./status.js";
 import { historyCommand } from "./history.js";
+import { setLogger, consoleLogger } from "../logger.js";
+
+setLogger(consoleLogger);
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(resolve(__dirname, "../../package.json"), "utf-8")) as { version: string };
