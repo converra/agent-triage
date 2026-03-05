@@ -61,5 +61,5 @@ import { readJsonTraces, extractPolicies, createLlmClient, evaluateAll, buildHtm
 - Full LLM context: https://github.com/converra/agent-triage/blob/main/llms-full.txt
 - npm: https://www.npmjs.com/package/agent-triage
 - Issues: https://github.com/converra/agent-triage/issues
-- License: FSL-1.1-Apache-2.0 (converts to Apache 2.0 after 2 years)
+- License: MIT
 - Built by: Converra (https://converra.ai)

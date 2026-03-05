@@ -27,3 +27,6 @@ index.html
 # Ad-hoc test output
 test-data/
 prompts/
+
+# Claude Code local settings (may contain API keys)
+.claude/settings.local.json

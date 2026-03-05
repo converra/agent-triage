@@ -351,7 +351,7 @@ data/           — Built-in demo data
 
 ## License
 
-FSL-1.1-Apache-2.0 — Free to use and self-host. Cannot be offered as a competing hosted service. Converts to Apache 2.0 after 2 years.
+MIT
 
 ## Links
 

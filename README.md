@@ -391,7 +391,7 @@ See [src/index.ts](src/index.ts) for all available exports.
 
 agent-triage is a standalone diagnostic tool. It gives you a complete picture of what's failing and why.
 
-[Converra](https://converra.ai) is an optional next step that automates the fix cycle:
+[Converra](https://converra.ai?utm_source=agent-triage&utm_medium=readme&utm_campaign=oss) is an optional next step that automates the fix cycle:
 
 - **Tested fix proposals** — concrete prompt patches with confidence scores, not directional hints
 - **Simulation testing** — test fixes against personas, scenarios, and complexity levels before deploying
@@ -417,4 +417,4 @@ npm test
 
 ---
 
-Built by [Converra](https://converra.ai)
+Built by [Converra](https://converra.ai?utm_source=agent-triage&utm_medium=readme&utm_campaign=oss)

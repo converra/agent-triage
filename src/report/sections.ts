@@ -21,6 +21,17 @@ function truncate(text: string, max: number): string {
   return (cut > 0 ? text.slice(0, cut) : text.slice(0, max)) + "…";
 }
 
+/** Extract a short headline from a verbose diagnosis summary. */
+function shortenSummary(summary: string): string {
+  // Try first sentence
+  const first = summary.split(/\.\s/)[0]!.replace(/\.$/, "");
+  if (first.length <= 80) return first;
+  // Cut at first subordinate clause marker
+  const clauseCut = first.search(/,\s*(which|despite|indicating|leading|resulting|because|although)\b/i);
+  if (clauseCut > 20) return first.slice(0, clauseCut);
+  return truncate(first, 80);
+}
+
 export function renderHeader(report: Report, date: string): string {
   const agentCount = report.agents?.length ?? 0;
   const autoName = report.agents?.[0]?.name;
@@ -33,7 +44,7 @@ export function renderHeader(report: Report, date: string): string {
     <div class="hdr-top">
       <div class="logo">${ICONS.check}</div>
       <div class="tool-name"><b>agent</b>-triage</div>
-      <span class="hdr-by">by <a href="https://converra.ai" class="hdr-by-link">Converra</a></span>
+      <span class="hdr-by">by <a href="https://converra.ai?utm_source=agent-triage&utm_medium=report&utm_campaign=header" class="hdr-by-link">Converra</a></span>
     </div>
     <h1>${headerTitle}</h1>
     <div class="hdr-meta">
@@ -83,7 +94,7 @@ export function renderHealthSummary(
   </div>`;
 }
 
-/** Extract top 2 distinct problem descriptions from failing conversations. */
+/** Extract distinct problem descriptions from failing conversations (up to 5). */
 function buildTopSummaries(issueConvs: Report["conversations"]): string {
   const withDiag = issueConvs.filter((c) => c.diagnosis);
   if (withDiag.length === 0) return "";
@@ -92,13 +103,13 @@ function buildTopSummaries(issueConvs: Report["conversations"]): string {
   const items: string[] = [];
   for (const c of withDiag) {
     const d = c.diagnosis!;
-    const text = d.shortSummary || d.summary.split(/\.\s/)[0]!.replace(/\.$/, "");
+    const text = d.shortSummary || shortenSummary(d.summary);
     const key = text.slice(0, 30).toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
     const typeClass = d.failureType === "prompt_issue" ? "prompt" : d.failureType === "orchestration_issue" ? "orch" : "model";
     items.push(`<li><span class="type-badge sm ${typeClass}">${esc(formatFailureType(d.failureType))}</span> ${escBold(text)}</li>`);
-    if (items.length >= 2) break;
+    if (items.length >= 5) break;
   }
 
   return `<ul class="verdict-summaries">${items.join("")}</ul>`;
@@ -479,8 +490,62 @@ function renderConvDive(
   </div>`;
 }
 
-export function renderFailurePatterns(_report: Report): string {
-  return "";
+const FP_ICONS: Record<string, string> = {
+  prompt_issue: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>',
+  orchestration_issue: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>',
+  model_limitation: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>',
+  retrieval_rag_issue: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
+};
+
+function fpColorClass(type: string): string {
+  if (type === "prompt_issue") return "prompt";
+  if (type === "orchestration_issue") return "orch";
+  if (type === "retrieval_rag_issue") return "rag";
+  return "model";
+}
+
+export function renderFailurePatterns(report: Report): string {
+  const patterns = report.failurePatterns.byType;
+  if (patterns.length === 0) return "";
+
+  const total = patterns.reduce((s, p) => s + p.count, 0);
+
+  const cards = patterns.map((p) => {
+    const cls = fpColorClass(p.type);
+    const icon = FP_ICONS[p.type] ?? FP_ICONS.model_limitation;
+    const critHtml = p.criticalCount > 0
+      ? ` · <span class="fp-crit">${p.criticalCount} critical</span>`
+      : "";
+
+    const subtypesHtml = p.subtypes.map((s) =>
+      `<div class="fp-sub">
+        <span class="fp-sub-name">${esc(formatSubtype(s.name))}</span>
+        <div class="fp-sub-bar-wrap"><div class="fp-sub-bar ${cls}" style="width:${s.percentage}%"></div></div>
+        <span class="fp-sub-pct">${s.percentage}%</span>
+        <span class="fp-sub-ct">${s.count}</span>
+      </div>`
+    ).join("");
+
+    return `<div class="fp-card">
+      <div class="fp-card-hdr">
+        <div class="fp-icon ${cls}">${icon}</div>
+        <div class="fp-info">
+          <div class="fp-type">${esc(formatFailureType(p.type))}</div>
+          <div class="fp-count"><b>${p.count}</b> failure${p.count !== 1 ? "s" : ""}${critHtml}</div>
+        </div>
+        <div class="fp-num">${p.count}</div>
+      </div>
+      <div class="fp-body"><div class="fp-subtypes">${subtypesHtml}</div></div>
+    </div>`;
+  }).join("");
+
+  return `<div class="fp">
+    <div class="fp-header">
+      <div class="stitle">Root cause breakdown</div>
+      <div class="fp-total"><b>${total}</b> failure${total !== 1 ? "s" : ""} across <b>${patterns.length}</b> root cause ${patterns.length !== 1 ? "categories" : "category"}</div>
+    </div>
+    <div class="fp-grid">${cards}</div>
+  </div>`;
 }
 
 
@@ -585,5 +650,5 @@ export function renderReproducibility(report: Report): string {
 }
 
 export function renderFooter(): string {
-  return `<div class="ftr"><div class="trust-note">${ICONS.lock} This report is local-only. No data was uploaded.</div><div class="ftr-brand"><div class="ftr-mark">${ICONS.check}</div><span class="ftr-text">Powered by <a href="https://converra.ai" class="ftr-name">Converra</a> — for when you're done fixing agents manually.</span></div><div class="ftr-actions"><a href="https://converra.ai" class="verdict-cta">Automate this ${ICONS.externalSm}</a></div><div class="helpful">Was this report useful? <button class="hbtn">${ICONS.thumbUp}</button> <button class="hbtn">${ICONS.thumbDown}</button></div></div>`;
+  return `<div class="ftr"><div class="trust-note">${ICONS.lock} This report is local-only. No data was uploaded.</div><div class="ftr-brand"><div class="ftr-mark">${ICONS.check}</div><span class="ftr-text">Powered by <a href="https://converra.ai?utm_source=agent-triage&utm_medium=report&utm_campaign=footer" class="ftr-name">Converra</a> — for when you're done fixing agents manually.</span></div><div class="ftr-actions"><a href="https://converra.ai?utm_source=agent-triage&utm_medium=report&utm_campaign=cta-automate" class="verdict-cta">Automate this ${ICONS.externalSm}</a></div><div class="helpful">Was this report useful? <button class="hbtn">${ICONS.thumbUp}</button> <button class="hbtn">${ICONS.thumbDown}</button></div></div>`;
 }
