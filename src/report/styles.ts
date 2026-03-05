@@ -194,11 +194,11 @@ details[open] > summary .chev { transform:rotate(180deg); }
 @keyframes flash { 0%,100% { background:transparent; } 15% { background:var(--coral-50); } }
 .trust-note { font-size:11px; color:var(--text-3); padding:8px 0 0; display:flex; align-items:center; gap:5px; }
 .recs { padding:20px 0; border-top:1px solid var(--border); }
-.recs > summary { list-style:none; cursor:pointer; }
-.recs > summary::-webkit-details-marker { display:none; }
 .recs-header { display:flex; align-items:center; gap:12px; margin-bottom:10px; }
 .recs-header .stitle { flex:1; }
-.recs[open] > .recs-header .chev { transform:rotate(180deg); }
+.recs-details > summary { list-style:none; cursor:pointer; font-size:13px; color:var(--text-3); padding:8px 0; }
+.recs-details > summary::-webkit-details-marker { display:none; }
+.recs-details[open] > summary { margin-bottom:8px; }
 .patterns[open] > .patterns-summary .chev { transform:rotate(180deg); }
 .recs-cta { display:flex; gap:6px; }
 .recs-batch { display:flex; gap:8px; align-items:center; padding:12px 0; border-bottom:1px solid var(--border-subtle); margin-bottom:6px; }
@@ -478,13 +478,6 @@ function viewConv(e, btn) {
 function jumpToConv(e, id) {
   e.preventDefault();
   jumpToConvById(id);
-}
-function scrollToRecs() {
-  var el = document.getElementById('recs-section');
-  if (!el) return;
-  el.open = true;
-  el.querySelectorAll('details.rec-card').forEach(function(d) { d.open = true; });
-  setTimeout(function() { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 50);
 }
 function jumpToConvById(id) {
   var el = document.getElementById(id);

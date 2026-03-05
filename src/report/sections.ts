@@ -79,7 +79,7 @@ export function renderHealthSummary(
         ${topSummaries}
       </div>
       ${report.failurePatterns.topRecommendations.length > 0
-        ? `<a href="#recs-section" class="verdict-cta" onclick="event.preventDefault();scrollToRecs()">See fixes below ${ICONS.chevDownSm}</a>`
+        ? `<a href="https://converra.ai" class="verdict-cta" onclick="event.stopPropagation()">Track fixes over time ${ICONS.externalSm}</a>`
         : ""}
     </div>
   </div>`;
@@ -565,18 +565,20 @@ export function renderRecommendations(report: Report): string {
   const allRecsB64 = btoa(unescape(encodeURIComponent(allRecsMd)));
   const recCount = report.failurePatterns.topRecommendations.length;
 
-  return `<details class="recs" id="recs-section" open>
-    <summary class="recs-header">
+  return `<div class="recs" id="recs-section">
+    <div class="recs-header">
       <div class="stitle" style="margin:0;">How to fix it</div>
-      <a href="https://converra.ai" class="verdict-cta" onclick="event.stopPropagation()">Track fixes over time ${ICONS.externalSm}</a>
-      ${ICONS.chevDown}
-    </summary>
+      <a href="https://converra.ai" class="verdict-cta">Track fixes over time ${ICONS.externalSm}</a>
+    </div>
     ${recCount > 1 ? `<div class="recs-batch">
       <button class="copy-btn primary" data-fix="${allRecsB64}" onclick="copyFix(this)">${ICONS.copy} Copy all ${recCount} fixes</button>
       <button class="copy-btn" data-fix="${allRecsB64}" onclick="downloadFix(this, 'all-recommendations')">${ICONS.fileSm} Save all as .md</button>
     </div>` : ""}
-    ${cards}
-  </details>`;
+    <details class="recs-details">
+      <summary class="recs-expand">${recCount} recommendation${recCount > 1 ? "s" : ""} — click to expand ${ICONS.chevDownSm}</summary>
+      ${cards}
+    </details>
+  </div>`;
 }
 
 export function renderBehavioralRules(report: Report): string {

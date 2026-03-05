@@ -90,8 +90,8 @@ export function buildHtml(report: Report): string {
 
   ${renderHeader(report, date)}
   ${renderHealthSummary(report, healthy, needsAttention, critical, issueConvs)}
-  ${renderAllConversations(issueConvs, report)}
   ${renderRecommendations(report)}
+  ${renderAllConversations(issueConvs, report)}
   ${renderFailurePatterns(report)}
   ${renderAgentHealth(report)}
   ${renderMetricsBar(report)}
