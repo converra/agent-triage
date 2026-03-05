@@ -115,8 +115,8 @@ describe("buildHtml", () => {
 
   it("includes failure patterns section", () => {
     const html = buildHtml(makeReport());
-    // renderFailurePatterns is currently a stub — just verify it doesn't crash
-    expect(html).toBeDefined();
+    expect(html).toContain("Root cause breakdown");
+    expect(html).toContain("Prompt Issue");
   });
 
   it("includes cost and model info", () => {

@@ -479,8 +479,62 @@ function renderConvDive(
   </div>`;
 }
 
-export function renderFailurePatterns(_report: Report): string {
-  return "";
+export function renderFailurePatterns(report: Report): string {
+  const patterns = report.failurePatterns.byType;
+  if (patterns.length === 0) return "";
+
+  const total = patterns.reduce((s, p) => s + p.count, 0);
+
+  const iconMap: Record<string, string> = {
+    prompt_issue: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>',
+    orchestration_issue: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>',
+    model_limitation: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>',
+    retrieval_rag_issue: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
+  };
+
+  function colorClass(type: string): string {
+    if (type === "prompt_issue") return "prompt";
+    if (type === "orchestration_issue") return "orch";
+    if (type === "retrieval_rag_issue") return "rag";
+    return "model";
+  }
+
+  const cards = patterns.map((p, i) => {
+    const cls = colorClass(p.type);
+    const icon = iconMap[p.type] ?? iconMap.model_limitation;
+    const critHtml = p.criticalCount > 0
+      ? ` · <span class="fp-crit">${p.criticalCount} critical</span>`
+      : "";
+
+    const subtypesHtml = p.subtypes.map((s) =>
+      `<div class="fp-sub">
+        <span class="fp-sub-name">${esc(formatSubtype(s.name))}</span>
+        <div class="fp-sub-bar-wrap"><div class="fp-sub-bar ${cls}" style="width:${s.percentage}%"></div></div>
+        <span class="fp-sub-pct">${s.percentage}%</span>
+        <span class="fp-sub-ct">${s.count}</span>
+      </div>`
+    ).join("");
+
+    return `<div class="fp-card">
+      <div class="fp-card-hdr">
+        <div class="fp-icon ${cls}">${icon}</div>
+        <div class="fp-info">
+          <div class="fp-type">${esc(formatFailureType(p.type))}</div>
+          <div class="fp-count"><b>${p.count}</b> failure${p.count !== 1 ? "s" : ""}${critHtml}</div>
+        </div>
+        <div class="fp-num">${p.count}</div>
+      </div>
+      <div class="fp-body"><div class="fp-subtypes">${subtypesHtml}</div></div>
+    </div>`;
+  }).join("");
+
+  return `<div class="fp">
+    <div class="fp-header">
+      <div class="stitle">Root cause breakdown</div>
+      <div class="fp-total"><b>${total}</b> failure${total !== 1 ? "s" : ""} across <b>${patterns.length}</b> root cause ${patterns.length !== 1 ? "categories" : "category"}</div>
+    </div>
+    <div class="fp-grid">${cards}</div>
+  </div>`;
 }
 
 
