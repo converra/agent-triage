@@ -33,7 +33,7 @@ export function renderHeader(report: Report, date: string): string {
     <div class="hdr-top">
       <div class="logo">${ICONS.check}</div>
       <div class="tool-name"><b>agent</b>-triage</div>
-      <span class="hdr-by">by <a href="https://converra.ai" class="hdr-by-link">Converra</a></span>
+      <span class="hdr-by">by <a href="https://converra.ai?utm_source=agent-triage&utm_medium=report&utm_campaign=header" class="hdr-by-link">Converra</a></span>
     </div>
     <h1>${headerTitle}</h1>
     <div class="hdr-meta">
@@ -585,5 +585,5 @@ export function renderReproducibility(report: Report): string {
 }
 
 export function renderFooter(): string {
-  return `<div class="ftr"><div class="trust-note">${ICONS.lock} This report is local-only. No data was uploaded.</div><div class="ftr-brand"><div class="ftr-mark">${ICONS.check}</div><span class="ftr-text">Powered by <a href="https://converra.ai" class="ftr-name">Converra</a> — for when you're done fixing agents manually.</span></div><div class="ftr-actions"><a href="https://converra.ai" class="verdict-cta">Automate this ${ICONS.externalSm}</a></div><div class="helpful">Was this report useful? <button class="hbtn">${ICONS.thumbUp}</button> <button class="hbtn">${ICONS.thumbDown}</button></div></div>`;
+  return `<div class="ftr"><div class="trust-note">${ICONS.lock} This report is local-only. No data was uploaded.</div><div class="ftr-brand"><div class="ftr-mark">${ICONS.check}</div><span class="ftr-text">Powered by <a href="https://converra.ai?utm_source=agent-triage&utm_medium=report&utm_campaign=footer" class="ftr-name">Converra</a> — for when you're done fixing agents manually.</span></div><div class="ftr-actions"><a href="https://converra.ai?utm_source=agent-triage&utm_medium=report&utm_campaign=cta-automate" class="verdict-cta">Automate this ${ICONS.externalSm}</a></div><div class="helpful">Was this report useful? <button class="hbtn">${ICONS.thumbUp}</button> <button class="hbtn">${ICONS.thumbDown}</button></div></div>`;
 }
