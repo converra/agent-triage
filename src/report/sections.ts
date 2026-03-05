@@ -79,7 +79,6 @@ export function renderHealthSummary(
         <div class="verdict-text">${issues} of ${total} conversations have issues${critical > 0 ? ` — ${critical} critical` : ""}.</div>
         ${topSummaries}
       </div>
-      ${""/* CTA removed — fixes section is directly below */}
     </div>
   </div>`;
 }
@@ -121,7 +120,7 @@ export function renderMetricsBar(report: Report): string {
     return `<div class="mb-cell"><div class="mb-label">${m.label}</div><div class="mb-val ${color}">${val}</div></div>`;
   });
 
-  return `<details class="section-collapse">
+  return `<details class="section-collapse" open>
   <summary><div class="stitle" style="margin:0;">Quality metrics (averages)</div>${ICONS.chevDown}</summary>
   <div class="metrics-bar">${cells.join("")}</div>
   </details>`;
@@ -292,18 +291,23 @@ function buildTurnTimeline(
     const { turnNum, originalTurn, isRoot, isFailing, isCascade, isUser, msg } = entry.turn;
     const dotClass = isRoot || isFailing ? "f" : isCascade ? "w" : "p";
 
-    // Policy violations — show names directly
+    // Policy violations — collapse behind count when many
     let failBadges = "";
     const failingPolicies = (isRoot || isFailing)
       ? conv.policyResults.filter((pr) => !pr.passed && pr.failingTurns?.includes(originalTurn))
       : [];
     if (failingPolicies.length > 0) {
-      failBadges = failingPolicies
+      const badges = failingPolicies
         .map((pr) => {
           const policy = report.policies.find((p) => p.id === pr.policyId);
           return `<span class="tb f">${esc(policy?.name ?? pr.policyId)}</span>`;
         })
         .join("");
+      if (failingPolicies.length <= 3) {
+        failBadges = badges;
+      } else {
+        failBadges = `<span class="tb f tb-count" onclick="this.nextElementSibling.classList.toggle('show');this.classList.toggle('expanded')">${failingPolicies.length} violations</span><span class="tb-overflow">${badges}</span>`;
+      }
     }
 
     // Routing chain: show on first assistant turn, then only when agent changes
@@ -403,7 +407,7 @@ export function renderAllConversations(
           ${agentBadge}
           <span class="conv-score ${healthClass}">${avg}</span>
           <span class="conv-cause">${escBold(cause)}</span>
-          ${d?.failureSubtype ? `<span class="type-badge sm ${d.failureType === "prompt_issue" ? "prompt" : d.failureType === "orchestration_issue" ? "orch" : "model"}">${esc(formatSubtype(d.failureSubtype))}</span>` : ""}
+          ${d?.failureSubtype && d.failureSubtype !== "unknown" ? `<span class="type-badge sm ${d.failureType === "prompt_issue" ? "prompt" : d.failureType === "orchestration_issue" ? "orch" : "model"}">${esc(formatSubtype(d.failureSubtype))}</span>` : ""}
           ${ICONS.chevDownSm}
         </summary>
         ${expand}
@@ -475,42 +479,8 @@ function renderConvDive(
   </div>`;
 }
 
-export function renderFailurePatterns(report: Report): string {
-  if (report.failurePatterns.byType.length === 0) return "";
-
-  const fixable = report.failurePatterns.byType.filter(
-    (t) => t.type === "prompt_issue" || t.type === "retrieval_rag_issue",
-  );
-  const needsCode = report.failurePatterns.byType.filter(
-    (t) => t.type === "orchestration_issue" || t.type === "model_limitation",
-  );
-
-  const renderGroupLine = (
-    patterns: Report["failurePatterns"]["byType"],
-    label: string,
-    icon: string,
-    cssClass: string,
-  ): string => {
-    const subtypes = patterns.flatMap((p) =>
-      p.subtypes.map((s) => `${esc(formatSubtype(s.name))} ${s.count} (${s.percentage}%)`),
-    );
-    return `<div class="group-label ${cssClass}">${icon} ${label}: ${subtypes.join(", ")}</div>`;
-  };
-
-  let html = `<div class="patterns" style="border-bottom:1px solid var(--border-subtle);padding:12px 0 8px;">`;
-  html += `<div class="stitle">Root cause analysis</div>`;
-
-  if (fixable.length > 0) {
-    html += renderGroupLine(fixable, "Fixable — prompt &amp; config", ICONS.checkCircleSm, "fixable");
-  }
-
-  if (needsCode.length > 0) {
-    html += renderGroupLine(needsCode, "Needs code change", ICONS.code, "needs-code");
-  }
-
-  html += `<div class="trust-note">${ICONS.lock} This report is local-only. No data was uploaded.</div>`;
-  html += `</div>`;
-  return html;
+export function renderFailurePatterns(_report: Report): string {
+  return "";
 }
 
 
@@ -523,14 +493,6 @@ export function renderRecommendations(report: Report): string {
         .map(formatFailureType)
         .join(", ");
       const recMd = btoa(unescape(encodeURIComponent(buildRecommendationFixMd(rec, i))));
-
-      // Pull evidence from conversations matching this recommendation's failure types
-      const evidence = report.conversations
-        .filter((c) => c.diagnosis && rec.targetFailureTypes.includes(c.diagnosis.failureType))
-        .slice(0, 2)
-        .map((c) => `<span style="color:var(--text-3);font-size:12px;">${esc(c.id.slice(0, 10))}: ${escBold(c.diagnosis!.summary.split(".")[0]!)}</span>`)
-        .join("<br>");
-      const evidenceHtml = evidence ? `<div style="margin-top:8px;padding:8px 10px;background:var(--bg-subtle);border-radius:var(--r);border:1px solid var(--border-subtle);line-height:1.6;">${evidence}</div>` : "";
 
       const howToApplyHtml = rec.howToApply
         ? `<div class="rec-how-to-apply"><div class="rec-how-label">How to apply</div><div class="rec-how-content">${escBold(truncate(rec.howToApply, 400))}</div></div>`
@@ -548,7 +510,6 @@ export function renderRecommendations(report: Report): string {
       <div class="rec-detail">
         <div class="rec-desc">${esc(rec.description)}</div>
         ${howToApplyHtml}
-        ${evidenceHtml}
         <div class="rec-actions">
           <button class="copy-btn" data-fix="${recMd}" onclick="copyFix(this)">${ICONS.copy} Copy for coding agent</button>
         </div>
@@ -567,14 +528,14 @@ export function renderRecommendations(report: Report): string {
   return `<div class="recs" id="recs-section">
     <div class="recs-header">
       <div class="stitle" style="margin:0;">How to fix it</div>
-      <a href="https://converra.ai" class="verdict-cta">Automate this ${ICONS.externalSm}</a>
+      <div class="recs-batch">
+        <button class="copy-btn primary" data-fix="${allRecsB64}" onclick="copyFix(this)">${ICONS.copy} Copy all ${recCount} fixes</button>
+        <button class="copy-btn" data-fix="${allRecsB64}" onclick="downloadFix(this, 'all-recommendations')">${ICONS.fileSm} Save all as .md</button>
+        <span class="recs-hint">Paste into Claude Code, Cursor, or your coding agent</span>
+      </div>
     </div>
-    ${recCount > 1 ? `<div class="recs-batch">
-      <button class="copy-btn primary" data-fix="${allRecsB64}" onclick="copyFix(this)">${ICONS.copy} Copy all ${recCount} fixes</button>
-      <button class="copy-btn" data-fix="${allRecsB64}" onclick="downloadFix(this, 'all-recommendations')">${ICONS.fileSm} Save all as .md</button>
-    </div>` : ""}
     <details class="recs-details">
-      <summary class="recs-expand">${recCount} recommendation${recCount > 1 ? "s" : ""} — click to expand ${ICONS.chevDownSm}</summary>
+      <summary class="recs-expand">${recCount} recommendation${recCount > 1 ? "s" : ""} ${ICONS.chevDownSm}</summary>
       ${cards}
     </details>
   </div>`;
@@ -624,5 +585,5 @@ export function renderReproducibility(report: Report): string {
 }
 
 export function renderFooter(): string {
-  return `<div class="ftr"><div class="ftr-brand"><div class="ftr-mark">${ICONS.check}</div><span class="ftr-text">Powered by <a href="https://converra.ai" class="ftr-name">Converra</a> — for when you're done fixing agents manually. <a href="https://converra.ai" class="ftr-link">Learn more ${ICONS.externalSm}</a></span></div><div class="helpful">Was this report useful? <button class="hbtn">${ICONS.thumbUp}</button> <button class="hbtn">${ICONS.thumbDown}</button></div></div>`;
+  return `<div class="ftr"><div class="trust-note">${ICONS.lock} This report is local-only. No data was uploaded.</div><div class="ftr-brand"><div class="ftr-mark">${ICONS.check}</div><span class="ftr-text">Powered by <a href="https://converra.ai" class="ftr-name">Converra</a> — for when you're done fixing agents manually.</span></div><div class="ftr-actions"><a href="https://converra.ai" class="verdict-cta">Automate this ${ICONS.externalSm}</a></div><div class="helpful">Was this report useful? <button class="hbtn">${ICONS.thumbUp}</button> <button class="hbtn">${ICONS.thumbDown}</button></div></div>`;
 }
