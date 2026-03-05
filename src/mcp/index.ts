@@ -1,13 +1,22 @@
 #!/usr/bin/env node
 
+import { readFileSync } from "node:fs";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { registerTools } from "./server.js";
+import { setLogger, consoleLogger } from "../logger.js";
+
+setLogger(consoleLogger);
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const pkg = JSON.parse(readFileSync(resolve(__dirname, "../../package.json"), "utf-8")) as { version: string };
 
 const server = new McpServer(
   {
     name: "agent-triage",
-    version: "0.1.0",
+    version: pkg.version,
   },
   {
     instructions: `agent-triage diagnoses AI agents in production by evaluating conversation traces against behavioral policies.
