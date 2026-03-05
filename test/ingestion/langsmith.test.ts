@@ -20,8 +20,11 @@ const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
 
 // Import after mocking
-const { readLangSmithTraces, extractMessagesFromRun, resolveAgentName, hashPrompt, normalizeRole } = await import(
+const { readLangSmithTraces, extractMessagesFromRun, resolveAgentName, hashPrompt } = await import(
   "../../src/ingestion/langsmith.js"
+);
+const { normalizeRole } = await import(
+  "../../src/ingestion/normalize-role.js"
 );
 
 beforeEach(() => {
@@ -877,8 +880,8 @@ describe("resolveAgentName", () => {
       inputs: {}, outputs: null, start_time: "", end_time: null,
       extra: {}, parent_run_id: null, total_tokens: null, status: "success",
     };
-    const name = resolveAgentName(run, "# Beelo AI Guide\n\nYou help users navigate the website.");
-    expect(name).toBe("Beelo AI Guide");
+    const name = resolveAgentName(run, "# Acme AI Guide\n\nYou help users navigate the website.");
+    expect(name).toBe("Acme AI Guide");
   });
 });
 
