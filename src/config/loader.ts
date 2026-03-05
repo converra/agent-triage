@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { parse as parseYaml } from "yaml";
 import { ConfigSchema, type Config } from "./schema.js";
-import { buildDefaultConfig, getDefaultModel } from "./defaults.js";
+import { getDefaultModel } from "./defaults.js";
 
 const CONFIG_FILENAMES = [
   "agent-triage.config.yaml",
