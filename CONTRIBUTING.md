@@ -56,4 +56,4 @@ See [`src/ingestion/types.ts`](src/ingestion/types.ts) for the `NormalizedConver
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the project's [FSL-1.1-Apache-2.0](./LICENSE) license.
+By contributing, you agree that your contributions will be licensed under the project's [MIT](./LICENSE) license.
