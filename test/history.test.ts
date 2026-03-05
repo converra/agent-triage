@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { writeFile, rm, mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { appendHistory, readHistory, extractHistoryEntry, getLastEntry } from "../src/history.js";
+import { appendHistory, readHistory, extractHistoryEntry } from "../src/history.js";
 import type { Report } from "../src/evaluation/types.js";
 
 const TMP_DIR = resolve(import.meta.dirname, ".tmp-history-test");
@@ -95,17 +95,4 @@ describe("history", () => {
     expect(entries).toEqual([]);
   });
 
-  it("getLastEntry returns last entry", async () => {
-    await appendHistory(makeReport({ overallCompliance: 75 }), TMP_DIR);
-    await appendHistory(makeReport({ overallCompliance: 85 }), TMP_DIR);
-
-    const last = getLastEntry(TMP_DIR);
-    expect(last).not.toBeNull();
-    expect(last!.overallCompliance).toBe(85);
-  });
-
-  it("getLastEntry returns null when no file exists", () => {
-    const last = getLastEntry(resolve(TMP_DIR, "nonexistent"));
-    expect(last).toBeNull();
-  });
 });

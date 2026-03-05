@@ -1,5 +1,5 @@
 import { appendFile, readFile } from "node:fs/promises";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import type { Report } from "./evaluation/types.js";
 
@@ -63,14 +63,4 @@ export async function readHistory(dir: string): Promise<HistoryEntry[]> {
     .split("\n")
     .filter((line) => line.trim())
     .map((line) => JSON.parse(line) as HistoryEntry);
-}
-
-export function getLastEntry(dir: string): HistoryEntry | null {
-  const historyPath = resolve(dir, HISTORY_FILE);
-  if (!existsSync(historyPath)) return null;
-
-  const raw = readFileSync(historyPath, "utf-8");
-  const lines = raw.split("\n").filter((line) => line.trim());
-  if (lines.length === 0) return null;
-  return JSON.parse(lines[lines.length - 1]) as HistoryEntry;
 }
