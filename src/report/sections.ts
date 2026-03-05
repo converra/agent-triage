@@ -452,7 +452,7 @@ function renderConvDive(
 
   const metricBadgesHtml = buildMetricBadges(conv.metrics as Record<string, number>);
 
-  const timelineHtml = visibleStepCount > 1
+  const timelineHtml = turns.length > 0
     ? `<div class="tl">
       <div class="tl-header"><div class="tl-label">Step Timeline</div><div class="tl-filter">${turns.length} of ${visibleStepCount} steps</div></div>
       ${turns.join("")}
