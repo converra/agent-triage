@@ -566,7 +566,7 @@ export function renderRecommendations(report: Report): string {
   return `<div class="recs" id="recs-section">
     <div class="recs-header">
       <div class="stitle" style="margin:0;">How to fix it</div>
-      <a href="https://converra.ai" class="verdict-cta">Track fixes over time ${ICONS.externalSm}</a>
+      <a href="https://converra.ai" class="verdict-cta">Automate this ${ICONS.externalSm}</a>
     </div>
     ${recCount > 1 ? `<div class="recs-batch">
       <button class="copy-btn primary" data-fix="${allRecsB64}" onclick="copyFix(this)">${ICONS.copy} Copy all ${recCount} fixes</button>
