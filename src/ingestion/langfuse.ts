@@ -21,6 +21,9 @@ interface LangfuseTrace {
   name?: string;
   timestamp: string;
   metadata?: Record<string, unknown>;
+  tags?: string[];
+  sessionId?: string;
+  userId?: string;
   input?: unknown;
   output?: unknown;
 }
@@ -274,6 +277,9 @@ function normalizeTrace(
       totalTokens: totalTokens > 0 ? totalTokens : undefined,
       duration: durationSec > 0 ? durationSec : undefined,
       source: "langfuse",
+      agentName: trace.name || undefined,
+      tags: trace.tags && trace.tags.length > 0 ? trace.tags : undefined,
+      sessionId: trace.sessionId || undefined,
       promptHash,
       traceId: trace.id,
     },
