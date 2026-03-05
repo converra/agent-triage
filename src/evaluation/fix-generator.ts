@@ -89,7 +89,8 @@ export async function generateFixes(
 }
 
 /**
- * Generate top 3 recommendations from aggregated failure patterns.
+ * Generate top recommendations from aggregated failure patterns.
+ * Generates one per failure category, capped at 5.
  */
 export async function generateRecommendations(
   llm: LlmClient,
@@ -122,8 +123,9 @@ export async function generateRecommendations(
     .filter(Boolean)
     .join("\n");
 
+  const maxRecs = Math.min(Math.max(failurePatterns.length, 3), 5);
   const evidenceExcerpts = buildEvidenceExcerpts(failurePatterns, results);
-  const prompt = buildRecommendationsPrompt(patternSummary, policySummary, evidenceExcerpts);
+  const prompt = buildRecommendationsPrompt(patternSummary, policySummary, evidenceExcerpts, maxRecs);
   const response = await llm.call(prompt, {
     temperature: 0.3,
     maxTokens: 2048,
@@ -137,7 +139,7 @@ export async function generateRecommendations(
     Record<string, unknown>
   >;
 
-  return recs.slice(0, 3).map((rec) => ({
+  return recs.slice(0, maxRecs).map((rec) => ({
     title: String(rec.title ?? ""),
     description: String(rec.description ?? ""),
     targetFailureTypes: Array.isArray(rec.targetFailureTypes)

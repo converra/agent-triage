@@ -287,18 +287,19 @@ Return ONLY valid JSON:
 /**
  * Prompt 6: Top Recommendations Generator
  * Input: all failure patterns + policy results
- * Output: top 3 actionable recommendations
+ * Output: actionable recommendations (one per failure category, up to maxRecs)
  */
 export function buildRecommendationsPrompt(
   failurePatterns: string,
   policySummary: string,
   evidenceExcerpts?: string,
+  maxRecs = 3,
 ): string {
   const evidenceBlock = evidenceExcerpts
     ? `\nEVIDENCE FROM FAILING CONVERSATIONS:\n${evidenceExcerpts}\n`
     : "";
 
-  return `You are an expert AI agent consultant. Based on these failure patterns, policy results, and evidence from failing conversations, generate the top 3 most impactful recommendations.
+  return `You are an expert AI agent consultant. Based on these failure patterns, policy results, and evidence from failing conversations, generate the top ${maxRecs} most impactful recommendations.
 
 FAILURE PATTERNS:
 ${failurePatterns}

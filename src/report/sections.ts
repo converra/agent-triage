@@ -21,6 +21,17 @@ function truncate(text: string, max: number): string {
   return (cut > 0 ? text.slice(0, cut) : text.slice(0, max)) + "…";
 }
 
+/** Extract a short headline from a verbose diagnosis summary. */
+function shortenSummary(summary: string): string {
+  // Try first sentence
+  const first = summary.split(/\.\s/)[0]!.replace(/\.$/, "");
+  if (first.length <= 80) return first;
+  // Cut at first subordinate clause marker
+  const clauseCut = first.search(/,\s*(which|despite|indicating|leading|resulting|because|although)\b/i);
+  if (clauseCut > 20) return first.slice(0, clauseCut);
+  return truncate(first, 80);
+}
+
 export function renderHeader(report: Report, date: string): string {
   const agentCount = report.agents?.length ?? 0;
   const autoName = report.agents?.[0]?.name;
@@ -83,7 +94,7 @@ export function renderHealthSummary(
   </div>`;
 }
 
-/** Extract top 2 distinct problem descriptions from failing conversations. */
+/** Extract distinct problem descriptions from failing conversations (up to 5). */
 function buildTopSummaries(issueConvs: Report["conversations"]): string {
   const withDiag = issueConvs.filter((c) => c.diagnosis);
   if (withDiag.length === 0) return "";
@@ -92,13 +103,13 @@ function buildTopSummaries(issueConvs: Report["conversations"]): string {
   const items: string[] = [];
   for (const c of withDiag) {
     const d = c.diagnosis!;
-    const text = d.shortSummary || d.summary.split(/\.\s/)[0]!.replace(/\.$/, "");
+    const text = d.shortSummary || shortenSummary(d.summary);
     const key = text.slice(0, 30).toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
     const typeClass = d.failureType === "prompt_issue" ? "prompt" : d.failureType === "orchestration_issue" ? "orch" : "model";
     items.push(`<li><span class="type-badge sm ${typeClass}">${esc(formatFailureType(d.failureType))}</span> ${escBold(text)}</li>`);
-    if (items.length >= 2) break;
+    if (items.length >= 5) break;
   }
 
   return `<ul class="verdict-summaries">${items.join("")}</ul>`;
