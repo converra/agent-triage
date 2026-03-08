@@ -141,8 +141,10 @@ export function buildRecommendationFixMd(
   if (rec.howToApply) {
     lines.push(rec.howToApply);
   } else {
-    const type = rec.targetFailureTypes[0] ?? "prompt_issue";
-    lines.push(...getGuidanceForCategory(type));
+    const types = rec.targetFailureTypes.length > 0 ? rec.targetFailureTypes : ["prompt_issue"];
+    for (const type of types) {
+      lines.push(...getGuidanceForCategory(type));
+    }
   }
 
   lines.push("");
