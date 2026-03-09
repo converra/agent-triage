@@ -116,7 +116,7 @@ describe("buildHtml", () => {
   it("includes failure patterns section", () => {
     const html = buildHtml(makeReport());
     expect(html).toContain("Root cause breakdown");
-    expect(html).toContain("Prompt Issue");
+    expect(html).toContain("Prompt Issues");
   });
 
   it("includes cost and model info", () => {

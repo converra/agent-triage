@@ -319,6 +319,8 @@ Flexible field mapping is supported — `role`/`sender`, `content`/`text`/`messa
 
 Point to a LangSmith project and agent-triage will fetch traces automatically. Auto-detects trace-based vs session-based architectures, discovers agents by system prompt, and pushes time filters server-side for efficiency. Requires `LANGSMITH_API_KEY`.
 
+> **Note:** LangSmith's API is rate-limited, so fetching large projects can take a few minutes. agent-triage throttles requests automatically and shows progress. Use `--since` / `--until` to narrow the time window, or `--max-conversations` to cap the number of traces fetched.
+
 ### OpenTelemetry
 
 Export OTLP/JSON traces from any OpenTelemetry-instrumented agent. agent-triage follows the [GenAI semantic conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/) (pinned to v1.36.0).
@@ -365,7 +367,7 @@ const conversations = await readJsonTraces("./conversations.json");
 // ... evaluate, aggregate, generate report
 ```
 
-See [src/index.ts](src/index.ts) for all available exports.
+See [src/index.ts](https://github.com/converra/agent-triage/blob/main/src/index.ts) for all available exports.
 
 ## How It Compares
 

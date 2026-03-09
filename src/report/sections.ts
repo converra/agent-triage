@@ -530,7 +530,7 @@ export function renderFailurePatterns(report: Report): string {
       <div class="fp-card-hdr">
         <div class="fp-icon ${cls}">${icon}</div>
         <div class="fp-info">
-          <div class="fp-type">${esc(formatFailureType(p.type))}</div>
+          <div class="fp-type">${esc(formatFailureType(p.type))}s</div>
           <div class="fp-count"><b>${p.count}</b> failure${p.count !== 1 ? "s" : ""}${critHtml}</div>
         </div>
         <div class="fp-num">${p.count}</div>

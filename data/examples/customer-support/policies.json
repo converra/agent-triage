@@ -103,5 +103,33 @@
     "description": "If the conversation has been ongoing for more than 10 exchanges without resolution, the agent must offer to escalate to a supervisor.",
     "complexity": 3,
     "category": "routing"
+  },
+  {
+    "id": "accurate-data-from-lookups",
+    "name": "Accurate order and product information",
+    "description": "When providing order or product information from system lookups, the agent must provide accurate, up-to-date data. If a customer disputes retrieved information (wrong product, wrong status, outdated specs), the agent must acknowledge the discrepancy and escalate to correct the records.",
+    "complexity": 3,
+    "category": "knowledge"
+  },
+  {
+    "id": "correct-specialist-routing",
+    "name": "Route to correct specialist agent",
+    "description": "In multi-agent systems, the Router must direct customers to the specialist that matches their issue type: billing issues to Billing Agent, product questions to FAQ Agent, device troubleshooting to Tech Support Agent.",
+    "complexity": 3,
+    "category": "routing"
+  },
+  {
+    "id": "complete-promised-transfers",
+    "name": "Complete promised agent transfers",
+    "description": "When a transfer to a specialist is promised to the customer or explicitly requested, the system must complete the handoff to the correct specialist. Never route back to the same agent the customer was already speaking with.",
+    "complexity": 3,
+    "category": "routing"
+  },
+  {
+    "id": "verify-data-currency",
+    "name": "Verify data currency before presenting",
+    "description": "Before sharing product specifications, compatibility, or pricing from system lookups, the agent must verify the data is current. If the data may be outdated, flag it rather than presenting it as fact.",
+    "complexity": 2,
+    "category": "knowledge"
   }
 ]

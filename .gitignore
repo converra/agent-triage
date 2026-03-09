@@ -4,6 +4,7 @@ dist/
 .agent-triage-progress.json
 .env
 .env.*
+.npmrc
 *.log
 .DS_Store
 Thumbs.db

@@ -991,6 +991,7 @@ async function fetchAllRuns(
     if (runs.length === 0) break;
 
     allRuns.push(...runs);
+    getLogger().log(`  Fetched ${allRuns.length} runs so far (rate-limited, ~${Math.ceil((maxRuns - allRuns.length) / PAGE_SIZE * RATE_LIMIT_DELAY_MS / 1000)}s remaining)...`);
 
     if (!cursor) break;
     await new Promise((r) => setTimeout(r, RATE_LIMIT_DELAY_MS));

@@ -128,7 +128,7 @@ export async function generateRecommendations(
   const prompt = buildRecommendationsPrompt(patternSummary, policySummary, evidenceExcerpts, maxRecs);
   const response = await llm.call(prompt, {
     temperature: 0.3,
-    maxTokens: 2048,
+    maxTokens: 4096,
   });
 
   const parsed = parseJsonResponse(response.content) as Record<
