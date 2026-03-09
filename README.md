@@ -42,6 +42,16 @@ npx agent-triage analyze --langsmith my-project
 
 **Privacy:** Traces stay on your machine. Only LLM API calls leave — no telemetry, nothing sent to us.
 
+### What you get
+
+Root cause breakdown with failure categories, severity scores, and one-click fix generation:
+
+![Report Overview](assets/report-overview.png)
+
+Step-by-step conversation replay showing exactly where things went wrong and which agent caused it:
+
+![Step Analysis](assets/report-step-analysis.png)
+
 ## Installation
 
 ```bash

@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.2.0] - 2026-03-09
+
+### CLI
+- `demo` command accepts example name as argument (`npx agent-triage demo customer-support`)
+- Auto-detect API key from any available provider (Anthropic or OpenAI)
+- Auto-load `.env` file — no manual `export` needed
+- Replace interactive API key prompt with clear, actionable error message
+- Switch default model to claude-sonnet-4-6
+
+### Evaluation
+- Parallelize diagnosis and fix generation LLM calls for faster runs
+- Add severity floors to prevent false low scores
+
+### Report
+- Add "Copy all fixes" batch action in recommendations section
+- Add "Save as .md" export for individual fixes
+- Improve information hierarchy — concise, scannable text
+- Rename "Retrieval Rag Issue" to "RAG Issue"
+- Structured fix instructions with blast radius
+
+### MCP Server
+- Add `triage_view` and `triage_demo` tools
+
+### Ingestion
+- Fix Langfuse trace metadata (agentName, tags, sessionId)
+
 ## [0.1.0] - 2026-02-22
 
 ### CLI
