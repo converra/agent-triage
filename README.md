@@ -8,9 +8,7 @@
 
 ## Why?
 
-Your agent's system prompt is a behavioral contract — dozens of rules about tone, routing, safety, escalation, and knowledge boundaries. But once agents are live, you're flying blind. Which rules are actually being followed? Where do handoffs break? When does the agent hallucinate instead of escalating?
-
-agent-triage turns that contract into testable policies, audits production traces against every one of them, and shows you exactly where things go wrong — down to the specific step, the specific agent, and the specific policy that was violated.
+Your agent's system prompt is a behavioral contract. agent-triage turns it into testable policies, audits production traces against every one of them, and shows you exactly where things go wrong — down to the specific step, the specific agent, and the specific policy that was violated.
 
 ## Quick Start
 
@@ -39,6 +37,10 @@ Or skip the setup entirely — agent-triage can auto-discover agents and extract
 # Zero-config: auto-discovers agents, extracts policies, evaluates everything
 npx agent-triage analyze --langsmith my-project
 ```
+
+**Cost:** ~$0.40 for 10 conversations with claude-sonnet-4-6 (default), ~$0.02 with gpt-4o-mini. Use `--dry-run` to preview before running anything.
+
+**Privacy:** Traces stay on your machine. Only LLM API calls leave — no telemetry, nothing sent to us.
 
 ## Installation
 
