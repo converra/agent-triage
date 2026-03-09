@@ -7,9 +7,19 @@ import type { NormalizedConversation } from "../ingestion/types.js";
  * Output: JSON array of policies
  */
 export function buildPolicyExtractionPrompt(systemPrompt: string): string {
-  return `You are an expert AI agent auditor. Your job is to extract every testable behavioral policy from the following system prompt.
+  return `You are an expert AI agent auditor. Your job is to extract testable behavioral policies from the following system prompt.
 
-A "policy" is any rule, constraint, instruction, or expectation that the agent is supposed to follow. Be EXHAUSTIVE — extract every single one, including implicit expectations about tone, formatting, escalation, safety, knowledge boundaries, and routing logic.
+A "policy" is any rule, constraint, instruction, or expectation that the agent is supposed to follow. Extract policies covering tone, formatting, escalation, safety, knowledge boundaries, and routing logic.
+
+CRITICAL: Each policy must test ONE DISTINCT BEHAVIOR. Do NOT create overlapping or redundant policies.
+
+DEDUPLICATION RULES:
+1. ONE policy per testable behavior. If multiple prompt instructions all serve the same purpose, consolidate them into a single policy. For example:
+   - "Use product catalog as source" + "Don't fabricate product info" + "Don't fabricate order info" + "Acknowledge when info unavailable" → ONE policy: "Ground all claims in provided data sources"
+   - "Route billing to Billing Agent" + "Route tech to Tech Support" + "Route FAQ to FAQ Agent" + "Route to correct specialist" → ONE policy: "Route to correct specialist agent" (list the specific routing rules in the description)
+2. A parent policy SUBSUMES its children. If "Route to correct specialist" exists, do NOT also create "Route billing to Billing Agent" as a separate policy — include the specific rules in the parent's description.
+3. Test: if two policies would ALWAYS fail together on the same conversation, they are redundant. Keep only the more comprehensive one.
+4. Aim for 10-20 policies for a typical system prompt. More than 25 is almost certainly redundant.
 
 SYSTEM PROMPT TO ANALYZE:
 <system_prompt>
@@ -19,7 +29,7 @@ ${systemPrompt}
 For each policy, provide:
 - id: a short kebab-case slug (e.g., "escalate-billing-disputes")
 - name: human-readable name (e.g., "Escalate billing disputes to human agent")
-- description: what the policy requires — specific enough to test against a conversation
+- description: what the policy requires — specific enough to test against a conversation. For consolidated policies, list all the specific sub-rules in the description so the evaluator knows exactly what to check.
 - complexity: 1-5 (1 = simple check like greeting, 5 = complex multi-turn behavior)
 - category: one of "routing", "tone", "safety", "knowledge", "behavior", "formatting"
 
@@ -28,11 +38,11 @@ EXAMPLES:
 If the system prompt says "Always greet the user by name if available", extract:
 {"id": "greet-by-name", "name": "Greet user by name", "description": "When the user's name is available, the agent must use it in the greeting.", "complexity": 1, "category": "tone"}
 
-If the system prompt says "For billing disputes over $100, escalate to a human agent", extract:
-{"id": "escalate-high-value-billing", "name": "Escalate high-value billing disputes", "description": "When a user disputes a charge over $100, the agent must escalate to a human agent rather than resolving independently.", "complexity": 3, "category": "routing"}
+If the system prompt defines routing rules for billing, tech support, and FAQ agents, extract ONE policy:
+{"id": "correct-specialist-routing", "name": "Route to correct specialist agent", "description": "The agent must route each request to the correct specialist: billing disputes and refunds to Billing Agent, device troubleshooting to Tech Support Agent, product questions to FAQ Agent. The agent must not attempt to handle specialist tasks directly.", "complexity": 3, "category": "routing"}
 
-If the system prompt says "Never make promises about pricing or availability that aren't in the product catalog", extract:
-{"id": "no-fabricated-pricing", "name": "No fabricated pricing or availability claims", "description": "The agent must not make claims about pricing, discounts, or availability that are not explicitly stated in the system prompt or product catalog.", "complexity": 4, "category": "safety"}
+If the system prompt says "Never make promises about pricing or availability that aren't in the product catalog" and "Use the order database for order status" and "Acknowledge when information is unavailable", extract ONE policy:
+{"id": "ground-claims-in-data", "name": "Ground all claims in provided data sources", "description": "The agent must not fabricate information about products, pricing, orders, warranties, or policies. All factual claims must be grounded in the system prompt, product catalog, order database, or tool results. When information is unavailable, the agent must acknowledge this rather than guessing.", "complexity": 4, "category": "safety"}
 
 Return ONLY a JSON array of policy objects. No additional text, markdown, or code blocks.
 
@@ -69,7 +79,7 @@ METRIC DEFINITIONS:
 - successScore: How well the AI achieved conversation goals (0=failed, 100=perfect)
 - aiRelevancy: How relevant and on-topic responses were (0=off-topic, 100=perfectly relevant)
 - sentiment: Estimated user satisfaction (0=frustrated, 100=delighted)
-- hallucinationScore: CRITICAL — Score 0 if the AI makes claims about products, pricing, features, timelines, or capabilities NOT stated in the system prompt. Score 100 only if ALL claims are either explicitly in the system prompt or general knowledge. Making up specific numbers, prices, or policies is a severe hallucination.
+- hallucinationScore: CRITICAL — Score 0 if the AI makes ANY claims about products, pricing, warranties, features, timelines, availability, or capabilities NOT explicitly stated in the system prompt or tool/function results. This includes fabricated warranty terms, invented prices, made-up features, specific numbers/dates with no source, and promises about policies that don't exist. Score 100 only if ALL factual claims are grounded in the system prompt, tool results, or conversation context. When in doubt, score LOW — a false positive is far less dangerous than missing a hallucination that creates legal liability.
 - repetitionScore: Response variety (0=highly repetitive, 100=no repetition)
 - consistencyScore: Coherence across turns (0=contradictory, 100=perfectly consistent)
 - naturalLanguageScore: Language quality (0=poor, 100=excellent)
@@ -126,6 +136,9 @@ ${conversation}
 
 POLICIES TO CHECK:
 ${policyList}
+
+HALLUCINATION CHECK (apply to EVERY conversation regardless of policies):
+Before evaluating policies, scan all assistant turns for claims about products, pricing, warranties, timelines, features, or capabilities. If ANY claim is not grounded in the system prompt, tool results, or conversation context, it is a hallucination. This includes fabricated warranty terms, made-up prices, invented features, or specific numbers/dates that appear nowhere in the provided context. Hallucinations create legal liability — treat them as "fail" with failureSubtype "hallucination" even if no specific anti-hallucination policy exists.
 
 For each policy, determine:
 1. verdict: "pass" | "fail" | "not_applicable"
@@ -231,15 +244,17 @@ ${conversation}
 
 ${issueContext}
 
+HALLUCINATION CHECK: Before diagnosing, verify whether the agent stated any facts about products, policies, warranties, pricing, or timelines that are NOT grounded in the system prompt, tool results, or conversation context. If the agent fabricated information, this is a hallucination — it must be severity "critical" regardless of other factors, as it creates legal liability and false customer expectations.
+
 Provide a detailed diagnosis:
 
 1. rootCauseTurn: the turn number where the failure ORIGINATED (not where it was first noticed — trace back to the actual cause)
 2. rootCauseAgent: if multiple agents/roles are involved, which one caused the failure (e.g., "router", "faq-handler", "billing-agent"). Use null if single-agent.
-3. shortSummary: one concise line connecting the root cause to its effect — name the system gap AND what it caused the agent to do. Format: "[root cause] caused/led to [agent behavior]". Good: "Missing discovery step caused agent to pitch without understanding needs", "Routing rules can't distinguish pre-sales from support, sending questions to wrong agent". Bad: "Agent failed to ask questions" (symptom only), "No discovery step" (cause only, no effect).
-4. summary: 1-2 sentences, max 40 words. Lead with the system gap, then its effect. Do NOT just describe what the agent did wrong; explain what in the system caused it. Good: "The system prompt has no discovery step — the agent jumps straight to pitching because nothing tells it to ask about pain points first." Bad: "The agent failed to ask targeted questions."
-5. impact: Max 2 sentences. Name the worst turn and what went wrong — don't retrace every step.
+3. shortSummary: MAX 80 CHARACTERS. A single punchy phrase connecting root cause to effect. Format: "[cause] → [effect]". Good: "No routing rules → agent handled billing directly", "Missing escalation rule → supervisor request ignored". Bad: "Router misclassified device troubleshooting as an FAQ issue, causing repeated misdirection to the wrong specialist and customer abandonment" (way too long).
+4. summary: 1-2 crisp sentences explaining the root cause — WHY the agent behaved this way, pointing to the specific prompt gap, missing instruction, or system design flaw. Do NOT just describe what the agent did wrong; explain what in the system caused it. Good: "The system prompt has no discovery/qualification step — the agent jumps straight to product pitching because nothing tells it to ask about pain points first." Bad: "The agent failed to ask targeted questions to understand the user's pain points."
+5. impact: name affected turns and quote user reactions. Trace the CASCADE — how did the initial failure affect subsequent turns?
 6. cascadeChain: array describing how the failure propagated turn by turn (e.g., ["Turn 4: fabricated policy", "Turn 5: user pushback ignored", "Turn 6: doubled down on fabrication"])
-7. fix: Max 2 sentences, ~30 words. A DIRECTIONAL prompt change suggestion — describe WHAT to change and WHERE, but don't write the full prompt patch. Tested prompt patches with simulation and regression gating are available via Converra (converra.ai).
+7. fix: a DIRECTIONAL prompt change suggestion — describe WHAT to change and WHERE, referencing the exact system prompt text when possible. Quote the specific section that needs modification (e.g., "In the section 'You have access to three specialist agents: FAQ Agent...' add a routing rule: 'Route billing disputes to Billing Agent before attempting FAQ resolution'"). For orchestration issues, name the specific routing rule or condition to add. For hallucination issues, specify the guardrail text. Do NOT write the full rewritten prompt. Tested prompt patches with simulation and regression gating are available via Converra (converra.ai).
 8. severity: "critical" (user harm, legal risk, trust broken), "major" (goal failed, user frustrated), "minor" (suboptimal but not harmful)
 9. confidence: "high" (clear evidence), "medium" (probable), "low" (uncertain)
 10. failureType: "prompt_issue" | "orchestration_issue" | "model_limitation" | "retrieval_rag_issue"
@@ -338,7 +353,13 @@ Each recommendation should be:
 3. Include which failure types and subtypes it addresses
 4. Include how many conversations would be affected
 5. Include confidence level
-6. Include a "howToApply" field: concrete, specific steps that reference actual system prompt content and failing agent behavior from the evidence. Do NOT give generic steps like "Open your system prompt and add instructions." Instead, quote the specific prompt section that needs changing and describe exactly what to add/modify based on the observed failures.
+6. Include a "howToApply" field with this structure:
+   - Quote the EXACT text from the system prompt that needs modification (e.g., "In the section that reads 'You have access to three specialist agents...'")
+   - Describe the specific change: what text to add, remove, or replace
+   - For routing issues, name the specific routing rule or condition to add
+   - For hallucination issues, specify the exact guardrail text to insert
+   - Reference specific failing behavior from the evidence (e.g., "The agent said '3-year premium warranty' despite no warranty terms in the prompt")
+   - Do NOT give generic steps like "Open your system prompt and add instructions" — be as specific as the evidence allows
 
 Note: agent-triage identifies what to fix. For generated prompt patches, simulation testing, and regression gating before deployment, see Converra (converra.ai).
 

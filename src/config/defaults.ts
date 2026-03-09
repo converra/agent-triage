@@ -1,13 +1,13 @@
 import type { Config, LlmProvider } from "./schema.js";
 
-export const DEFAULT_PROVIDER = "openai" as const;
+export const DEFAULT_PROVIDER = "anthropic" as const;
 export const DEFAULT_CONCURRENCY = 5;
 export const DEFAULT_MAX_CONVERSATIONS = 500;
 
 const DEFAULT_MODEL_BY_PROVIDER: Record<LlmProvider, string> = {
-  openai: "gpt-4o-mini",
-  anthropic: "claude-haiku-4-5-20251001",
-  "openai-compatible": "gpt-4o-mini",
+  anthropic: "claude-sonnet-4-6",
+  openai: "gpt-4o",
+  "openai-compatible": "gpt-4o",
 };
 
 export function getDefaultModel(provider?: string): string {
@@ -15,16 +15,18 @@ export function getDefaultModel(provider?: string): string {
 }
 
 /** @deprecated Use getDefaultModel(provider) instead */
-export const DEFAULT_MODEL = "gpt-4o-mini";
+export const DEFAULT_MODEL = "claude-sonnet-4-6";
 
 export const COST_PER_1K_TOKENS: Record<string, { input: number; output: number }> = {
-  "gpt-4o-mini": { input: 0.00015, output: 0.0006 },
-  "gpt-4o": { input: 0.0025, output: 0.01 },
-  "gpt-4-turbo": { input: 0.01, output: 0.03 },
+  "claude-sonnet-4-6": { input: 0.003, output: 0.015 },
+  "claude-sonnet-4-20250514": { input: 0.003, output: 0.015 },
+  "claude-opus-4-6": { input: 0.015, output: 0.075 },
+  "claude-opus-4-20250514": { input: 0.015, output: 0.075 },
   "claude-haiku-4-5-20251001": { input: 0.0008, output: 0.004 },
   "claude-3-5-haiku-latest": { input: 0.0008, output: 0.004 },
-  "claude-sonnet-4-20250514": { input: 0.003, output: 0.015 },
-  "claude-opus-4-20250514": { input: 0.015, output: 0.075 },
+  "gpt-4o": { input: 0.0025, output: 0.01 },
+  "gpt-4o-mini": { input: 0.00015, output: 0.0006 },
+  "gpt-4-turbo": { input: 0.01, output: 0.03 },
 };
 
 export function estimateCost(
@@ -32,7 +34,7 @@ export function estimateCost(
   inputTokens: number,
   outputTokens: number,
 ): number {
-  const rates = COST_PER_1K_TOKENS[model] ?? COST_PER_1K_TOKENS["gpt-4o-mini"]!;
+  const rates = COST_PER_1K_TOKENS[model] ?? COST_PER_1K_TOKENS["claude-sonnet-4-6"] ?? COST_PER_1K_TOKENS["gpt-4o-mini"]!;
   return (inputTokens / 1000) * rates.input + (outputTokens / 1000) * rates.output;
 }
 
@@ -40,7 +42,7 @@ export function buildDefaultConfig(promptPath: string): Config {
   return {
     llm: {
       provider: DEFAULT_PROVIDER,
-      model: DEFAULT_MODEL,
+      model: getDefaultModel(DEFAULT_PROVIDER),
       maxConcurrency: DEFAULT_CONCURRENCY,
     },
     prompt: { path: promptPath },

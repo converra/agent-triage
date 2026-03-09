@@ -13,8 +13,8 @@ export type TraceSource = z.infer<typeof TraceSourceSchema>;
 export const ConfigSchema = z.object({
   llm: z
     .object({
-      provider: LlmProviderSchema.default("openai"),
-      model: z.string().default("gpt-4o-mini"),
+      provider: LlmProviderSchema.default("anthropic"),
+      model: z.string().default("claude-sonnet-4-6"),
       apiKey: z.string().optional(),
       baseUrl: z.string().url().optional(),
       maxConcurrency: z.number().int().min(1).max(20).default(5),

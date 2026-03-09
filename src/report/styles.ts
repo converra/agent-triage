@@ -324,7 +324,7 @@ details[open] > summary .chev { transform:rotate(180deg); }
 .blast-icon { color:var(--amber); flex-shrink:0; margin-top:1px; }
 .blast strong { color:var(--amber); }
 .diag-cta { padding:12px 18px; display:flex; align-items:center; gap:10px; }
-.wif .diag-cta { padding:8px 0 4px; border-top:1px solid var(--border-subtle); margin-top:8px; }
+.wif .diag-cta { padding:8px 0 12px; border-top:1px solid var(--border-subtle); margin-top:8px; }
 .diag-link { color:#fff; font-size:12px; font-weight:600; background:var(--coral); border:1px solid var(--coral); border-radius:var(--r); padding:5px 12px; text-decoration:none; display:inline-flex; align-items:center; gap:5px; transition:all 0.15s; font-family:inherit; }
 .diag-link:hover { background:var(--coral-dark); border-color:var(--coral-dark); text-decoration:none; }
 .metrics-bar { display:flex; gap:0; border:1px solid var(--border); border-radius:var(--r); overflow:hidden; margin:12px 0; }

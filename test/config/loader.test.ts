@@ -5,8 +5,8 @@ import type { Config } from "../../src/config/schema.js";
 describe("loadConfig", () => {
   it("returns valid default config with prompt path override", async () => {
     const config = await loadConfig({ prompt: { path: "test.txt" } });
-    expect(config.llm.provider).toBe("openai");
-    expect(config.llm.model).toBe("gpt-4o-mini");
+    expect(config.llm.provider).toBe("anthropic");
+    expect(config.llm.model).toBe("claude-sonnet-4-6");
     expect(config.llm.maxConcurrency).toBe(5);
     expect(config.prompt.path).toBe("test.txt");
   });
@@ -14,10 +14,10 @@ describe("loadConfig", () => {
   it("applies CLI overrides over defaults", async () => {
     const config = await loadConfig({
       prompt: { path: "test.txt" },
-      llm: { provider: "anthropic", model: "claude-sonnet-4-20250514" },
+      llm: { provider: "openai", model: "gpt-4o" },
     });
-    expect(config.llm.provider).toBe("anthropic");
-    expect(config.llm.model).toBe("claude-sonnet-4-20250514");
+    expect(config.llm.provider).toBe("openai");
+    expect(config.llm.model).toBe("gpt-4o");
   });
 
   it("deep merges nested objects", async () => {
@@ -26,7 +26,7 @@ describe("loadConfig", () => {
       llm: { model: "gpt-4o" },
     });
     // provider should still default
-    expect(config.llm.provider).toBe("openai");
+    expect(config.llm.provider).toBe("anthropic");
     expect(config.llm.model).toBe("gpt-4o");
   });
 });

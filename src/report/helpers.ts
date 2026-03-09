@@ -35,7 +35,11 @@ export function conversationHealth(
 ): "healthy" | "attention" | "critical" {
   const avg = avgMetrics(metrics);
   if (avg < 50) return "critical";
-  if (avg < 75 || policyFailures > 0) return "attention";
+  if (avg < 75) return "attention";
+  // High-quality conversations with minor policy nits are healthy, not "attention".
+  // Only flag as attention when there are meaningful failures (2+) or score is borderline.
+  if (policyFailures >= 2) return "attention";
+  if (policyFailures === 1 && avg < 85) return "attention";
   return "healthy";
 }
 

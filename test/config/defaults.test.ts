@@ -18,9 +18,9 @@ describe("estimateCost", () => {
     expect(cost).toBeCloseTo(2 * rates.input + 0.5 * rates.output, 6);
   });
 
-  it("falls back to gpt-4o-mini rates for unknown models", () => {
+  it("falls back to claude-sonnet-4-6 rates for unknown models", () => {
     const cost = estimateCost("unknown-model", 1000, 1000);
-    const fallback = COST_PER_1K_TOKENS["gpt-4o-mini"]!;
+    const fallback = COST_PER_1K_TOKENS["claude-sonnet-4-6"]!;
     expect(cost).toBeCloseTo(fallback.input + fallback.output, 6);
   });
 
@@ -33,8 +33,8 @@ describe("buildDefaultConfig", () => {
   it("returns a valid config with the given prompt path", () => {
     const config = buildDefaultConfig("my-prompt.txt");
     expect(config.prompt.path).toBe("my-prompt.txt");
-    expect(config.llm.provider).toBe("openai");
-    expect(config.llm.model).toBe("gpt-4o-mini");
+    expect(config.llm.provider).toBe("anthropic");
+    expect(config.llm.model).toBe("claude-sonnet-4-6");
     expect(config.llm.maxConcurrency).toBe(5);
     expect(config.output?.maxConversations).toBe(500);
   });

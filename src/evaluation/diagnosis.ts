@@ -1,12 +1,55 @@
 import { LlmClient } from "../llm/client.js";
 import { buildDiagnosisPrompt } from "../llm/prompts.js";
 import { parseJsonResponse } from "../llm/json.js";
-import type { Diagnosis, ConversationResult, MetricScores } from "./types.js";
+import type { Diagnosis, ConversationResult, MetricScores, PolicyResult } from "./types.js";
 import type { NormalizedConversation } from "../ingestion/types.js";
 import { formatTranscript, averageMetrics, validateEnum } from "./shared.js";
 import { getLogger } from "../logger.js";
 
 const TOP_N_WORST = 10;
+
+/**
+ * Patterns that should always be severity "critical" regardless of model opinion.
+ * Applied as a post-processing floor after LLM diagnosis.
+ */
+const CRITICAL_FLOOR_PATTERNS: Array<{
+  test: (conv: NormalizedConversation, policyResults: PolicyResult[]) => boolean;
+}> = [
+  // Hallucination detected — agent fabricated facts
+  {
+    test: (_conv, policyResults) =>
+      policyResults.some(
+        (pr) => !pr.passed && pr.failureSubtype === "hallucination",
+      ),
+  },
+  // Customer explicitly requests escalation/supervisor
+  {
+    test: (conv) =>
+      conv.messages.some(
+        (m) =>
+          m.role === "user" &&
+          /\b(supervisor|manager|escalat|speak to (a |someone )?(human|person|agent|representative))\b/i.test(m.content),
+      ),
+  },
+  // Customer threatens chargeback, legal action, or leaving
+  {
+    test: (conv) =>
+      conv.messages.some(
+        (m) =>
+          m.role === "user" &&
+          /\b(chargeback|charge.?back|lawyer|attorney|legal action|sue |BBB|better business|cancel|leaving|switching (to|provider))\b/i.test(m.content),
+      ),
+  },
+  // Repeat contact — customer mentions prior calls/contacts about same issue
+  {
+    test: (conv) =>
+      conv.messages.some(
+        (m) =>
+          m.role === "user" &&
+          /\b(called (before|again|twice|three|multiple|several)|this is (my |the )?(2nd|3rd|4th|second|third|fourth|fifth) (time|call|contact)|already (called|contacted|reached out|spoken))\b/i.test(m.content),
+      ),
+  },
+];
 
 /** Defensively parse turnDescriptions from LLM output into Record<number, string>. */
 export function parseTurnDescriptions(val: unknown): Record<number, string> | undefined {
@@ -68,6 +111,24 @@ export async function generateDiagnoses(
   }
 }
 
+/** Enforce severity floor: some patterns must always be "critical". */
+function applySeverityFloor(
+  diagnosis: Diagnosis,
+  conversation: NormalizedConversation,
+  policyResults: PolicyResult[],
+): Diagnosis {
+  if (diagnosis.severity === "critical") return diagnosis;
+
+  const shouldBeCritical = CRITICAL_FLOOR_PATTERNS.some((p) =>
+    p.test(conversation, policyResults),
+  );
+
+  if (shouldBeCritical) {
+    return { ...diagnosis, severity: "critical" };
+  }
+  return diagnosis;
+}
+
 async function diagnoseSingle(
   llm: LlmClient,
   conversation: NormalizedConversation,
@@ -89,7 +150,7 @@ async function diagnoseSingle(
 
   const parsed = parseJsonResponse(response.content) as Record<string, unknown>;
 
-  return {
+  const diagnosis: Diagnosis = {
     rootCauseTurn: Number(parsed.rootCauseTurn ?? 1),
     rootCauseAgent: parsed.rootCauseAgent
       ? String(parsed.rootCauseAgent)
@@ -110,5 +171,7 @@ async function diagnoseSingle(
       : [],
     turnDescriptions: parseTurnDescriptions(parsed.turnDescriptions),
   };
+
+  return applySeverityFloor(diagnosis, conversation, result.policyResults);
 }
 

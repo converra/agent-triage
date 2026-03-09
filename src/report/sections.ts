@@ -27,7 +27,7 @@ function shortenSummary(summary: string): string {
   const first = summary.split(/\.\s/)[0]!.replace(/\.$/, "");
   if (first.length <= 80) return first;
   // Cut at first subordinate clause marker
-  const clauseCut = first.search(/,\s*(which|despite|indicating|leading|resulting|because|although)\b/i);
+  const clauseCut = first.search(/,\s*(which|despite|indicating|leading|resulting|because|although|sending|causing)\b/i);
   if (clauseCut > 20) return first.slice(0, clauseCut);
   return truncate(first, 80);
 }
@@ -107,7 +107,8 @@ function buildTopSummaries(issueConvs: Report["conversations"]): string {
   const items: string[] = [];
   for (const c of withDiag) {
     const d = c.diagnosis!;
-    const text = d.shortSummary || shortenSummary(d.summary);
+    const raw = d.shortSummary || shortenSummary(d.summary);
+    const text = raw.length > 80 ? shortenSummary(raw) : raw;
     const key = text.slice(0, 30).toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
@@ -644,7 +645,7 @@ export function renderBehavioralRules(report: Report): string {
     return `<div class="rule-row"><span class="rule-icon ${icon}">${p.complianceRate < 50 ? "×" : "!"}</span><span class="rule-name">${esc(p.name)}</span><span class="rule-stat ${icon}">${p.complianceRate}% (${p.failing}/${p.evaluated} failing)</span></div>`;
   }).join("");
 
-  return `<details class="rules-section">
+  return `<details class="rules-section" open>
     <summary>
       <div class="stitle" style="margin:0;">Behavioral rules</div>
       <span class="rules-summary">${failing.length} failing · ${passing.length} passing</span>
