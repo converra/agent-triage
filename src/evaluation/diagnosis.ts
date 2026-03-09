@@ -69,6 +69,7 @@ export function parseTurnDescriptions(val: unknown): Record<number, string> | un
 /**
  * Generate step-level diagnosis for the worst conversations.
  * Selects bottom N by aggregate metric score, runs 1 LLM call per conversation.
+ * Processes in parallel batches for speed.
  */
 export async function generateDiagnoses(
   llm: LlmClient,
@@ -76,6 +77,7 @@ export async function generateDiagnoses(
   conversations: NormalizedConversation[],
   systemPrompt: string,
   onProgress?: (current: number, total: number) => void,
+  concurrency = 5,
 ): Promise<void> {
   // Find worst conversations: policy failures OR low metric scores (< 75 avg)
   const scored = results
@@ -93,20 +95,28 @@ export async function generateDiagnoses(
 
   const convMap = new Map(conversations.map((c) => [c.id, c]));
 
-  for (let i = 0; i < worst.length; i++) {
-    const { result } = worst[i]!;
-    const conv = convMap.get(result.id);
-    if (!conv) continue;
+  let completed = 0;
+  for (let i = 0; i < worst.length; i += concurrency) {
+    const batch = worst.slice(i, i + concurrency);
 
-    onProgress?.(i + 1, worst.length);
+    const batchResults = await Promise.allSettled(
+      batch.map(async ({ result }) => {
+        const conv = convMap.get(result.id);
+        if (!conv) return;
+        const diagnosis = await diagnoseSingle(llm, conv, result, systemPrompt);
+        result.diagnosis = diagnosis;
+      }),
+    );
 
-    try {
-      const diagnosis = await diagnoseSingle(llm, conv, result, systemPrompt);
-      result.diagnosis = diagnosis;
-    } catch (error) {
-      getLogger().warn(
-        `  Warning: Could not generate diagnosis for ${result.id}: ${error}`,
-      );
+    for (let j = 0; j < batch.length; j++) {
+      completed++;
+      onProgress?.(completed, worst.length);
+      const outcome = batchResults[j]!;
+      if (outcome.status === "rejected") {
+        getLogger().warn(
+          `  Warning: Could not generate diagnosis for ${batch[j]!.result.id}: ${outcome.reason}`,
+        );
+      }
     }
   }
 }

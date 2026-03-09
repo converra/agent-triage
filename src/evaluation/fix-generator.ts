@@ -15,6 +15,7 @@ interface FixResult {
 
 /**
  * Generate directional fixes for failing policies.
+ * Processes in parallel batches for speed.
  */
 export async function generateFixes(
   llm: LlmClient,
@@ -22,6 +23,7 @@ export async function generateFixes(
   results: ConversationResult[],
   failurePatterns: FailurePattern[],
   onProgress?: (current: number, total: number) => void,
+  concurrency = 5,
 ): Promise<Map<string, FixResult>> {
   const fixes = new Map<string, FixResult>();
 
@@ -35,53 +37,68 @@ export async function generateFixes(
 
   const patternSummary = formatPatternSummary(failurePatterns);
 
-  for (let i = 0; i < failingPolicies.length; i++) {
-    const policy = failingPolicies[i]!;
-    onProgress?.(i + 1, failingPolicies.length);
+  let completed = 0;
+  for (let i = 0; i < failingPolicies.length; i += concurrency) {
+    const batch = failingPolicies.slice(i, i + concurrency);
 
-    try {
-      // Get worst 3 failing conversations for this policy
-      const failing = results
-        .filter((r) =>
-          r.policyResults.some((pr) => pr.policyId === policy.id && !pr.passed),
-        )
-        .sort((a, b) => {
-          const aAvg =
-            Object.values(a.metrics).reduce((s, v) => s + v, 0) /
-            Object.values(a.metrics).length;
-          const bAvg =
-            Object.values(b.metrics).reduce((s, v) => s + v, 0) /
-            Object.values(b.metrics).length;
-          return aAvg - bAvg;
-        })
-        .slice(0, 3);
+    const batchResults = await Promise.allSettled(
+      batch.map(async (policy) => {
+        // Get worst 3 failing conversations for this policy
+        const failing = results
+          .filter((r) =>
+            r.policyResults.some((pr) => pr.policyId === policy.id && !pr.passed),
+          )
+          .sort((a, b) => {
+            const aAvg =
+              Object.values(a.metrics).reduce((s, v) => s + v, 0) /
+              Object.values(a.metrics).length;
+            const bAvg =
+              Object.values(b.metrics).reduce((s, v) => s + v, 0) /
+              Object.values(b.metrics).length;
+            return aAvg - bAvg;
+          })
+          .slice(0, 3);
 
-      const examples = failing.map((r) =>
-        r.messages
-          .map((m, j) => `Turn ${j + 1} [${m.role}]: ${m.content}`)
-          .join("\n"),
-      );
+        const examples = failing.map((r) =>
+          r.messages
+            .map((m, j) => `Turn ${j + 1} [${m.role}]: ${m.content}`)
+            .join("\n"),
+        );
 
-      const prompt = buildFixGeneratorPrompt(policy, examples, patternSummary);
-      const response = await llm.call(prompt, {
-        temperature: 0.3,
-        maxTokens: 512,
-      });
+        const prompt = buildFixGeneratorPrompt(policy, examples, patternSummary);
+        const response = await llm.call(prompt, {
+          temperature: 0.3,
+          maxTokens: 512,
+        });
 
-      const parsed = parseJsonResponse(response.content) as Record<
-        string,
-        unknown
-      >;
-      fixes.set(policy.id, {
-        fix: String(parsed.fix ?? ""),
-        blastRadius: Array.isArray(parsed.blastRadius)
-          ? parsed.blastRadius.map(String)
-          : [],
-      });
-    } catch (error) {
-      getLogger().warn(
-        `  Warning: Could not generate fix for "${policy.name}": ${error}`,
-      );
+        const parsed = parseJsonResponse(response.content) as Record<
+          string,
+          unknown
+        >;
+        return {
+          policyId: policy.id,
+          fix: String(parsed.fix ?? ""),
+          blastRadius: Array.isArray(parsed.blastRadius)
+            ? parsed.blastRadius.map(String)
+            : [],
+        };
+      }),
+    );
+
+    for (let j = 0; j < batch.length; j++) {
+      completed++;
+      onProgress?.(completed, failingPolicies.length);
+      const outcome = batchResults[j]!;
+      if (outcome.status === "fulfilled") {
+        fixes.set(outcome.value.policyId, {
+          fix: outcome.value.fix,
+          blastRadius: outcome.value.blastRadius,
+        });
+      } else {
+        getLogger().warn(
+          `  Warning: Could not generate fix for "${batch[j]!.name}": ${outcome.reason}`,
+        );
+      }
     }
   }
 
