@@ -157,7 +157,7 @@ program
   .action(wrapAction(viewCommand));
 
 program
-  .command("demo")
+  .command("demo [example]")
   .description("Run a demo with built-in example agents and traces")
   .option("--provider <provider>", "LLM provider")
   .option("--model <model>", "LLM model")

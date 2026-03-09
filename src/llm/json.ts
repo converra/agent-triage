@@ -8,10 +8,15 @@
 export function parseJsonResponse(raw: string): unknown {
   let cleaned = raw.trim();
 
-  // Strip markdown code blocks
+  // Strip markdown code blocks (including truncated ones missing the closing fence)
   const codeBlockMatch = cleaned.match(/```(?:json)?\s*\n?([\s\S]*?)```/);
   if (codeBlockMatch) {
     cleaned = codeBlockMatch[1]!.trim();
+  } else {
+    const openFenceMatch = cleaned.match(/```(?:json)?\s*\n?([\s\S]*)/);
+    if (openFenceMatch) {
+      cleaned = openFenceMatch[1]!.trim();
+    }
   }
 
   // Find the JSON boundary (first [ or { to last ] or })

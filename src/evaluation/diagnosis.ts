@@ -155,7 +155,7 @@ async function diagnoseSingle(
 
   const response = await llm.call(prompt, {
     temperature: 0.3,
-    maxTokens: 1024,
+    maxTokens: 4096,
   });
 
   const parsed = parseJsonResponse(response.content) as Record<string, unknown>;

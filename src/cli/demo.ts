@@ -5,8 +5,11 @@ import { fileURLToPath } from "node:url";
 import { loadConfig, resolveLlm } from "../config/loader.js";
 import { analyzeCommand } from "./analyze.js";
 
-const EXAMPLE = "customer-support";
-const EXAMPLE_DESCRIPTION = "Acme Electronics support agent — escalation, refund rules, tone policies";
+const EXAMPLES: Record<string, string> = {
+  "customer-support": "Acme Electronics support agent — escalation, refund rules, tone policies",
+};
+
+const DEFAULT_EXAMPLE = "customer-support";
 
 interface DemoOptions {
   provider?: string;
@@ -14,7 +17,16 @@ interface DemoOptions {
   apiKey?: string;
 }
 
-export async function demoCommand(options: DemoOptions): Promise<void> {
+export async function demoCommand(example: string | undefined, options: DemoOptions): Promise<void> {
+  const EXAMPLE = example ?? DEFAULT_EXAMPLE;
+
+  if (!EXAMPLES[EXAMPLE]) {
+    const available = Object.keys(EXAMPLES).join(", ");
+    throw new Error(`Unknown demo example "${EXAMPLE}". Available: ${available}`);
+  }
+
+  const EXAMPLE_DESCRIPTION = EXAMPLES[EXAMPLE];
+
   // Check for API key before doing anything else
   const config = await loadConfig({
     llm: {

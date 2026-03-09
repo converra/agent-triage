@@ -22,7 +22,7 @@ export const ConfigSchema = z.object({
     .default({}),
   prompt: z.object({
     path: z.string(),
-  }),
+  }).optional(),
   traces: z
     .object({
       source: TraceSourceSchema.default("json"),
