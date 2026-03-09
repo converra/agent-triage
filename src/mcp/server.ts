@@ -6,8 +6,8 @@ import { registerEvalTools } from "./tools-eval.js";
  * Register all MCP tools on the server.
  *
  * Tools are organized by cost and purpose:
- * - Read tools (zero LLM cost): status, sample, list_policies, diff
- * - Eval tools (LLM cost): init, explain, check, analyze
+ * - Read tools (zero LLM cost): status, sample, list_policies, diff, history, view
+ * - Eval tools (LLM cost): init, explain, check, analyze, demo
  *
  * The intended debugging workflow is:
  * 1. triage_status → understand current health
@@ -18,6 +18,7 @@ import { registerEvalTools } from "./tools-eval.js";
  * 6. (fix the prompt)
  * 7. triage_analyze → re-run full evaluation
  * 8. triage_diff → verify improvement
+ * 9. triage_view → open HTML report in browser
  */
 export function registerTools(server: McpServer): void {
   registerReadTools(server);

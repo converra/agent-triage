@@ -272,7 +272,7 @@ export async function analyzeCommand(options: AnalyzeOptions): Promise<void> {
     log.log("Generating diagnoses for worst conversations...");
     await generateDiagnoses(llm, results, limited, systemPrompt, jsonMode ? undefined : (cur, total) => {
       process.stdout.write(`\r  Diagnosing: ${cur}/${total}    `);
-    });
+    }, config.llm.maxConcurrency);
     if (!jsonMode) process.stdout.write("\n");
 
     // Step 4: Generate fixes for failing policies
@@ -285,6 +285,7 @@ export async function analyzeCommand(options: AnalyzeOptions): Promise<void> {
       jsonMode ? undefined : (cur, total) => {
         process.stdout.write(`\r  Fixes: ${cur}/${total}    `);
       },
+      config.llm.maxConcurrency,
     );
     if (!jsonMode) process.stdout.write("\n");
 

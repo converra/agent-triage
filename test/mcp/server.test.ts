@@ -147,13 +147,14 @@ describe("MCP Server", () => {
   });
 
   describe("tool registration", () => {
-    it("registers all 8 tools", async () => {
+    it("registers all 10 tools", async () => {
       const client = await createTestClient();
       const result = await client.listTools();
       const names = result.tools.map((t) => t.name).sort();
       expect(names).toEqual([
         "triage_analyze",
         "triage_check",
+        "triage_demo",
         "triage_diff",
         "triage_explain",
         "triage_history",
@@ -161,6 +162,7 @@ describe("MCP Server", () => {
         "triage_list_policies",
         "triage_sample",
         "triage_status",
+        "triage_view",
       ]);
     });
 

@@ -66,10 +66,12 @@ Accepted field variants (auto-detected):
 | List loaded policies | triage_list_policies | Zero |
 | Compare two reports | triage_diff | Zero |
 | Compliance trend over time | triage_history | Zero |
+| Open report in browser | triage_view | Zero |
 | Check specific policies | triage_check | Moderate |
 | Extract policies from prompt | triage_init | Moderate |
 | Diagnose one conversation | triage_explain | Moderate |
-| Full analysis + report | triage_analyze | High |`,
+| Full analysis + report | triage_analyze | High |
+| Try with example data | triage_demo | High |`,
   },
 );
 

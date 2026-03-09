@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile, mkdir, cp } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -23,6 +23,7 @@ import {
   resolveApiKey,
   estimateCost,
   applyFilters,
+  readJsonTraces,
 } from "../index.js";
 
 import type { Policy, Report } from "../index.js";
@@ -610,6 +611,157 @@ export function registerEvalTools(server: McpServer): void {
         recommendations: recommendations.slice(0, 3).map((r) => ({
           title: r.title, description: r.description, affectedConversations: r.affectedConversations,
         })),
+        reportPath,
+        htmlPath,
+        duration: `${Math.round(runDuration)}s`,
+        cost: { tokens: totalTokens, estimated: `$${cost.toFixed(4)}` },
+      });
+    } catch (error) {
+      return errorResult(error instanceof Error ? error.message : String(error));
+    }
+  });
+
+  // -------------------------------------------------------------------------
+  // triage_demo — Run analysis on bundled example data
+  // -------------------------------------------------------------------------
+  const DEMO_EXAMPLES: Record<string, string> = {
+    "customer-support": "Acme Electronics support agent — escalation, refund rules, tone policies",
+  };
+
+  server.registerTool("triage_demo", {
+    title: "Agent Triage: Run Demo",
+    description:
+      "Run a full analysis on bundled example conversations to see agent-triage in action. " +
+      "High LLM cost (same as triage_analyze). Uses pre-extracted policies. " +
+      "Great for onboarding — shows a realistic report without needing your own traces.",
+    inputSchema: {
+      example: z
+        .string()
+        .optional()
+        .describe(`Demo example to run (default: customer-support). Available: ${Object.keys(DEMO_EXAMPLES).join(", ")}`),
+      output_dir: z
+        .string()
+        .optional()
+        .describe("Output directory for demo report files (default: .agent-triage-demo-<example>)"),
+    },
+    annotations: { readOnlyHint: false },
+  }, async (params) => {
+    try {
+      const name = params.example ?? "customer-support";
+
+      if (!DEMO_EXAMPLES[name]) {
+        return errorResult(
+          `Unknown example: "${name}". Available: ${Object.keys(DEMO_EXAMPLES).join(", ")}`,
+        );
+      }
+
+      const srcDir = resolve(__dirname, `../../data/examples/${name}`);
+      if (!existsSync(srcDir)) {
+        return errorResult(
+          `Demo data not found for "${name}". Ensure data/examples/ exists in the agent-triage installation.`,
+        );
+      }
+
+      const outputDir = safePath(params.output_dir ?? `.agent-triage-demo-${name}`);
+      if (!existsSync(outputDir)) {
+        await mkdir(outputDir, { recursive: true });
+      }
+
+      // Copy fixtures
+      const promptDst = resolve(outputDir, "prompt.txt");
+      const tracesDst = resolve(outputDir, "conversations.json");
+      const policiesDst = resolve(outputDir, "policies.json");
+
+      await cp(resolve(srcDir, "prompt.txt"), promptDst);
+      await cp(resolve(srcDir, "conversations.json"), tracesDst);
+      await cp(resolve(srcDir, "policies.json"), policiesDst);
+
+      const policiesData = JSON.parse(await readFile(policiesDst, "utf-8")) as unknown[];
+
+      // Resolve LLM
+      const config = await loadConfig({ prompt: { path: promptDst } });
+      const apiKey = resolveApiKey(config);
+      const llm = createLlmClient(config.llm.provider, apiKey, config.llm.model, config.llm.baseUrl);
+
+      // Load fixtures
+      const conversations = await readJsonTraces(tracesDst);
+      const policies = PoliciesFileSchema.parse(JSON.parse(await readFile(policiesDst, "utf-8")));
+      const systemPrompt = await readFile(promptDst, "utf-8");
+      const policiesHash = computePoliciesHash(JSON.stringify(policies));
+
+      const startTime = Date.now();
+
+      // Evaluate
+      const results = await evaluateAll(llm, conversations, policies, systemPrompt, {
+        concurrency: config.llm.maxConcurrency,
+        policiesHash,
+      });
+
+      // Aggregate
+      const failurePatterns = aggregateFailurePatterns(results);
+      const totalFailures = failurePatterns.reduce((s, p) => s + p.count, 0);
+
+      // Diagnoses + fixes
+      await generateDiagnoses(llm, results, conversations, systemPrompt);
+      const fixes = await generateFixes(llm, policies, results, failurePatterns);
+      let recommendations: Report["failurePatterns"]["topRecommendations"] = [];
+      try {
+        recommendations = await generateRecommendations(llm, failurePatterns, policies, results);
+      } catch { /* non-fatal */ }
+
+      // Build report
+      const aggregated = aggregatePolicies(policies, results);
+      const metricSummary = calculateMetricSummary(results);
+      const overallCompliance = calculateOverallCompliance(results);
+
+      for (const policy of aggregated) {
+        const fixResult = fixes.get(policy.id);
+        if (fixResult) { policy.fix = fixResult.fix; policy.blastRadius = fixResult.blastRadius; }
+      }
+
+      const usage = llm.getUsage();
+      const totalTokens = usage.inputTokens + usage.outputTokens;
+      const cost = estimateCost(config.llm.model, usage.inputTokens, usage.outputTokens);
+      const runDuration = (Date.now() - startTime) / 1000;
+
+      const report: Report = {
+        agentTriageVersion: pkg.version,
+        llmProvider: config.llm.provider,
+        llmModel: config.llm.model,
+        policiesHash,
+        agent: {
+          name: "Acme Electronics Support Agent",
+          promptPath: promptDst,
+          promptContent: systemPrompt,
+        },
+        agents: [],
+        generatedAt: new Date().toISOString(),
+        runDuration,
+        totalConversations: results.length,
+        policies: aggregated.map((p) => ({ ...p, blastRadius: p.blastRadius })),
+        conversations: results,
+        failurePatterns: { byType: failurePatterns, topRecommendations: recommendations, totalFailures },
+        metricSummary,
+        overallCompliance,
+        cost: { totalTokens, estimatedCost: cost },
+      };
+
+      const reportPath = resolve(outputDir, "report.json");
+      await writeFile(reportPath, JSON.stringify(report, null, 2), "utf-8");
+
+      const htmlPath = resolve(outputDir, "report.html");
+      await writeFile(htmlPath, buildHtml(report), "utf-8");
+
+      const { appendHistory } = await import("../history.js");
+      await appendHistory(report, outputDir);
+
+      return jsonResult({
+        example: name,
+        description: DEMO_EXAMPLES[name],
+        policiesUsed: policiesData.length,
+        totalConversations: results.length,
+        overallCompliance,
+        totalFailures,
         reportPath,
         htmlPath,
         duration: `${Math.round(runDuration)}s`,
