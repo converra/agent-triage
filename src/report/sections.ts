@@ -32,6 +32,7 @@ function shortenSummary(summary: string): string {
   return truncate(first, 80);
 }
 
+
 export function renderHeader(report: Report, date: string): string {
   const agentCount = report.agents?.length ?? 0;
   const autoName = report.agents?.[0]?.name;
@@ -90,6 +91,9 @@ export function renderHealthSummary(
         <div class="verdict-text">${issues} of ${total} conversations have issues${critical > 0 ? ` — ${critical} critical` : ""}.</div>
         ${topSummaries}
       </div>
+      ${report.failurePatterns.topRecommendations.length > 0
+        ? `<a href="#recs-section" class="verdict-cta" onclick="event.preventDefault();scrollToRecs()">See fixes below ${ICONS.chevDownSm}</a>`
+        : ""}
     </div>
   </div>`;
 }
@@ -426,6 +430,13 @@ export function renderAllConversations(
     })
     .join("");
 
+  // Build combined fix MD for "Copy all fixes" button
+  const allFixesMd = shown
+    .filter((c) => c.diagnosis)
+    .map((c) => buildConversationFixMd(c, report))
+    .join("\n\n---\n\n");
+  const allFixesB64 = btoa(unescape(encodeURIComponent(allFixesMd)));
+
   const moreText =
     issues.length > 50
       ? `<div class="show-all">Showing 50 of ${issues.length} conversations with issues</div>`
@@ -437,8 +448,16 @@ export function renderAllConversations(
     <span class="colhdr-cause">Diagnosis</span>
   </div>`;
 
+  const diagCount = shown.filter((c) => c.diagnosis).length;
+
   return `<div class="convs">
-    <div class="stitle">Step analysis</div>
+    <div class="convs-header">
+      <div class="stitle">Step analysis</div>
+      ${diagCount > 1 ? `<div class="convs-actions">
+        <button class="copy-btn" data-fix="${allFixesB64}" onclick="copyFix(this)">${ICONS.copy} Copy all ${diagCount} fixes</button>
+        <button class="copy-btn" data-fix="${allFixesB64}" onclick="downloadFix(this, 'all-fixes')">${ICONS.fileSm} Save all as .md</button>
+      </div>` : ""}
+    </div>
     ${colHeader}
     ${convHtml}
     ${moreText}
@@ -482,6 +501,7 @@ function renderConvDive(
       <div class="diag-cta">
         <button class="copy-btn" data-fix="${fixMd}" onclick="copyFix(this)">${ICONS.copy} Copy for coding agent</button>
         <button class="copy-btn" data-fix="${fixMd}" onclick="downloadFix(this, '${escJs(conv.id.slice(0, 20))}')">${ICONS.fileSm} Save as .md</button>
+        ${d.failureType === "prompt_issue" || d.failureType === "retrieval_rag_issue" ? `<a href="https://converra.ai" class="diag-link">Fix in Converra ${ICONS.externalSm}</a>` : ""}
       </div>
       <div class="wif-s"><div class="wif-l impact">Impact</div><div class="wif-t">${escBold(truncate(d.impact, 300))}</div></div>
       <div class="wif-s"><div class="wif-l fix">Fix</div><div class="wif-t">${escBold(truncate(d.fix, 250))} <span class="wif-conf">(${d.confidence} confidence)</span></div></div>
@@ -593,6 +613,7 @@ export function renderRecommendations(report: Report): string {
   return `<div class="recs" id="recs-section">
     <div class="recs-header">
       <div class="stitle" style="margin:0;">How to fix it</div>
+      <a href="https://converra.ai" class="verdict-cta" onclick="event.stopPropagation()">Track fixes over time ${ICONS.externalSm}</a>
       <div class="recs-batch">
         <button class="copy-btn primary" data-fix="${allRecsB64}" onclick="copyFix(this)">${ICONS.copy} Copy all ${recCount} fixes</button>
         <button class="copy-btn" data-fix="${allRecsB64}" onclick="downloadFix(this, 'all-recommendations')">${ICONS.fileSm} Save all as .md</button>

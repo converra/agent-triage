@@ -92,7 +92,10 @@ describe("readLangfuseTraces", () => {
   });
 
   it("fetches traces and generations, normalizes correctly", async () => {
-    const trace = makeTrace();
+    const trace = makeTrace({
+      tags: ["coding", "python"],
+      sessionId: "sess-abc",
+    });
     const gen = makeGeneration();
 
     globalThis.fetch = mockFetch([
@@ -107,6 +110,9 @@ describe("readLangfuseTraces", () => {
     expect(convs[0].metadata.source).toBe("langfuse");
     expect(convs[0].metadata.model).toBe("gpt-4o-mini");
     expect(convs[0].metadata.totalTokens).toBe(150);
+    expect(convs[0].metadata.agentName).toBe("test-trace");
+    expect(convs[0].metadata.tags).toEqual(["coding", "python"]);
+    expect(convs[0].metadata.sessionId).toBe("sess-abc");
   });
 
   it("sends Basic auth header with base64-encoded credentials", async () => {

@@ -26,6 +26,7 @@ interface LangfuseTrace {
   tags?: string[];
   sessionId?: string;
   userId?: string;
+  release?: string;
   input?: unknown;
   output?: unknown;
 }
