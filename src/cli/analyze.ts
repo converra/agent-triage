@@ -2,7 +2,7 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { loadConfig, resolveApiKey } from "../config/loader.js";
+import { loadConfig, resolveLlm } from "../config/loader.js";
 import { createLlmClient } from "../llm/client.js";
 import { readJsonTraces } from "../ingestion/json.js";
 import { readLangSmithTraces } from "../ingestion/langsmith.js";
@@ -203,15 +203,15 @@ export async function analyzeCommand(options: AnalyzeOptions): Promise<void> {
       : {}),
   });
 
-  const apiKey = await resolveApiKey(config);
+  const resolved = await resolveLlm(config);
   const llm = createLlmClient(
-    config.llm.provider,
-    apiKey,
-    config.llm.model,
+    resolved.provider,
+    resolved.apiKey,
+    resolved.model,
     config.llm.baseUrl,
   );
 
-  log.log(`\nUsing ${config.llm.provider}/${config.llm.model}`);
+  log.log(`\nUsing ${resolved.provider}/${resolved.model}`);
 
   // Check for previous progress
   const previousResults = await loadProgress(policiesHash);
@@ -453,11 +453,11 @@ async function createLlmForOptions(options: AnalyzeOptions): Promise<LlmClient> 
       : {}),
   });
 
-  const apiKey = await resolveApiKey(config);
+  const resolved = await resolveLlm(config);
   return createLlmClient(
-    config.llm.provider,
-    apiKey,
-    config.llm.model,
+    resolved.provider,
+    resolved.apiKey,
+    resolved.model,
     config.llm.baseUrl,
   );
 }

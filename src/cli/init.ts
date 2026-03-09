@@ -1,6 +1,6 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { loadConfig, resolveApiKey } from "../config/loader.js";
+import { loadConfig, resolveLlm } from "../config/loader.js";
 import { createLlmClient } from "../llm/client.js";
 import { extractPolicies } from "../policy/extractor.js";
 import { estimateCost } from "../config/defaults.js";
@@ -59,15 +59,15 @@ export async function initCommand(options: InitOptions): Promise<void> {
 
   const config = await loadConfig(overrides);
 
-  const apiKey = await resolveApiKey(config);
+  const resolved = await resolveLlm(config);
   const llm = createLlmClient(
-    config.llm.provider,
-    apiKey,
-    config.llm.model,
+    resolved.provider,
+    resolved.apiKey,
+    resolved.model,
     config.llm.baseUrl,
   );
 
-  console.log(`\nUsing ${config.llm.provider}/${config.llm.model}`);
+  console.log(`\nUsing ${resolved.provider}/${resolved.model}`);
   console.log("Extracting policies...\n");
 
   const policies = await extractPolicies(llm, systemPrompt);

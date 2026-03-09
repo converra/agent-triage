@@ -20,7 +20,7 @@ import {
   buildHtml,
   autoExtractPolicies,
   loadConfig,
-  resolveApiKey,
+  resolveLlm as resolveLlmConfig,
   estimateCost,
   applyFilters,
   readJsonTraces,
@@ -38,7 +38,7 @@ const pkg = JSON.parse(readFileSync(resolve(__dirname, "../../package.json"), "u
 import {
   jsonResult,
   errorResult,
-  resolveLlm,
+  createLlmFromOptions,
   ingestTraces,
   filterByQuery,
   loadPoliciesFromFile,
@@ -76,7 +76,7 @@ export function registerEvalTools(server: McpServer): void {
         "utf-8",
       );
 
-      const llm = await resolveLlm();
+      const llm = await createLlmFromOptions();
       const policies = await extractPolicies(llm, promptContent);
 
       const outPath = safePath(output_path ?? "policies.json");
@@ -177,7 +177,7 @@ export function registerEvalTools(server: McpServer): void {
           return jsonResult(formatExplanation(worst));
         }
 
-        const llm = await resolveLlm();
+        const llm = await createLlmFromOptions();
         const diagnosis = await generateDiagnosisForResult(
           llm,
           worst,
@@ -197,7 +197,7 @@ export function registerEvalTools(server: McpServer): void {
         }
 
         if (existing) {
-          const llm = await resolveLlm();
+          const llm = await createLlmFromOptions();
           const diagnosis = await generateDiagnosisForResult(
             llm,
             existing,
@@ -222,7 +222,7 @@ export function registerEvalTools(server: McpServer): void {
         return errorResult(`Conversation "${params.conversation_id}" not found in trace source.`);
       }
 
-      const llm = await resolveLlm();
+      const llm = await createLlmFromOptions();
       const policiesPath = safePath(params.policies_path ?? "policies.json");
       let policies: Policy[] = [];
       if (existsSync(policiesPath)) {
@@ -348,7 +348,7 @@ export function registerEvalTools(server: McpServer): void {
         return errorResult("No conversations found matching filters.");
       }
 
-      const llm = await resolveLlm();
+      const llm = await createLlmFromOptions();
       const systemPrompt = params.prompt_path
         ? await readFile(safePath(params.prompt_path), "utf-8")
         : limited[0]?.systemPrompt ?? "";
@@ -485,8 +485,8 @@ export function registerEvalTools(server: McpServer): void {
 
       // Resolve LLM — single client for both auto-discovery and evaluation
       const config = await loadConfig({ prompt: { path: params.prompt_path ?? "." } });
-      const apiKey = await resolveApiKey(config);
-      const llm = createLlmClient(config.llm.provider, apiKey, config.llm.model, config.llm.baseUrl);
+      const resolved = await resolveLlmConfig(config);
+      const llm = createLlmClient(resolved.provider, resolved.apiKey, resolved.model, config.llm.baseUrl);
 
       // Resolve policies
       const policiesPath = safePath(params.policies_path ?? "policies.json");
@@ -680,8 +680,8 @@ export function registerEvalTools(server: McpServer): void {
 
       // Resolve LLM
       const config = await loadConfig({ prompt: { path: promptDst } });
-      const apiKey = await resolveApiKey(config);
-      const llm = createLlmClient(config.llm.provider, apiKey, config.llm.model, config.llm.baseUrl);
+      const resolved = await resolveLlmConfig(config);
+      const llm = createLlmClient(resolved.provider, resolved.apiKey, resolved.model, config.llm.baseUrl);
 
       // Load fixtures
       const conversations = await readJsonTraces(tracesDst);

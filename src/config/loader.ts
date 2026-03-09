@@ -54,28 +54,48 @@ export async function loadConfig(overrides?: Record<string, unknown>): Promise<C
   return ConfigSchema.parse(merged);
 }
 
-export async function resolveApiKey(
-  config: Config,
-): Promise<string> {
-  if (config.llm.apiKey) return config.llm.apiKey;
+export interface ResolvedLlm {
+  apiKey: string;
+  provider: Config["llm"]["provider"];
+  model: string;
+}
 
-  const envMap: Record<string, string> = {
-    openai: "OPENAI_API_KEY",
-    anthropic: "ANTHROPIC_API_KEY",
-    "openai-compatible": "OPENAI_API_KEY",
-  };
+const ENV_KEYS: { provider: Config["llm"]["provider"]; envVar: string }[] = [
+  { provider: "anthropic", envVar: "ANTHROPIC_API_KEY" },
+  { provider: "openai", envVar: "OPENAI_API_KEY" },
+];
 
-  const envVar = envMap[config.llm.provider] ?? "API key";
-  const key = envVar ? process.env[envVar] : undefined;
-  if (key) return key;
+export async function resolveLlm(config: Config): Promise<ResolvedLlm> {
+  if (config.llm.apiKey) {
+    return { apiKey: config.llm.apiKey, provider: config.llm.provider, model: config.llm.model };
+  }
+
+  // Try configured provider first
+  const primaryEnv = ENV_KEYS.find((e) => e.provider === config.llm.provider);
+  if (primaryEnv && process.env[primaryEnv.envVar]) {
+    return { apiKey: process.env[primaryEnv.envVar]!, provider: config.llm.provider, model: config.llm.model };
+  }
+
+  // Auto-detect: try any available key
+  for (const { provider, envVar } of ENV_KEYS) {
+    const key = process.env[envVar];
+    if (key) {
+      return { apiKey: key, provider, model: getDefaultModel(provider) };
+    }
+  }
 
   throw new Error(
     `No API key found. Run:\n\n` +
-      `  export ${envVar}=your-key-here\n\n` +
-      `Or add to agent-triage.config.yaml:\n\n` +
-      `  llm:\n` +
-      `    apiKey: your-key-here\n`,
+      `  export ANTHROPIC_API_KEY=your-key-here\n\n` +
+      `Or:\n\n` +
+      `  export OPENAI_API_KEY=your-key-here\n`,
   );
+}
+
+/** @deprecated Use resolveLlm() instead */
+export async function resolveApiKey(config: Config): Promise<string> {
+  const resolved = await resolveLlm(config);
+  return resolved.apiKey;
 }
 
 function deepMerge(

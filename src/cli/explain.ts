@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { loadConfig, resolveApiKey } from "../config/loader.js";
+import { loadConfig, resolveLlm } from "../config/loader.js";
 import { createLlmClient } from "../llm/client.js";
 import { readLangSmithTraces } from "../ingestion/langsmith.js";
 import { readJsonTraces } from "../ingestion/json.js";
@@ -185,8 +185,8 @@ async function diagnoseOnDemand(
       : {}),
   });
 
-  const apiKey = await resolveApiKey(config);
-  const llm = createLlmClient(config.llm.provider, apiKey, config.llm.model, config.llm.baseUrl);
+  const resolved = await resolveLlm(config);
+  const llm = createLlmClient(resolved.provider, resolved.apiKey, resolved.model, config.llm.baseUrl);
 
   const systemPrompt = report.agent.promptContent ?? "";
   const transcript = formatTranscript(conv);
@@ -294,8 +294,8 @@ async function evaluateAndDiagnose(
       : {}),
   });
 
-  const apiKey = await resolveApiKey(config);
-  const llm = createLlmClient(config.llm.provider, apiKey, config.llm.model, config.llm.baseUrl);
+  const resolved = await resolveLlm(config);
+  const llm = createLlmClient(resolved.provider, resolved.apiKey, resolved.model, config.llm.baseUrl);
 
   // Load policies
   const policiesPath = resolve(process.cwd(), options.policies ?? "policies.json");

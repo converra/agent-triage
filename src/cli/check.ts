@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { loadConfig, resolveApiKey } from "../config/loader.js";
+import { loadConfig, resolveLlm } from "../config/loader.js";
 import { createLlmClient } from "../llm/client.js";
 import { readJsonTraces } from "../ingestion/json.js";
 import { readLangSmithTraces } from "../ingestion/langsmith.js";
@@ -132,15 +132,15 @@ export async function checkCommand(options: CheckOptions): Promise<void> {
       : {}),
   });
 
-  const apiKey = await resolveApiKey(config);
+  const resolved = await resolveLlm(config);
   const llm = createLlmClient(
-    config.llm.provider,
-    apiKey,
-    config.llm.model,
+    resolved.provider,
+    resolved.apiKey,
+    resolved.model,
     config.llm.baseUrl,
   );
 
-  log.log(`Using ${config.llm.provider}/${config.llm.model}\n`);
+  log.log(`Using ${resolved.provider}/${resolved.model}\n`);
 
   // Run policy checks only (no metrics evaluation — that's the key difference from analyze)
   const allResults = new Map<string, CheckResult>();

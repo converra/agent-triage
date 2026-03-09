@@ -42,7 +42,7 @@ export { buildHtml, generateHtmlReport } from "./report/generator.js";
 export { diffReports, formatDiffTerminal } from "./diff/diff.js";
 export type { PolicyDiff, DiffResult } from "./diff/diff.js";
 
-export { loadConfig, resolveApiKey } from "./config/loader.js";
+export { loadConfig, resolveLlm, resolveApiKey } from "./config/loader.js";
 export type { Config, LlmProvider, TraceSource } from "./config/schema.js";
 export { estimateCost, COST_PER_1K_TOKENS } from "./config/defaults.js";
 

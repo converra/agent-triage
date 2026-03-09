@@ -23,7 +23,7 @@ import {
   readAxiomTraces,
   readLangfuseTraces,
   loadConfig,
-  resolveApiKey,
+  resolveLlm,
   createLlmClient,
   applyFilters,
   parseDuration,
@@ -63,7 +63,7 @@ export function errorResult(message: string) {
 // LLM / Config helpers
 // ---------------------------------------------------------------------------
 
-export async function resolveLlm(overrides?: {
+export async function createLlmFromOptions(overrides?: {
   provider?: string;
   model?: string;
   apiKey?: string;
@@ -81,11 +81,11 @@ export async function resolveLlm(overrides?: {
       : {}),
   });
 
-  const apiKey = await resolveApiKey(config);
+  const resolved = await resolveLlm(config);
   return createLlmClient(
-    config.llm.provider,
-    apiKey,
-    config.llm.model,
+    resolved.provider,
+    resolved.apiKey,
+    resolved.model,
     config.llm.baseUrl,
   );
 }
