@@ -42,38 +42,38 @@ describe("resolveApiKey", () => {
     process.env = originalEnv;
   });
 
-  it("returns explicit API key from config", () => {
+  it("returns explicit API key from config", async () => {
     const config = {
       llm: { provider: "openai" as const, model: "gpt-4o-mini", apiKey: "sk-test-123", maxConcurrency: 5 },
       prompt: { path: "test.txt" },
     };
-    expect(resolveApiKey(config)).toBe("sk-test-123");
+    expect(await resolveApiKey(config)).toBe("sk-test-123");
   });
 
-  it("falls back to OPENAI_API_KEY env var for openai provider", () => {
+  it("falls back to OPENAI_API_KEY env var for openai provider", async () => {
     process.env.OPENAI_API_KEY = "sk-env-456";
     const config = {
       llm: { provider: "openai" as const, model: "gpt-4o-mini", maxConcurrency: 5 },
       prompt: { path: "test.txt" },
     };
-    expect(resolveApiKey(config)).toBe("sk-env-456");
+    expect(await resolveApiKey(config)).toBe("sk-env-456");
   });
 
-  it("falls back to ANTHROPIC_API_KEY for anthropic provider", () => {
+  it("falls back to ANTHROPIC_API_KEY for anthropic provider", async () => {
     process.env.ANTHROPIC_API_KEY = "sk-ant-789";
     const config = {
       llm: { provider: "anthropic" as const, model: "claude-sonnet-4-20250514", maxConcurrency: 5 },
       prompt: { path: "test.txt" },
     };
-    expect(resolveApiKey(config)).toBe("sk-ant-789");
+    expect(await resolveApiKey(config)).toBe("sk-ant-789");
   });
 
-  it("throws when no API key is available", () => {
+  it("throws when no API key is available", async () => {
     delete process.env.OPENAI_API_KEY;
     const config = {
       llm: { provider: "openai" as const, model: "gpt-4o-mini", maxConcurrency: 5 },
       prompt: { path: "test.txt" },
     };
-    expect(() => resolveApiKey(config)).toThrow("No API key found");
+    await expect(resolveApiKey(config)).rejects.toThrow("No API key found");
   });
 });

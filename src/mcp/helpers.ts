@@ -81,7 +81,7 @@ export async function resolveLlm(overrides?: {
       : {}),
   });
 
-  const apiKey = resolveApiKey(config);
+  const apiKey = await resolveApiKey(config);
   return createLlmClient(
     config.llm.provider,
     apiKey,
