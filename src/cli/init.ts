@@ -59,7 +59,7 @@ export async function initCommand(options: InitOptions): Promise<void> {
 
   const config = await loadConfig(overrides);
 
-  const apiKey = resolveApiKey(config);
+  const apiKey = await resolveApiKey(config, { interactive: true });
   const llm = createLlmClient(
     config.llm.provider,
     apiKey,

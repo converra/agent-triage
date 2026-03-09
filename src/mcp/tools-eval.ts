@@ -485,7 +485,7 @@ export function registerEvalTools(server: McpServer): void {
 
       // Resolve LLM — single client for both auto-discovery and evaluation
       const config = await loadConfig({ prompt: { path: params.prompt_path ?? "." } });
-      const apiKey = resolveApiKey(config);
+      const apiKey = await resolveApiKey(config);
       const llm = createLlmClient(config.llm.provider, apiKey, config.llm.model, config.llm.baseUrl);
 
       // Resolve policies
@@ -680,7 +680,7 @@ export function registerEvalTools(server: McpServer): void {
 
       // Resolve LLM
       const config = await loadConfig({ prompt: { path: promptDst } });
-      const apiKey = resolveApiKey(config);
+      const apiKey = await resolveApiKey(config);
       const llm = createLlmClient(config.llm.provider, apiKey, config.llm.model, config.llm.baseUrl);
 
       // Load fixtures

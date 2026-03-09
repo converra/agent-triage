@@ -203,7 +203,7 @@ export async function analyzeCommand(options: AnalyzeOptions): Promise<void> {
       : {}),
   });
 
-  const apiKey = resolveApiKey(config);
+  const apiKey = await resolveApiKey(config, { interactive: true });
   const llm = createLlmClient(
     config.llm.provider,
     apiKey,
@@ -453,7 +453,7 @@ async function createLlmForOptions(options: AnalyzeOptions): Promise<LlmClient> 
       : {}),
   });
 
-  const apiKey = resolveApiKey(config);
+  const apiKey = await resolveApiKey(config, { interactive: true });
   return createLlmClient(
     config.llm.provider,
     apiKey,

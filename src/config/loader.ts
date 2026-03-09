@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
+import { createInterface } from "node:readline";
 import { parse as parseYaml } from "yaml";
 import { ConfigSchema, type Config } from "./schema.js";
 import { getDefaultModel } from "./defaults.js";
@@ -54,7 +55,20 @@ export async function loadConfig(overrides?: Record<string, unknown>): Promise<C
   return ConfigSchema.parse(merged);
 }
 
-export function resolveApiKey(config: Config): string {
+function promptForKey(envVar: string): Promise<string> {
+  const rl = createInterface({ input: process.stdin, output: process.stderr });
+  return new Promise((resolve) => {
+    rl.question(`\n  Enter your ${envVar} (or set it as an env var): `, (answer) => {
+      rl.close();
+      resolve(answer.trim());
+    });
+  });
+}
+
+export async function resolveApiKey(
+  config: Config,
+  options?: { interactive?: boolean },
+): Promise<string> {
   if (config.llm.apiKey) return config.llm.apiKey;
 
   const envMap: Record<string, string> = {
@@ -63,17 +77,19 @@ export function resolveApiKey(config: Config): string {
     "openai-compatible": "OPENAI_API_KEY",
   };
 
-  const envVar = envMap[config.llm.provider];
+  const envVar = envMap[config.llm.provider] ?? "API key";
   const key = envVar ? process.env[envVar] : undefined;
+  if (key) return key;
 
-  if (!key) {
-    throw new Error(
-      `No API key found. Set ${envVar ?? "API key"} environment variable ` +
-        `or add llm.apiKey to agent-triage.config.yaml`,
-    );
+  if (options?.interactive && process.stdin.isTTY) {
+    const entered = await promptForKey(envVar);
+    if (entered) return entered;
   }
 
-  return key;
+  throw new Error(
+    `No API key found. Set ${envVar} environment variable ` +
+      `or add llm.apiKey to agent-triage.config.yaml`,
+  );
 }
 
 function deepMerge(
