@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
+import { execFile } from "node:child_process";
 import { diffReports, applyFilters } from "../index.js";
 import type { Report } from "../index.js";
 import {
@@ -323,6 +324,60 @@ export function registerReadTools(server: McpServer): void {
       });
     } catch (error) {
       return errorResult(error instanceof Error ? error.message : String(error));
+    }
+  });
+
+  // -------------------------------------------------------------------------
+  // triage_view — Open HTML report in browser
+  // -------------------------------------------------------------------------
+  server.registerTool("triage_view", {
+    title: "Agent Triage: View Report",
+    description:
+      "Open the HTML report in the user's default browser. Zero LLM cost. " +
+      "Use after triage_analyze to let the user visually explore the report.",
+    inputSchema: {
+      report_dir: z
+        .string()
+        .optional()
+        .describe("Directory containing report.html (default: current directory)"),
+    },
+    annotations: { readOnlyHint: true },
+  }, async ({ report_dir }) => {
+    try {
+      const dir = safePath(report_dir ?? ".");
+      const htmlPath = resolve(dir, "report.html");
+
+      if (!existsSync(htmlPath)) {
+        const jsonPath = resolve(dir, "report.json");
+        if (existsSync(jsonPath)) {
+          return errorResult(
+            "report.html not found, but report.json exists. Re-run triage_analyze to generate the HTML report.",
+          );
+        }
+        return errorResult(
+          "No report found in this directory. Run triage_analyze first.",
+        );
+      }
+
+      const [cmd, args] =
+        process.platform === "darwin"
+          ? ["open", [htmlPath]]
+          : process.platform === "win32"
+            ? ["cmd", ["/c", "start", "", htmlPath]]
+            : ["xdg-open", [htmlPath]];
+
+      await new Promise<void>((res, rej) => {
+        execFile(cmd, args, (err) => {
+          if (err) rej(err);
+          else res();
+        });
+      });
+
+      return jsonResult({ opened: htmlPath });
+    } catch (error) {
+      return errorResult(
+        `Could not open browser automatically. Open manually: ${resolve(safePath(report_dir ?? "."), "report.html")}`,
+      );
     }
   });
 }
