@@ -106,7 +106,12 @@ export function stripHtml(s: string): string {
 }
 
 
+const FAILURE_TYPE_LABELS: Record<string, string> = {
+  retrieval_rag_issue: "RAG Issue",
+};
+
 export function formatFailureType(type: string): string {
+  if (FAILURE_TYPE_LABELS[type]) return FAILURE_TYPE_LABELS[type];
   return type
     .replace(/_/g, " ")
     .replace(/\b\w/g, (c) => c.toUpperCase());

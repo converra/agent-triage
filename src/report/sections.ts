@@ -112,7 +112,7 @@ function buildTopSummaries(issueConvs: Report["conversations"]): string {
     const key = text.slice(0, 30).toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
-    const typeClass = d.failureType === "prompt_issue" ? "prompt" : d.failureType === "orchestration_issue" ? "orch" : "model";
+    const typeClass = d.failureType === "prompt_issue" ? "prompt" : d.failureType === "orchestration_issue" ? "orch" : d.failureType === "retrieval_rag_issue" ? "rag" : "model";
     items.push(`<li><span class="type-badge sm ${typeClass}">${esc(formatFailureType(d.failureType))}</span> ${escBold(text)}</li>`);
     if (items.length >= 5) break;
   }
@@ -423,7 +423,7 @@ export function renderAllConversations(
           ${agentBadge}
           <span class="conv-score ${healthClass}">${avg}</span>
           <span class="conv-cause">${escBold(cause)}</span>
-          ${d?.failureSubtype && d.failureSubtype !== "unknown" ? `<span class="type-badge sm ${d.failureType === "prompt_issue" ? "prompt" : d.failureType === "orchestration_issue" ? "orch" : "model"}">${esc(formatSubtype(d.failureSubtype))}</span>` : ""}
+          ${d?.failureSubtype && d.failureSubtype !== "unknown" ? `<span class="type-badge sm ${d.failureType === "prompt_issue" ? "prompt" : d.failureType === "orchestration_issue" ? "orch" : d.failureType === "retrieval_rag_issue" ? "rag" : "model"}">${esc(formatSubtype(d.failureSubtype))}</span>` : ""}
           ${ICONS.chevDownSm}
         </summary>
         ${expand}

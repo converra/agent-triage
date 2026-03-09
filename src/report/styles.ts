@@ -145,6 +145,7 @@ details[open] > summary .chev { transform:rotate(180deg); }
 .type-badge.prompt { background:var(--coral-50); color:var(--coral-dark); border:1px solid var(--coral-border); }
 .type-badge.orch { background:var(--amber-bg); color:var(--amber-dark); border:1px solid var(--amber-border); }
 .type-badge.model { background:var(--bg-subtle); color:var(--text-2); border:1px solid var(--border); }
+.type-badge.rag { background:rgba(56,139,253,0.08); color:var(--blue); border:1px solid rgba(56,139,253,0.22); }
 .sev-badge { font-size:11px; font-weight:700; padding:2px 10px; border-radius:20px; }
 .sev-badge.crit { background:var(--red-bg); color:var(--red); border:1px solid var(--red-border); }
 .sev-badge.major { background:var(--amber-bg); color:var(--amber); border:1px solid var(--amber-border); }
