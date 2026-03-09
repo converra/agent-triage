@@ -1,7 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { createInterface } from "node:readline";
 import { parse as parseYaml } from "yaml";
 import { ConfigSchema, type Config } from "./schema.js";
 import { getDefaultModel } from "./defaults.js";
@@ -55,19 +54,8 @@ export async function loadConfig(overrides?: Record<string, unknown>): Promise<C
   return ConfigSchema.parse(merged);
 }
 
-function promptForKey(envVar: string): Promise<string> {
-  const rl = createInterface({ input: process.stdin, output: process.stderr });
-  return new Promise((resolve) => {
-    rl.question(`\n  Enter your ${envVar} (or set it as an env var): `, (answer) => {
-      rl.close();
-      resolve(answer.trim());
-    });
-  });
-}
-
 export async function resolveApiKey(
   config: Config,
-  options?: { interactive?: boolean },
 ): Promise<string> {
   if (config.llm.apiKey) return config.llm.apiKey;
 
@@ -81,14 +69,12 @@ export async function resolveApiKey(
   const key = envVar ? process.env[envVar] : undefined;
   if (key) return key;
 
-  if (options?.interactive && process.stdin.isTTY) {
-    const entered = await promptForKey(envVar);
-    if (entered) return entered;
-  }
-
   throw new Error(
-    `No API key found. Set ${envVar} environment variable ` +
-      `or add llm.apiKey to agent-triage.config.yaml`,
+    `No API key found. Run:\n\n` +
+      `  export ${envVar}=your-key-here\n\n` +
+      `Or add to agent-triage.config.yaml:\n\n` +
+      `  llm:\n` +
+      `    apiKey: your-key-here\n`,
   );
 }
 

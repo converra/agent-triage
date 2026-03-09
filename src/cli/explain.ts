@@ -185,7 +185,7 @@ async function diagnoseOnDemand(
       : {}),
   });
 
-  const apiKey = await resolveApiKey(config, { interactive: true });
+  const apiKey = await resolveApiKey(config);
   const llm = createLlmClient(config.llm.provider, apiKey, config.llm.model, config.llm.baseUrl);
 
   const systemPrompt = report.agent.promptContent ?? "";
@@ -294,7 +294,7 @@ async function evaluateAndDiagnose(
       : {}),
   });
 
-  const apiKey = await resolveApiKey(config, { interactive: true });
+  const apiKey = await resolveApiKey(config);
   const llm = createLlmClient(config.llm.provider, apiKey, config.llm.model, config.llm.baseUrl);
 
   // Load policies

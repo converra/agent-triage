@@ -132,7 +132,7 @@ export async function checkCommand(options: CheckOptions): Promise<void> {
       : {}),
   });
 
-  const apiKey = await resolveApiKey(config, { interactive: true });
+  const apiKey = await resolveApiKey(config);
   const llm = createLlmClient(
     config.llm.provider,
     apiKey,
