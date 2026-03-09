@@ -159,7 +159,6 @@ program
 program
   .command("demo")
   .description("Run a demo with built-in example agents and traces")
-  .argument("[example]", "Example to run (customer-support)", "customer-support")
   .option("--provider <provider>", "LLM provider")
   .option("--model <model>", "LLM model")
   .option("--api-key <key>", "LLM API key")

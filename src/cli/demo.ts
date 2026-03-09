@@ -1,15 +1,12 @@
-import { readFile, writeFile, mkdir, cp } from "node:fs/promises";
+import { readFile, mkdir, cp } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { loadConfig, resolveLlm } from "../config/loader.js";
 import { analyzeCommand } from "./analyze.js";
 
-const EXAMPLES = ["customer-support"] as const;
-type ExampleName = (typeof EXAMPLES)[number];
-
-const EXAMPLE_DESCRIPTIONS: Record<ExampleName, string> = {
-  "customer-support": "Acme Electronics support agent — escalation, refund rules, tone policies",
-};
+const EXAMPLE = "customer-support";
+const EXAMPLE_DESCRIPTION = "Acme Electronics support agent — escalation, refund rules, tone policies";
 
 interface DemoOptions {
   provider?: string;
@@ -17,58 +14,46 @@ interface DemoOptions {
   apiKey?: string;
 }
 
-export async function demoCommand(
-  example: string | undefined,
-  options: DemoOptions,
-): Promise<void> {
-  const name = (example ?? "customer-support") as ExampleName;
+export async function demoCommand(options: DemoOptions): Promise<void> {
+  // Check for API key before doing anything else
+  const config = await loadConfig({
+    llm: {
+      ...(options.provider ? { provider: options.provider } : {}),
+      ...(options.model ? { model: options.model } : {}),
+      ...(options.apiKey ? { apiKey: options.apiKey } : {}),
+    },
+  });
+  await resolveLlm(config); // throws early if no key found
 
-  if (!EXAMPLES.includes(name as ExampleName)) {
-    console.error(`Unknown example: ${name}`);
-    console.error(`\nAvailable examples:`);
-    for (const ex of EXAMPLES) {
-      console.error(`  ${ex} — ${EXAMPLE_DESCRIPTIONS[ex]}`);
-    }
-    process.exit(1);
-  }
+  console.log(`\nRunning demo: ${EXAMPLE}`);
+  console.log(`  ${EXAMPLE_DESCRIPTION}\n`);
 
-  console.log(`\nRunning demo: ${name}`);
-  console.log(`  ${EXAMPLE_DESCRIPTIONS[name]}\n`);
-
-  // Resolve example files — bundled in data/examples/
-  const srcDir = resolve(dirname(fileURLToPath(import.meta.url)), `../../data/examples/${name}`);
+  const srcDir = resolve(dirname(fileURLToPath(import.meta.url)), `../../data/examples/${EXAMPLE}`);
 
   if (!existsSync(srcDir)) {
-    console.error(`Error: Demo data not found for "${name}".`);
+    console.error(`Error: Demo data not found.`);
     console.error("If installed via npm, please update to the latest version.");
     console.error("If running from source, ensure data/examples/ exists.");
     process.exit(1);
   }
 
-  // Set up a temp output directory
-  const outputDir = resolve(process.cwd(), `.agent-triage-demo-${name}`);
+  const outputDir = resolve(process.cwd(), `.agent-triage-demo-${EXAMPLE}`);
   if (!existsSync(outputDir)) {
     await mkdir(outputDir, { recursive: true });
   }
-
-  // Copy fixtures to output dir
-  const promptSrc = resolve(srcDir, "prompt.txt");
-  const tracesSrc = resolve(srcDir, "conversations.json");
-  const policiesSrc = resolve(srcDir, "policies.json");
 
   const promptDst = resolve(outputDir, "prompt.txt");
   const tracesDst = resolve(outputDir, "conversations.json");
   const policiesDst = resolve(outputDir, "policies.json");
 
-  await cp(promptSrc, promptDst);
-  await cp(tracesSrc, tracesDst);
-  await cp(policiesSrc, policiesDst);
+  await cp(resolve(srcDir, "prompt.txt"), promptDst);
+  await cp(resolve(srcDir, "conversations.json"), tracesDst);
+  await cp(resolve(srcDir, "policies.json"), policiesDst);
 
   const policiesData = JSON.parse(await readFile(policiesDst, "utf-8")) as unknown[];
   console.log(`  Copied demo files to ${outputDir}`);
-  console.log(`  Using pre-extracted policies (${policiesData.length} policies from customer-support prompt)\n`);
+  console.log(`  Using pre-extracted policies (${policiesData.length} policies from ${EXAMPLE} prompt)\n`);
 
-  // Run the analyze pipeline
   await analyzeCommand({
     traces: tracesDst,
     policies: policiesDst,
