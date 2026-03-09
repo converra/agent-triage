@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
 import type { NormalizedConversation, Message } from "./types.js";
+import { normalizeRole } from "./normalize-role.js";
+import { getLogger } from "../logger.js";
 
 const DEFAULT_BASE_URL = "https://api.smith.langchain.com";
 const PAGE_SIZE = 100;
@@ -43,6 +45,8 @@ export interface LangSmithRun {
   extra: Record<string, unknown>;
   parent_run_id: string | null;
   total_tokens: number | null;
+  prompt_tokens: number | null;
+  completion_tokens: number | null;
   status: string;
   tags?: string[];
 }
@@ -52,6 +56,35 @@ type IngestionStrategy = "trace-based" | "session-based";
 interface ExtractedMessages {
   systemPrompt: string | undefined;
   messages: Message[];
+}
+
+/**
+ * Extract per-run token count. Prefers prompt_tokens + completion_tokens
+ * (which are always per-run) over total_tokens (which can be cumulative).
+ */
+function getRunTokens(run: LangSmithRun): number {
+  const perRun = (run.prompt_tokens ?? 0) + (run.completion_tokens ?? 0);
+  if (perRun > 0) return perRun;
+  return run.total_tokens ?? 0;
+}
+
+/**
+ * Sum tokens from a set of LLM runs, deduplicating parent/child pairs.
+ * LangSmith often returns both a wrapper run (e.g. "process_chunks") and its
+ * child LLM run (e.g. "ChatOpenAI") with identical token counts. We only
+ * count leaf runs — those whose ID is not the parent of another run in the set.
+ */
+function sumTokens(runs: LangSmithRun[]): number {
+  const parentIds = new Set(
+    runs.map((r) => r.parent_run_id).filter(Boolean),
+  );
+  let total = 0;
+  for (const run of runs) {
+    // Skip runs that are parents of other runs in this set (they aggregate children)
+    if (parentIds.has(run.id)) continue;
+    total += getRunTokens(run);
+  }
+  return total;
 }
 
 // ─── Public API ──────────────────────────────────────────────────────
@@ -66,7 +99,7 @@ export async function readLangSmithTraces(
 
   // Detect strategy by sampling 5 root runs
   const strategy = await detectStrategy(baseUrl, headers, projectId);
-  console.log(
+  getLogger().log(
     `Detected ${strategy} agent architecture`,
   );
 
@@ -109,7 +142,7 @@ async function detectStrategy(
   );
 
   if (withSessionId.length > 0) {
-    console.log(
+    getLogger().log(
       `  (${withSessionId.length}/${runs.length} root runs have session_id)`,
     );
     return "session-based";
@@ -209,7 +242,6 @@ function composeMultiAgentTrace(
   let primarySystemPrompt: string | undefined;
   let primaryAgentName: string | undefined;
   let model: string | undefined;
-  let totalTokens = 0;
 
   // Collect sub-agent system prompts (distinct from primary)
   const subAgentPrompts = new Map<string, { name: string; systemPrompt: string; promptHash: string }>();
@@ -239,7 +271,6 @@ function composeMultiAgentTrace(
       }
     }
 
-    if (run.total_tokens) totalTokens += run.total_tokens;
     if (!model) model = extractModel(run);
 
     runInfos.push({ run, extracted, agentName });
@@ -291,7 +322,7 @@ function composeMultiAgentTrace(
     systemPrompt: primarySystemPrompt,
     metadata: {
       model,
-      totalTokens: totalTokens || undefined,
+      totalTokens: sumTokens(runs) || undefined,
       duration: duration && duration > 0 ? duration : undefined,
       source: "langsmith",
       agentName: primaryAgentName,
@@ -313,7 +344,9 @@ function resolveAgentNameFromRun(run: LangSmithRun): string {
   if (!GENERIC_RUN_NAMES.has(run.name.toLowerCase())) {
     return run.name;
   }
-  return run.name;
+  // Generic run name (e.g. "ChatOpenAI") — return empty so callers
+  // fall back to system-prompt-based name extraction
+  return "";
 }
 
 // ─── Session-Based Ingestion ─────────────────────────────────────────
@@ -341,7 +374,7 @@ async function ingestSessionBased(
     sessionMap.get(sessionId)!.push(run);
   }
 
-  console.log(`Fetching sessions... found ${sessionMap.size} sessions.`);
+  getLogger().log(`Fetching sessions... found ${sessionMap.size} sessions.`);
 
   // Collect unique trace IDs only for sessions we'll actually process (capped at limit)
   const traceIds = new Set<string>();
@@ -355,14 +388,14 @@ async function ingestSessionBased(
   }
 
   // Pre-fetch all LLM runs for these traces (bounded by limit, not full project)
-  console.log(`Fetching LLM runs for ${traceIds.size} traces...`);
+  getLogger().log(`Fetching LLM runs for ${traceIds.size} traces...`);
   const llmRunsByTrace = await prefetchLlmRunsByTrace(
     baseUrl,
     headers,
     projectId,
     traceIds,
   );
-  console.log(`Fetched LLM runs for ${llmRunsByTrace.size} traces.`);
+  getLogger().log(`Fetched LLM runs for ${llmRunsByTrace.size} traces.`);
 
   const conversations: NormalizedConversation[] = [];
 
@@ -378,8 +411,8 @@ async function ingestSessionBased(
     const allMessages: Message[] = [];
     let systemPrompt: string | undefined;
     let model: string | undefined;
-    let totalTokens = 0;
     let agentName: string | undefined;
+    const allChildRuns: LangSmithRun[] = [];
 
     // Collect all sub-agent system prompts across the session
     const subAgentPrompts = new Map<string, { name: string; systemPrompt: string; promptHash: string }>();
@@ -387,11 +420,11 @@ async function ingestSessionBased(
     for (const rootRun of runs) {
       // Use pre-fetched child LLM runs (cache hit, no API call)
       const childRuns = llmRunsByTrace.get(rootRun.trace_id) ?? [];
+      allChildRuns.push(...childRuns);
 
       // Extract system prompts and agent names from ALL child LLM runs
       for (const child of childRuns) {
         const extracted = extractMessagesFromRun(child);
-        if (child.total_tokens) totalTokens += child.total_tokens;
 
         if (!extracted.systemPrompt) continue;
 
@@ -452,7 +485,7 @@ async function ingestSessionBased(
       systemPrompt,
       metadata: {
         model,
-        totalTokens: totalTokens || undefined,
+        totalTokens: sumTokens(allChildRuns) || undefined,
         duration: extractSessionDuration(runs),
         source: "langsmith",
         agentName,
@@ -492,7 +525,7 @@ async function prefetchLlmRunsByTrace(
     }
     fetched++;
     if (fetched % 10 === 0) {
-      console.log(`  Fetched LLM runs for ${fetched}/${traceIds.size} traces...`);
+      getLogger().log(`  Fetched LLM runs for ${fetched}/${traceIds.size} traces...`);
     }
     // Throttle to avoid rate limiting on large trace sets
     if (fetched < traceIds.size) {
@@ -745,49 +778,6 @@ function extractResponseFromRun(run: LangSmithRun): string | null {
   return raw;
 }
 
-function extractAssistantResponseFromChildren(
-  childRuns: LangSmithRun[],
-): string | null {
-  // Try to find the "response generator" LLM run (usually the last one)
-  // Search from last to first since the response generator is typically the final LLM call
-  for (let i = childRuns.length - 1; i >= 0; i--) {
-    const run = childRuns[i];
-    if (!run.outputs) continue;
-
-    const outputs = run.outputs;
-
-    // Try specific response fields first
-    for (const field of [
-      "html_response",
-      "response",
-      "content",
-      "message",
-    ]) {
-      if (typeof outputs[field] === "string") {
-        return outputs[field] as string;
-      }
-    }
-
-    // Try JSON-parsing the output for response fields
-    if (typeof outputs.output === "string") {
-      try {
-        const parsed = JSON.parse(outputs.output) as Record<string, unknown>;
-        if (typeof parsed.html_response === "string") return parsed.html_response;
-        if (typeof parsed.message_to_user === "string") return parsed.message_to_user;
-        if (typeof parsed.response === "string") return parsed.response;
-      } catch {
-        // Not JSON — use as-is
-        return outputs.output;
-      }
-    }
-
-    // Standard output extraction
-    const content = extractOutputContent(outputs);
-    if (content) return content;
-  }
-
-  return null;
-}
 
 function parseHistory(rootRun: LangSmithRun): Message[] {
   const history = rootRun.inputs?.history;
@@ -865,7 +855,9 @@ export function resolveAgentName(
     return normalizeAgentName(run.name);
   }
 
-  return normalizeAgentName(run.name);
+  // Generic name — still return it as last resort, but callers
+  // should prefer system-prompt-based names when available
+  return "";
 }
 
 /**
@@ -999,6 +991,7 @@ async function fetchAllRuns(
     if (runs.length === 0) break;
 
     allRuns.push(...runs);
+    getLogger().log(`  Fetched ${allRuns.length} runs so far (rate-limited, ~${Math.ceil((maxRuns - allRuns.length) / PAGE_SIZE * RATE_LIMIT_DELAY_MS / 1000)}s remaining)...`);
 
     if (!cursor) break;
     await new Promise((r) => setTimeout(r, RATE_LIMIT_DELAY_MS));
@@ -1040,19 +1033,6 @@ async function fetchChildLlmRuns(
   return runs;
 }
 
-export function normalizeRole(
-  type: string,
-): "user" | "assistant" | "system" | "tool" {
-  const lower = type.toLowerCase();
-  if (lower === "human" || lower === "humanmessage" || lower === "user")
-    return "user";
-  if (lower === "ai" || lower === "aimessage" || lower === "assistant")
-    return "assistant";
-  if (lower === "system" || lower === "systemmessage") return "system";
-  if (lower === "tool" || lower === "toolmessage" || lower === "function")
-    return "tool";
-  return "user";
-}
 
 function extractModel(run: LangSmithRun): string | undefined {
   const extra = run.extra as Record<string, unknown>;
@@ -1086,7 +1066,7 @@ async function fetchWithRetry(
       const delayMs = retryAfter
         ? parseInt(retryAfter, 10) * 1000
         : RATE_LIMIT_DELAY_MS * Math.pow(2, attempt);
-      console.warn(
+      getLogger().warn(
         `LangSmith rate limited. Retrying in ${(delayMs / 1000).toFixed(1)}s...`,
       );
       await new Promise((r) => setTimeout(r, delayMs));

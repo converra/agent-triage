@@ -3,11 +3,31 @@ dist/
 *.tsbuildinfo
 .agent-triage-progress.json
 .env
-.env.local
+.env.*
+.npmrc
 *.log
 .DS_Store
+Thumbs.db
+.vscode/
+.idea/
 report.json
 report.html
 diff.json
 .agent-triage-demo-*
 .triage-history.jsonl
+
+# Generated artifacts
+conversations.json
+policies.json
+*.bak
+*.backup.json
+demo-report.json
+demo-report.html
+index.html
+
+# Ad-hoc test output
+test-data/
+prompts/
+
+# Claude Code local settings (may contain API keys)
+.claude/settings.local.json

@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { createHash } from "node:crypto";
 import type { ConversationResult } from "./types.js";
+import { getLogger } from "../logger.js";
 
 const PROGRESS_FILE = ".agent-triage-progress.json";
 const TEMP_SUFFIX = ".tmp";
@@ -29,7 +30,7 @@ export async function loadProgress(
     const data: ProgressData = JSON.parse(raw);
 
     if (data.policiesHash !== policiesHash) {
-      console.warn(
+      getLogger().warn(
         "Warning: policies.json has changed since the last run. " +
           "Discarding stale progress.\n",
       );

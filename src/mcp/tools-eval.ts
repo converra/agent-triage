@@ -1,8 +1,9 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { readFile, writeFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import {
   extractPolicies,
@@ -30,6 +31,9 @@ import type { ConversationResult } from "../evaluation/types.js";
 import { PoliciesFileSchema } from "../policy/types.js";
 import { computePoliciesHash, loadProgress, cleanupProgress } from "../evaluation/progress.js";
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const pkg = JSON.parse(readFileSync(resolve(__dirname, "../../package.json"), "utf-8")) as { version: string };
+
 import {
   jsonResult,
   errorResult,
@@ -40,6 +44,7 @@ import {
   averageMetrics,
   formatExplanation,
   generateDiagnosisForResult,
+  safePath,
 } from "./helpers.js";
 
 /**
@@ -66,14 +71,14 @@ export function registerEvalTools(server: McpServer): void {
   }, async ({ prompt_path, output_path }) => {
     try {
       const promptContent = await readFile(
-        resolve(process.cwd(), prompt_path),
+        safePath(prompt_path),
         "utf-8",
       );
 
       const llm = await resolveLlm();
       const policies = await extractPolicies(llm, promptContent);
 
-      const outPath = resolve(process.cwd(), output_path ?? "policies.json");
+      const outPath = safePath(output_path ?? "policies.json");
       await writeFile(outPath, JSON.stringify(policies, null, 2), "utf-8");
 
       const usage = llm.getUsage();
@@ -132,7 +137,7 @@ export function registerEvalTools(server: McpServer): void {
     },
   }, async (params) => {
     try {
-      const reportDir = resolve(process.cwd(), params.report_dir ?? ".");
+      const reportDir = safePath(params.report_dir ?? ".");
       const reportPath = resolve(reportDir, "report.json");
       const hasReport = existsSync(reportPath);
 
@@ -217,7 +222,7 @@ export function registerEvalTools(server: McpServer): void {
       }
 
       const llm = await resolveLlm();
-      const policiesPath = resolve(process.cwd(), params.policies_path ?? "policies.json");
+      const policiesPath = safePath(params.policies_path ?? "policies.json");
       let policies: Policy[] = [];
       if (existsSync(policiesPath)) {
         const raw = await readFile(policiesPath, "utf-8");
@@ -225,7 +230,7 @@ export function registerEvalTools(server: McpServer): void {
       }
 
       const systemPrompt = params.prompt_path
-        ? await readFile(resolve(process.cwd(), params.prompt_path), "utf-8")
+        ? await readFile(safePath(params.prompt_path), "utf-8")
         : conv.systemPrompt ?? "";
 
       const { evaluateConversation } = await import("../evaluation/evaluator.js");
@@ -344,7 +349,7 @@ export function registerEvalTools(server: McpServer): void {
 
       const llm = await resolveLlm();
       const systemPrompt = params.prompt_path
-        ? await readFile(resolve(process.cwd(), params.prompt_path), "utf-8")
+        ? await readFile(safePath(params.prompt_path), "utf-8")
         : limited[0]?.systemPrompt ?? "";
 
       const allResults = new Map<string, {
@@ -483,7 +488,7 @@ export function registerEvalTools(server: McpServer): void {
       const llm = createLlmClient(config.llm.provider, apiKey, config.llm.model, config.llm.baseUrl);
 
       // Resolve policies
-      const policiesPath = resolve(process.cwd(), params.policies_path ?? "policies.json");
+      const policiesPath = safePath(params.policies_path ?? "policies.json");
       const hasPoliciesFile = existsSync(policiesPath);
 
       let policies: Policy[];
@@ -510,7 +515,7 @@ export function registerEvalTools(server: McpServer): void {
       }
 
       if (params.prompt_path) {
-        systemPrompt = await readFile(resolve(process.cwd(), params.prompt_path), "utf-8");
+        systemPrompt = await readFile(safePath(params.prompt_path), "utf-8");
       }
 
       if (!systemPrompt) {
@@ -560,7 +565,7 @@ export function registerEvalTools(server: McpServer): void {
       const runDuration = (Date.now() - startTime) / 1000;
 
       const report: Report = {
-        agentTriageVersion: "0.1.0",
+        agentTriageVersion: pkg.version,
         llmProvider: config.llm.provider,
         llmModel: config.llm.model,
         policiesHash,
@@ -581,7 +586,7 @@ export function registerEvalTools(server: McpServer): void {
         cost: { totalTokens, estimatedCost: cost },
       };
 
-      const outputDir = resolve(process.cwd(), params.output_dir ?? ".");
+      const outputDir = safePath(params.output_dir ?? ".");
       const reportPath = resolve(outputDir, "report.json");
       await writeFile(reportPath, JSON.stringify(report, null, 2), "utf-8");
 

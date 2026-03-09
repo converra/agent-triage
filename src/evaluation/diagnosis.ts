@@ -3,6 +3,8 @@ import { buildDiagnosisPrompt } from "../llm/prompts.js";
 import { parseJsonResponse } from "../llm/json.js";
 import type { Diagnosis, ConversationResult, MetricScores } from "./types.js";
 import type { NormalizedConversation } from "../ingestion/types.js";
+import { formatTranscript, averageMetrics, validateEnum } from "./shared.js";
+import { getLogger } from "../logger.js";
 
 const TOP_N_WORST = 10;
 
@@ -59,7 +61,7 @@ export async function generateDiagnoses(
       const diagnosis = await diagnoseSingle(llm, conv, result, systemPrompt);
       result.diagnosis = diagnosis;
     } catch (error) {
-      console.warn(
+      getLogger().warn(
         `  Warning: Could not generate diagnosis for ${result.id}: ${error}`,
       );
     }
@@ -72,9 +74,7 @@ async function diagnoseSingle(
   result: ConversationResult,
   systemPrompt: string,
 ): Promise<Diagnosis> {
-  const transcript = conversation.messages
-    .map((msg, i) => `Turn ${i + 1} [${msg.role}]: ${msg.content}`)
-    .join("\n\n");
+  const transcript = formatTranscript(conversation);
 
   const prompt = buildDiagnosisPrompt(
     systemPrompt,
@@ -101,9 +101,9 @@ async function diagnoseSingle(
       ? parsed.cascadeChain.map(String)
       : [],
     fix: String(parsed.fix ?? ""),
-    severity: validateSeverity(parsed.severity),
-    confidence: validateConfidence(parsed.confidence),
-    failureType: validateFailureType(parsed.failureType),
+    severity: validateEnum(parsed.severity, ["critical", "major", "minor"], "major") as Diagnosis["severity"],
+    confidence: validateEnum(parsed.confidence, ["high", "medium", "low"], "medium") as Diagnosis["confidence"],
+    failureType: validateEnum(parsed.failureType, ["prompt_issue", "orchestration_issue", "model_limitation", "retrieval_rag_issue"], "prompt_issue") as Diagnosis["failureType"],
     failureSubtype: String(parsed.failureSubtype ?? ""),
     blastRadius: Array.isArray(parsed.blastRadius)
       ? parsed.blastRadius.map(String)
@@ -112,33 +112,3 @@ async function diagnoseSingle(
   };
 }
 
-function averageMetrics(metrics: MetricScores): number {
-  const values = Object.values(metrics);
-  return values.reduce((sum, v) => sum + v, 0) / values.length;
-}
-
-function validateSeverity(val: unknown): "critical" | "major" | "minor" {
-  const s = String(val).toLowerCase();
-  if (s === "critical" || s === "major" || s === "minor") return s;
-  return "major";
-}
-
-function validateConfidence(val: unknown): "high" | "medium" | "low" {
-  const s = String(val).toLowerCase();
-  if (s === "high" || s === "medium" || s === "low") return s;
-  return "medium";
-}
-
-function validateFailureType(
-  val: unknown,
-): Diagnosis["failureType"] {
-  const s = String(val);
-  const valid = [
-    "prompt_issue",
-    "orchestration_issue",
-    "model_limitation",
-    "retrieval_rag_issue",
-  ];
-  if (valid.includes(s)) return s as Diagnosis["failureType"];
-  return "prompt_issue";
-}

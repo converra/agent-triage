@@ -7,6 +7,7 @@ import {
   describeWeakMetrics,
   esc,
   escBold,
+  escJs,
   formatFailureType,
   formatSubtype,
   stripHtml,
@@ -20,6 +21,18 @@ function truncate(text: string, max: number): string {
   return (cut > 0 ? text.slice(0, cut) : text.slice(0, max)) + "…";
 }
 
+/** Extract a short headline from a verbose diagnosis summary. */
+function shortenSummary(summary: string): string {
+  // Try first sentence
+  const first = summary.split(/\.\s/)[0]!.replace(/\.$/, "");
+  if (first.length <= 80) return first;
+  // Cut at first subordinate clause marker
+  const clauseCut = first.search(/,\s*(which|despite|indicating|leading|resulting|because|although)\b/i);
+  if (clauseCut > 20) return first.slice(0, clauseCut);
+  return truncate(first, 80);
+}
+
+
 export function renderHeader(report: Report, date: string): string {
   const agentCount = report.agents?.length ?? 0;
   const autoName = report.agents?.[0]?.name;
@@ -32,7 +45,7 @@ export function renderHeader(report: Report, date: string): string {
     <div class="hdr-top">
       <div class="logo">${ICONS.check}</div>
       <div class="tool-name"><b>agent</b>-triage</div>
-      <span class="hdr-by">by <a href="https://converra.ai" class="hdr-by-link">Converra</a></span>
+      <span class="hdr-by">by <a href="https://converra.ai?utm_source=agent-triage&utm_medium=report&utm_campaign=header" class="hdr-by-link">Converra</a></span>
     </div>
     <h1>${headerTitle}</h1>
     <div class="hdr-meta">
@@ -85,7 +98,7 @@ export function renderHealthSummary(
   </div>`;
 }
 
-/** Extract top 2 distinct problem descriptions from failing conversations. */
+/** Extract distinct problem descriptions from failing conversations (up to 5). */
 function buildTopSummaries(issueConvs: Report["conversations"]): string {
   const withDiag = issueConvs.filter((c) => c.diagnosis);
   if (withDiag.length === 0) return "";
@@ -94,13 +107,13 @@ function buildTopSummaries(issueConvs: Report["conversations"]): string {
   const items: string[] = [];
   for (const c of withDiag) {
     const d = c.diagnosis!;
-    const text = d.shortSummary || d.summary.split(/\.\s/)[0]!.replace(/\.$/, "");
+    const text = d.shortSummary || shortenSummary(d.summary);
     const key = text.slice(0, 30).toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
     const typeClass = d.failureType === "prompt_issue" ? "prompt" : d.failureType === "orchestration_issue" ? "orch" : "model";
     items.push(`<li><span class="type-badge sm ${typeClass}">${esc(formatFailureType(d.failureType))}</span> ${escBold(text)}</li>`);
-    if (items.length >= 2) break;
+    if (items.length >= 5) break;
   }
 
   return `<ul class="verdict-summaries">${items.join("")}</ul>`;
@@ -122,7 +135,7 @@ export function renderMetricsBar(report: Report): string {
     return `<div class="mb-cell"><div class="mb-label">${m.label}</div><div class="mb-val ${color}">${val}</div></div>`;
   });
 
-  return `<details class="section-collapse">
+  return `<details class="section-collapse" open>
   <summary><div class="stitle" style="margin:0;">Quality metrics (averages)</div>${ICONS.chevDown}</summary>
   <div class="metrics-bar">${cells.join("")}</div>
   </details>`;
@@ -293,18 +306,23 @@ function buildTurnTimeline(
     const { turnNum, originalTurn, isRoot, isFailing, isCascade, isUser, msg } = entry.turn;
     const dotClass = isRoot || isFailing ? "f" : isCascade ? "w" : "p";
 
-    // Policy violations — show names directly
+    // Policy violations — collapse behind count when many
     let failBadges = "";
     const failingPolicies = (isRoot || isFailing)
       ? conv.policyResults.filter((pr) => !pr.passed && pr.failingTurns?.includes(originalTurn))
       : [];
     if (failingPolicies.length > 0) {
-      failBadges = failingPolicies
+      const badges = failingPolicies
         .map((pr) => {
           const policy = report.policies.find((p) => p.id === pr.policyId);
           return `<span class="tb f">${esc(policy?.name ?? pr.policyId)}</span>`;
         })
         .join("");
+      if (failingPolicies.length <= 3) {
+        failBadges = badges;
+      } else {
+        failBadges = `<span class="tb f tb-count" onclick="this.nextElementSibling.classList.toggle('show');this.classList.toggle('expanded')">${failingPolicies.length} violations</span><span class="tb-overflow">${badges}</span>`;
+      }
     }
 
     // Routing chain: show on first assistant turn, then only when agent changes
@@ -332,7 +350,7 @@ function buildTurnTimeline(
     const plain = stripHtml(msg.content);
     const turnDesc = d.turnDescriptions?.[originalTurn];
 
-    // Narrative-first: diagnosis/description is primary, message is secondary
+    // Narrative-first: use turnDesc for root cause (not diagnosis summary), cascade uses cascadeDesc
     const diagText = isRoot ? (turnDesc || summarizeTurnContent(plain, 120)) : (isFailing || isCascade) ? cascadeDesc : undefined;
     let contentHtml: string;
     if (diagText && (isRoot || isFailing || isCascade)) {
@@ -404,7 +422,7 @@ export function renderAllConversations(
           ${agentBadge}
           <span class="conv-score ${healthClass}">${avg}</span>
           <span class="conv-cause">${escBold(cause)}</span>
-          ${d?.failureSubtype ? `<span class="type-badge sm ${d.failureType === "prompt_issue" ? "prompt" : d.failureType === "orchestration_issue" ? "orch" : "model"}">${esc(formatSubtype(d.failureSubtype))}</span>` : ""}
+          ${d?.failureSubtype && d.failureSubtype !== "unknown" ? `<span class="type-badge sm ${d.failureType === "prompt_issue" ? "prompt" : d.failureType === "orchestration_issue" ? "orch" : "model"}">${esc(formatSubtype(d.failureSubtype))}</span>` : ""}
           ${ICONS.chevDownSm}
         </summary>
         ${expand}
@@ -465,25 +483,24 @@ function renderConvDive(
     ? `<div class="blast"><span class="blast-icon">${ICONS.alertTriangleSm}</span><span><strong>Blast radius:</strong> Editing may affect ${d.blastRadius.map((r) => `<em>${esc(r)}</em>`).join(", ")}.</span></div>`
     : "";
 
+  const metricBadgesHtml = buildMetricBadges(conv.metrics as Record<string, number>);
 
-  const timelineHtml = visibleStepCount > 1
+  const timelineHtml = turns.length > 0
     ? `<div class="tl">
       <div class="tl-header"><div class="tl-label">Step Timeline</div><div class="tl-filter">${turns.length} of ${visibleStepCount} steps</div></div>
       ${turns.join("")}
     </div>`
     : "";
 
-  const metricBadgesHtml = buildMetricBadges(conv.metrics as Record<string, number>);
-
   return `<div class="conv-expand">
-    <div class="conv-id-label">${esc(conv.id)}</div>
+    <div class="conv-id-label" title="${esc(conv.id)}">${esc(conv.id.length > 12 ? conv.id.slice(0, 12) + "…" : conv.id)}</div>
     <div class="conv-metrics-detail">${metricBadgesHtml}</div>
     ${timelineHtml}
     <div class="wif">
       <div class="wif-s"><div class="wif-l">What happened</div><div class="wif-t">${escBold(truncate(d.summary, 300))}</div></div>
       <div class="diag-cta">
         <button class="copy-btn" data-fix="${fixMd}" onclick="copyFix(this)">${ICONS.copy} Copy for coding agent</button>
-        <button class="copy-btn" data-fix="${fixMd}" onclick="downloadFix(this, '${esc(conv.id.slice(0, 20))}')">${ICONS.fileSm} Save as .md</button>
+        <button class="copy-btn" data-fix="${fixMd}" onclick="downloadFix(this, '${escJs(conv.id.slice(0, 20))}')">${ICONS.fileSm} Save as .md</button>
         ${d.failureType === "prompt_issue" || d.failureType === "retrieval_rag_issue" ? `<a href="https://converra.ai" class="diag-link">Fix in Converra ${ICONS.externalSm}</a>` : ""}
       </div>
       <div class="wif-s"><div class="wif-l impact">Impact</div><div class="wif-t">${escBold(truncate(d.impact, 300))}</div></div>
@@ -493,42 +510,62 @@ function renderConvDive(
   </div>`;
 }
 
+const FP_ICONS: Record<string, string> = {
+  prompt_issue: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>',
+  orchestration_issue: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>',
+  model_limitation: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>',
+  retrieval_rag_issue: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
+};
+
+function fpColorClass(type: string): string {
+  if (type === "prompt_issue") return "prompt";
+  if (type === "orchestration_issue") return "orch";
+  if (type === "retrieval_rag_issue") return "rag";
+  return "model";
+}
+
 export function renderFailurePatterns(report: Report): string {
-  if (report.failurePatterns.byType.length === 0) return "";
+  const patterns = report.failurePatterns.byType;
+  if (patterns.length === 0) return "";
 
-  const fixable = report.failurePatterns.byType.filter(
-    (t) => t.type === "prompt_issue" || t.type === "retrieval_rag_issue",
-  );
-  const needsCode = report.failurePatterns.byType.filter(
-    (t) => t.type === "orchestration_issue" || t.type === "model_limitation",
-  );
+  const total = patterns.reduce((s, p) => s + p.count, 0);
 
-  const renderGroupLine = (
-    patterns: Report["failurePatterns"]["byType"],
-    label: string,
-    icon: string,
-    cssClass: string,
-  ): string => {
-    const subtypes = patterns.flatMap((p) =>
-      p.subtypes.map((s) => `${esc(formatSubtype(s.name))} ${s.count} (${s.percentage}%)`),
-    );
-    return `<div class="group-label ${cssClass}">${icon} ${label}: ${subtypes.join(", ")}</div>`;
-  };
+  const cards = patterns.map((p) => {
+    const cls = fpColorClass(p.type);
+    const icon = FP_ICONS[p.type] ?? FP_ICONS.model_limitation;
+    const critHtml = p.criticalCount > 0
+      ? ` · <span class="fp-crit">${p.criticalCount} critical</span>`
+      : "";
 
-  let html = `<div class="patterns" style="border-bottom:1px solid var(--border-subtle);padding:12px 0 8px;">`;
-  html += `<div class="stitle">Root cause analysis</div>`;
+    const subtypesHtml = p.subtypes.map((s) =>
+      `<div class="fp-sub">
+        <span class="fp-sub-name">${esc(formatSubtype(s.name))}</span>
+        <div class="fp-sub-bar-wrap"><div class="fp-sub-bar ${cls}" style="width:${s.percentage}%"></div></div>
+        <span class="fp-sub-pct">${s.percentage}%</span>
+        <span class="fp-sub-ct">${s.count}</span>
+      </div>`
+    ).join("");
 
-  if (fixable.length > 0) {
-    html += renderGroupLine(fixable, "Fixable — prompt &amp; config", ICONS.checkCircleSm, "fixable");
-  }
+    return `<div class="fp-card">
+      <div class="fp-card-hdr">
+        <div class="fp-icon ${cls}">${icon}</div>
+        <div class="fp-info">
+          <div class="fp-type">${esc(formatFailureType(p.type))}s</div>
+          <div class="fp-count"><b>${p.count}</b> failure${p.count !== 1 ? "s" : ""}${critHtml}</div>
+        </div>
+        <div class="fp-num">${p.count}</div>
+      </div>
+      <div class="fp-body"><div class="fp-subtypes">${subtypesHtml}</div></div>
+    </div>`;
+  }).join("");
 
-  if (needsCode.length > 0) {
-    html += renderGroupLine(needsCode, "Needs code change", ICONS.code, "needs-code");
-  }
-
-  html += `<div class="trust-note">${ICONS.lock} This report is local-only. No data was uploaded.</div>`;
-  html += `</div>`;
-  return html;
+  return `<div class="fp">
+    <div class="fp-header">
+      <div class="stitle">Root cause breakdown</div>
+      <div class="fp-total"><b>${total}</b> failure${total !== 1 ? "s" : ""} across <b>${patterns.length}</b> root cause ${patterns.length !== 1 ? "categories" : "category"}</div>
+    </div>
+    <div class="fp-grid">${cards}</div>
+  </div>`;
 }
 
 
@@ -541,14 +578,6 @@ export function renderRecommendations(report: Report): string {
         .map(formatFailureType)
         .join(", ");
       const recMd = btoa(unescape(encodeURIComponent(buildRecommendationFixMd(rec, i))));
-
-      // Pull evidence from conversations matching this recommendation's failure types
-      const evidence = report.conversations
-        .filter((c) => c.diagnosis && rec.targetFailureTypes.includes(c.diagnosis.failureType))
-        .slice(0, 2)
-        .map((c) => `<span style="color:var(--text-3);font-size:12px;">${esc(c.id.slice(0, 10))}: ${escBold(c.diagnosis!.summary.split(".")[0]!)}</span>`)
-        .join("<br>");
-      const evidenceHtml = evidence ? `<div style="margin-top:8px;padding:8px 10px;background:var(--bg-subtle);border-radius:var(--r);border:1px solid var(--border-subtle);line-height:1.6;">${evidence}</div>` : "";
 
       const howToApplyHtml = rec.howToApply
         ? `<div class="rec-how-to-apply"><div class="rec-how-label">How to apply</div><div class="rec-how-content">${escBold(truncate(rec.howToApply, 400))}</div></div>`
@@ -566,10 +595,8 @@ export function renderRecommendations(report: Report): string {
       <div class="rec-detail">
         <div class="rec-desc">${esc(rec.description)}</div>
         ${howToApplyHtml}
-        ${evidenceHtml}
         <div class="rec-actions">
           <button class="copy-btn" data-fix="${recMd}" onclick="copyFix(this)">${ICONS.copy} Copy for coding agent</button>
-          ${rec.targetFailureTypes.some((t: string) => t === "prompt_issue" || t === "retrieval_rag_issue") ? `<a href="https://converra.ai" class="diag-link">Fix in Converra ${ICONS.externalSm}</a>` : ""}
         </div>
       </div>
     </details>`;
@@ -583,18 +610,21 @@ export function renderRecommendations(report: Report): string {
   const allRecsB64 = btoa(unescape(encodeURIComponent(allRecsMd)));
   const recCount = report.failurePatterns.topRecommendations.length;
 
-  return `<details class="recs" id="recs-section" open>
-    <summary class="recs-header">
+  return `<div class="recs" id="recs-section">
+    <div class="recs-header">
       <div class="stitle" style="margin:0;">How to fix it</div>
       <a href="https://converra.ai" class="verdict-cta" onclick="event.stopPropagation()">Track fixes over time ${ICONS.externalSm}</a>
-      ${ICONS.chevDown}
-    </summary>
-    ${recCount > 1 ? `<div class="recs-batch">
-      <button class="copy-btn primary" data-fix="${allRecsB64}" onclick="copyFix(this)">${ICONS.copy} Copy all ${recCount} fixes for coding agent</button>
-      <button class="copy-btn" data-fix="${allRecsB64}" onclick="downloadFix(this, 'all-recommendations')">${ICONS.fileSm} Save all as .md</button>
-    </div>` : ""}
-    ${cards}
-  </details>`;
+      <div class="recs-batch">
+        <button class="copy-btn primary" data-fix="${allRecsB64}" onclick="copyFix(this)">${ICONS.copy} Copy all ${recCount} fixes</button>
+        <button class="copy-btn" data-fix="${allRecsB64}" onclick="downloadFix(this, 'all-recommendations')">${ICONS.fileSm} Save all as .md</button>
+        <span class="recs-hint">Paste into Claude Code, Cursor, or your coding agent</span>
+      </div>
+    </div>
+    <details class="recs-details">
+      <summary class="recs-expand">${recCount} recommendation${recCount > 1 ? "s" : ""} ${ICONS.chevDownSm}</summary>
+      ${cards}
+    </details>
+  </div>`;
 }
 
 export function renderBehavioralRules(report: Report): string {
@@ -641,5 +671,5 @@ export function renderReproducibility(report: Report): string {
 }
 
 export function renderFooter(): string {
-  return `<div class="ftr"><div class="ftr-brand"><div class="ftr-mark">${ICONS.check}</div><span class="ftr-text">Powered by <a href="https://converra.ai" class="ftr-name">Converra</a></span> — for when you're done fixing agents manually. <a href="https://converra.ai" class="ftr-link">Learn more ${ICONS.externalSm}</a></span></div><div class="helpful">Was this report useful? <button class="hbtn">${ICONS.thumbUp}</button> <button class="hbtn">${ICONS.thumbDown}</button></div></div>`;
+  return `<div class="ftr"><div class="trust-note">${ICONS.lock} This report is local-only. No data was uploaded.</div><div class="ftr-brand"><div class="ftr-mark">${ICONS.check}</div><span class="ftr-text">Powered by <a href="https://converra.ai?utm_source=agent-triage&utm_medium=report&utm_campaign=footer" class="ftr-name">Converra</a> — for when you're done fixing agents manually.</span></div><div class="ftr-actions"><a href="https://converra.ai?utm_source=agent-triage&utm_medium=report&utm_campaign=cta-automate" class="verdict-cta">Automate this ${ICONS.externalSm}</a></div><div class="helpful">Was this report useful? <button class="hbtn">${ICONS.thumbUp}</button> <button class="hbtn">${ICONS.thumbDown}</button></div></div>`;
 }

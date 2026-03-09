@@ -4,6 +4,10 @@ import { parseJsonResponse } from "../llm/json.js";
 import type { Policy } from "../policy/types.js";
 import type { PolicyResult, Verdict } from "./types.js";
 import type { NormalizedConversation } from "../ingestion/types.js";
+import { formatTranscript, validateEnum } from "./shared.js";
+import { getLogger } from "../logger.js";
+
+const FAILURE_TYPES = ["prompt_issue", "orchestration_issue", "model_limitation", "retrieval_rag_issue"];
 
 /**
  * Check all policies against a single conversation.
@@ -20,7 +24,7 @@ export async function checkPolicies(
   try {
     return await batchCheck(llm, transcript, policies, systemPrompt);
   } catch (batchError) {
-    console.warn(
+    getLogger().warn(
       `  Batch policy check failed for ${conversation.id}, falling back to individual checks...`,
     );
     return individualCheck(llm, transcript, policies, systemPrompt);
@@ -56,7 +60,7 @@ async function batchCheck(
       failingTurns: Array.isArray(result.failingTurns)
         ? result.failingTurns.map(Number)
         : undefined,
-      failureType: result.failureType ? String(result.failureType) as PolicyResult["failureType"] : null,
+      failureType: result.failureType ? validateEnum(result.failureType, FAILURE_TYPES, "prompt_issue") as PolicyResult["failureType"] : null,
       failureSubtype: result.failureSubtype ? String(result.failureSubtype) : null,
     };
   });
@@ -100,7 +104,7 @@ async function individualCheck(
           : null,
       });
     } catch (error) {
-      console.warn(`  Warning: Could not evaluate policy "${policy.name}": ${error}`);
+      getLogger().warn(`  Warning: Could not evaluate policy "${policy.name}": ${error}`);
       results.push({
         policyId: policy.id,
         verdict: "fail" as Verdict,
@@ -122,10 +126,4 @@ function parseVerdict(result: Record<string, unknown>): Verdict {
   if (v === "pass" || v === "fail" || v === "not_applicable") return v;
   // Fallback: legacy LLM response with boolean `passed`
   return result.passed ? "pass" : "fail";
-}
-
-function formatTranscript(conversation: NormalizedConversation): string {
-  return conversation.messages
-    .map((msg, i) => `Turn ${i + 1} [${msg.role}]: ${msg.content}`)
-    .join("\n\n");
 }

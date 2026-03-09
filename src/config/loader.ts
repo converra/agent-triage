@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { parse as parseYaml } from "yaml";
 import { ConfigSchema, type Config } from "./schema.js";
-import { buildDefaultConfig, getDefaultModel } from "./defaults.js";
+import { getDefaultModel } from "./defaults.js";
 
 const CONFIG_FILENAMES = [
   "agent-triage.config.yaml",
@@ -83,6 +83,7 @@ function deepMerge(
   const result = { ...base };
   for (const [key, value] of Object.entries(override)) {
     if (value === undefined) continue;
+    if (key === "__proto__" || key === "constructor" || key === "prototype") continue;
     if (
       value !== null &&
       typeof value === "object" &&

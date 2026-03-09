@@ -11,6 +11,7 @@ import {
   ingestTraces,
   filterByQuery,
   loadPoliciesFromFile,
+  safePath,
 } from "./helpers.js";
 
 /**
@@ -35,7 +36,7 @@ export function registerReadTools(server: McpServer): void {
     },
   }, async ({ report_dir }) => {
     try {
-    const reportDir = resolve(process.cwd(), report_dir ?? ".");
+    const reportDir = safePath(report_dir ?? ".");
     const reportPath = resolve(reportDir, "report.json");
 
     if (!existsSync(reportPath)) {
@@ -257,8 +258,8 @@ export function registerReadTools(server: McpServer): void {
     },
   }, async ({ before_path, after_path }) => {
     try {
-      const beforeRaw = await readFile(resolve(process.cwd(), before_path), "utf-8");
-      const afterRaw = await readFile(resolve(process.cwd(), after_path), "utf-8");
+      const beforeRaw = await readFile(safePath(before_path), "utf-8");
+      const afterRaw = await readFile(safePath(after_path), "utf-8");
       const before = JSON.parse(beforeRaw) as Report;
       const after = JSON.parse(afterRaw) as Report;
       const diff = diffReports(before, after);
@@ -292,7 +293,7 @@ export function registerReadTools(server: McpServer): void {
   }, async ({ report_dir, last }) => {
     try {
       const { readHistory } = await import("../history.js");
-      const dir = resolve(process.cwd(), report_dir ?? ".");
+      const dir = safePath(report_dir ?? ".");
       const entries = await readHistory(dir);
 
       if (entries.length === 0) {

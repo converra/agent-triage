@@ -7,7 +7,7 @@ export const LlmProviderSchema = z.enum([
 ]);
 export type LlmProvider = z.infer<typeof LlmProviderSchema>;
 
-export const TraceSourceSchema = z.enum(["json", "langsmith", "otel"]);
+export const TraceSourceSchema = z.enum(["json", "langsmith", "otel", "langfuse", "axiom"]);
 export type TraceSource = z.infer<typeof TraceSourceSchema>;
 
 export const ConfigSchema = z.object({

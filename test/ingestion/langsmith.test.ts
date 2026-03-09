@@ -20,8 +20,11 @@ const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
 
 // Import after mocking
-const { readLangSmithTraces, extractMessagesFromRun, resolveAgentName, hashPrompt, normalizeRole } = await import(
+const { readLangSmithTraces, extractMessagesFromRun, resolveAgentName, hashPrompt } = await import(
   "../../src/ingestion/langsmith.js"
+);
+const { normalizeRole } = await import(
+  "../../src/ingestion/normalize-role.js"
 );
 
 beforeEach(() => {
@@ -860,14 +863,15 @@ describe("resolveAgentName", () => {
     expect(name).toBe("Sales Assistant");
   });
 
-  it("falls back to run name for generic names", () => {
+  it("returns empty string for generic run names without identifiable prompt agent", () => {
     const run = {
       id: "r3", name: "ChatOpenAI", run_type: "llm", trace_id: "t3",
       inputs: {}, outputs: null, start_time: "", end_time: null,
-      extra: {}, parent_run_id: null, total_tokens: null, status: "success",
+      extra: {}, parent_run_id: null, total_tokens: null,
+      prompt_tokens: null, completion_tokens: null, status: "success",
     };
     const name = resolveAgentName(run, "Answer the user's questions.");
-    expect(name).toBe("ChatOpenAI");
+    expect(name).toBe("");
   });
 
   it("extracts name from markdown heading", () => {
@@ -876,8 +880,8 @@ describe("resolveAgentName", () => {
       inputs: {}, outputs: null, start_time: "", end_time: null,
       extra: {}, parent_run_id: null, total_tokens: null, status: "success",
     };
-    const name = resolveAgentName(run, "# Beelo AI Guide\n\nYou help users navigate the website.");
-    expect(name).toBe("Beelo AI Guide");
+    const name = resolveAgentName(run, "# Acme AI Guide\n\nYou help users navigate the website.");
+    expect(name).toBe("Acme AI Guide");
   });
 });
 

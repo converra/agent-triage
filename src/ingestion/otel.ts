@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import type { NormalizedConversation, Message } from "./types.js";
+import { normalizeRole } from "./normalize-role.js";
 
 /**
  * OpenTelemetry OTLP/JSON reader
@@ -147,6 +148,7 @@ function normalizeTrace(
                   const role = msg.role ?? "user";
                   if (role === "system" && !systemPrompt) {
                     systemPrompt = msg.content;
+                    continue;
                   }
                   messages.push({
                     role: normalizeRole(role),
@@ -196,6 +198,7 @@ function normalizeTrace(
       totalTokens: totalTokens > 0 ? totalTokens : undefined,
       duration: durationMs > 0 ? durationMs / 1000 : undefined,
       source: "otel",
+      traceId,
     },
     timestamp: new Date(earliestTime / 1_000_000).toISOString(),
   };
@@ -217,13 +220,3 @@ function parseAttributes(
   return result;
 }
 
-function normalizeRole(
-  role: string,
-): "user" | "assistant" | "system" | "tool" {
-  const lower = role.toLowerCase();
-  if (lower === "user" || lower === "human") return "user";
-  if (lower === "assistant" || lower === "ai") return "assistant";
-  if (lower === "system") return "system";
-  if (lower === "tool" || lower === "function") return "tool";
-  return "user";
-}

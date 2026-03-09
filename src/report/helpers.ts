@@ -1,4 +1,5 @@
 import type { Report } from "../evaluation/types.js";
+import { averageMetrics } from "../evaluation/shared.js";
 
 export function esc(s: string): string {
   return s
@@ -9,16 +10,24 @@ export function esc(s: string): string {
     .replace(/'/g, "&#39;");
 }
 
+/** Escape a string for safe use inside a JS string literal within an HTML attribute. */
+export function escJs(s: string): string {
+  return s
+    .replace(/\\/g, "\\\\")
+    .replace(/'/g, "\\'")
+    .replace(/"/g, '\\"')
+    .replace(/</g, "\\x3c")
+    .replace(/>/g, "\\x3e")
+    .replace(/\n/g, "\\n")
+    .replace(/\r/g, "\\r");
+}
+
 /** HTML-escape then convert **bold** markers to <strong> for agent name emphasis. */
 export function escBold(s: string): string {
   return esc(s).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
 }
 
-export function avgMetrics(m: Record<string, number>): number {
-  const vals = Object.values(m);
-  if (vals.length === 0) return 0;
-  return vals.reduce((s, v) => s + v, 0) / vals.length;
-}
+export const avgMetrics = averageMetrics;
 
 export function conversationHealth(
   metrics: Record<string, number>,

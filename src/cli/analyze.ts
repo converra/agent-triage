@@ -1,6 +1,7 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
-import { existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { loadConfig, resolveApiKey } from "../config/loader.js";
 import { createLlmClient } from "../llm/client.js";
 import { readJsonTraces } from "../ingestion/json.js";
@@ -32,6 +33,9 @@ import { autoExtractPolicies } from "../ingestion/auto-discovery.js";
 import type { LlmClient } from "../llm/client.js";
 import { applyFilters, parseDuration, createLogger } from "./filters.js";
 import { appendHistory } from "../history.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const pkg = JSON.parse(readFileSync(resolve(__dirname, "../../package.json"), "utf-8")) as { version: string };
 
 export interface AnalyzeOptions {
   traces?: string;
@@ -318,7 +322,7 @@ export async function analyzeCommand(options: AnalyzeOptions): Promise<void> {
   const runDuration = (Date.now() - startTime) / 1000;
 
   const report: Report = {
-    agentTriageVersion: "0.1.0",
+    agentTriageVersion: pkg.version,
     llmProvider: config.llm.provider,
     llmModel: config.llm.model,
     policiesHash,

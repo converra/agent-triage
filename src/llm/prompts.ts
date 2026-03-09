@@ -134,12 +134,16 @@ For each policy, determine:
    - "not_applicable" — the conversation has insufficient turns/context to evaluate this policy, OR the policy is about a different product/feature/scenario that doesn't appear in this conversation. Use this generously — it's better to mark as not_applicable than to force a pass/fail on irrelevant policies.
 2. evidence: quote the specific turn(s) that prove compliance or violation. For not_applicable, briefly explain why.
 3. failingTurns: array of turn numbers (1-based) where the violation occurred (empty if passed or not_applicable)
-4. failureType: root cause category (only if verdict is "fail"):
-   - "prompt_issue" — the prompt is missing instructions or has conflicting rules
-   - "orchestration_issue" — routing, handoff, or multi-step flow failures
-   - "model_limitation" — the model can't do what's asked regardless of prompt
-   - "retrieval_rag_issue" — knowledge retrieval failures
-   IMPORTANT: In multi-agent systems, distinguish between prompt and orchestration failures. If the prompt itself defines wrong routing rules (e.g., "send billing questions to FAQ"), that's "prompt_issue". But if the prompt defines correct rules and the Router/Orchestrator still routes wrong (e.g., billing dispute sent to FAQ agent despite rules saying to use Billing agent), that's "orchestration_issue" / "wrong_routing". Similarly, if a handoff is promised but silently fails, that's "orchestration_issue" / "missing_handoff".
+4. failureType: root cause category (only if verdict is "fail"). Choose the type that best describes the ROOT CAUSE:
+   - "prompt_issue" — the prompt is missing instructions, has conflicting rules, lacks necessary context, or the instruction exists but could be improved (made clearer, more prominent, or better structured) to prevent this failure. KEY TEST: would changing the prompt likely fix this? If yes → prompt_issue. This is the most common type.
+   - "orchestration_issue" — routing, handoff, or multi-step flow failures in a multi-agent system. The prompt defines correct rules but the orchestrator/router fails to follow them.
+   - "model_limitation" — the prompt is crystal clear and unambiguous, yet the model demonstrates a fundamental capability gap: incorrect math/reasoning (e.g., "6 weeks is within 30 days"), logical contradictions, or inability to follow a simple, explicit instruction that no amount of prompt improvement could fix. This should be RARE — most failures can be addressed with better prompting.
+   - "retrieval_rag_issue" — the agent calls a tool, queries a database, or accesses a knowledge base, and the RETURNED DATA is wrong, stale, or incomplete. Look for tool/function call results that contain incorrect information, or the agent citing specific data from a lookup that the user corrects. The prompt and model are fine; the data layer failed.
+
+   IMPORTANT DISTINCTIONS:
+   - prompt_issue vs model_limitation: Most violations of existing instructions are "prompt_issue" — the instruction could be made clearer, given more emphasis, or better positioned. Only use "model_limitation" when the instruction is dead simple and unambiguous (e.g., a specific number or a basic math check) and the model still gets it wrong, showing a fundamental capability gap.
+   - prompt_issue vs orchestration_issue: If the prompt defines wrong routing rules (e.g., "send billing questions to FAQ"), that's "prompt_issue". If the prompt defines correct rules but the Router/Orchestrator still routes wrong, that's "orchestration_issue" / "wrong_routing".
+   - retrieval_rag_issue: If there is a tool call or data lookup in the conversation and the returned data is incorrect (wrong product, stale status, missing records), that's "retrieval_rag_issue" — even if the agent otherwise behaves correctly.
 5. failureSubtype: specific sub-category (only if verdict is "fail"):
    For prompt_issue: "context_loss", "intent_misclassification", "hallucination", "missing_escalation", "tone_violation"
    For orchestration_issue: "wrong_routing", "missing_handoff", "loop_detected"
@@ -157,12 +161,28 @@ Return ONLY a JSON array with no additional text:
     "failureSubtype": null
   },
   {
-    "policyId": "another-policy",
+    "policyId": "missing-instruction-policy",
     "verdict": "fail",
-    "evidence": "Turn 5: Agent fabricated a pricing policy...",
-    "failingTurns": [5, 7],
+    "evidence": "Turn 4: Agent had no guidance on handling this scenario...",
+    "failingTurns": [4],
     "failureType": "prompt_issue",
-    "failureSubtype": "hallucination"
+    "failureSubtype": "missing_escalation"
+  },
+  {
+    "policyId": "clear-rule-violated",
+    "verdict": "fail",
+    "evidence": "Turn 5: Agent stated 90-day return window despite prompt clearly saying 30 days...",
+    "failingTurns": [5],
+    "failureType": "model_limitation",
+    "failureSubtype": "instruction_following"
+  },
+  {
+    "policyId": "data-accuracy-policy",
+    "verdict": "fail",
+    "evidence": "Turn 3: Agent looked up order but returned wrong product name and stale delivery status...",
+    "failingTurns": [3],
+    "failureType": "retrieval_rag_issue",
+    "failureSubtype": "wrong_retrieval"
   },
   {
     "policyId": "short-conversation-policy",
@@ -223,6 +243,11 @@ Provide a detailed diagnosis:
 8. severity: "critical" (user harm, legal risk, trust broken), "major" (goal failed, user frustrated), "minor" (suboptimal but not harmful)
 9. confidence: "high" (clear evidence), "medium" (probable), "low" (uncertain)
 10. failureType: "prompt_issue" | "orchestration_issue" | "model_limitation" | "retrieval_rag_issue"
+    Choose the type that matches the ROOT CAUSE:
+    - "prompt_issue": the instruction is missing, ambiguous, conflicting, or could be improved to prevent this — most common type
+    - "orchestration_issue": routing/handoff failed despite correct prompt rules in a multi-agent system
+    - "model_limitation": the prompt is crystal clear and unambiguous but the model shows a fundamental capability gap (e.g., wrong math, simple logical errors) — should be rare
+    - "retrieval_rag_issue": a tool call or data lookup returned wrong, stale, or incomplete data
 11. failureSubtype: specific sub-category
 12. blastRadius: array of policy names that might be affected if the suggested fix is applied (policies that could regress)
 13. When multiple agents/roles are involved, wrap agent or role names in **bold** markers in summary, impact, fix, and cascadeChain fields. Example: "**Router** failed to hand off to **FAQ Agent**". This makes agent attribution scannable in the report.
@@ -287,18 +312,19 @@ Return ONLY valid JSON:
 /**
  * Prompt 6: Top Recommendations Generator
  * Input: all failure patterns + policy results
- * Output: top 3 actionable recommendations
+ * Output: actionable recommendations (one per failure category, up to maxRecs)
  */
 export function buildRecommendationsPrompt(
   failurePatterns: string,
   policySummary: string,
   evidenceExcerpts?: string,
+  maxRecs = 3,
 ): string {
   const evidenceBlock = evidenceExcerpts
     ? `\nEVIDENCE FROM FAILING CONVERSATIONS:\n${evidenceExcerpts}\n`
     : "";
 
-  return `You are an expert AI agent consultant. Based on these failure patterns, policy results, and evidence from failing conversations, generate the top 3 most impactful recommendations.
+  return `You are an expert AI agent consultant. Based on these failure patterns, policy results, and evidence from failing conversations, generate the top ${maxRecs} most impactful recommendations.
 
 FAILURE PATTERNS:
 ${failurePatterns}

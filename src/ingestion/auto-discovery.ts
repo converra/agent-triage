@@ -6,6 +6,7 @@ import { extractPolicies } from "../policy/extractor.js";
 import { buildBehavioralInferencePrompt } from "../llm/prompts.js";
 import { parseJsonResponse } from "../llm/json.js";
 import { PoliciesFileSchema } from "../policy/types.js";
+import { getLogger } from "../logger.js";
 
 export interface DiscoveredAgent {
   name: string;
@@ -117,9 +118,9 @@ async function extractPoliciesFromAgents(
   conversations: NormalizedConversation[],
 ): Promise<DiscoveryResult> {
   // Print discovery
-  console.log(`\nDiscovered agents:`);
+  getLogger().log(`\nDiscovered agents:`);
   for (let i = 0; i < agents.length; i++) {
-    console.log(
+    getLogger().log(
       `  ${i + 1}. ${agents[i].name} — ${agents[i].conversationCount} conversations`,
     );
   }
@@ -128,7 +129,7 @@ async function extractPoliciesFromAgents(
   const multiAgent = agents.length > 1;
 
   for (const agent of agents) {
-    console.log(
+    getLogger().log(
       `\nExtracting policies from ${agent.name}...`,
     );
 
@@ -146,7 +147,7 @@ async function extractPoliciesFromAgents(
         allPolicies.push(policy);
       }
     } catch (error) {
-      console.warn(
+      getLogger().warn(
         `  Warning: Could not extract policies from ${agent.name}: ${error}`,
       );
     }
@@ -157,7 +158,7 @@ async function extractPoliciesFromAgents(
     return inferPoliciesFromBehavior(llm, conversations);
   }
 
-  console.log(
+  getLogger().log(
     `\nExtracted ${allPolicies.length} policies across ${agents.length} agent${agents.length > 1 ? "s" : ""}.`,
   );
 
@@ -178,7 +179,7 @@ async function inferPoliciesFromBehavior(
   llm: LlmClient,
   conversations: NormalizedConversation[],
 ): Promise<DiscoveryResult> {
-  console.warn(
+  getLogger().warn(
     "\nNo system prompt found in traces. Inferring policies from observed behavior...",
   );
 
@@ -194,11 +195,11 @@ async function inferPoliciesFromBehavior(
   const parsed = parseJsonResponse(response.content);
   const policies = PoliciesFileSchema.parse(parsed);
 
-  console.warn(
+  getLogger().warn(
     "Warning: No system prompt found in traces. Policies were inferred from observed behavior and may be incomplete.",
   );
 
-  console.log(`Inferred ${policies.length} policies from behavior.`);
+  getLogger().log(`Inferred ${policies.length} policies from behavior.`);
 
   return {
     agents: [],

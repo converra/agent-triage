@@ -6,6 +6,7 @@ import {
 import { parseJsonResponse } from "../llm/json.js";
 import type { Policy } from "../policy/types.js";
 import type { ConversationResult, FailurePattern } from "./types.js";
+import { getLogger } from "../logger.js";
 
 interface FixResult {
   fix: string;
@@ -78,7 +79,7 @@ export async function generateFixes(
           : [],
       });
     } catch (error) {
-      console.warn(
+      getLogger().warn(
         `  Warning: Could not generate fix for "${policy.name}": ${error}`,
       );
     }
@@ -88,7 +89,8 @@ export async function generateFixes(
 }
 
 /**
- * Generate top 3 recommendations from aggregated failure patterns.
+ * Generate top recommendations from aggregated failure patterns.
+ * Generates one per failure category, capped at 5.
  */
 export async function generateRecommendations(
   llm: LlmClient,
@@ -107,22 +109,26 @@ export async function generateRecommendations(
 > {
   const patternSummary = formatPatternSummary(failurePatterns);
 
+  // Only include failing policies to keep the prompt focused
   const policySummary = policies
     .map((p) => {
       const total = results.length;
       const failing = results.filter((r) =>
         r.policyResults.some((pr) => pr.policyId === p.id && !pr.passed),
       ).length;
+      if (failing === 0) return null;
       const rate = total > 0 ? Math.round(((total - failing) / total) * 100) : 100;
       return `- ${p.name}: ${rate}% compliance (${failing} failures)`;
     })
+    .filter(Boolean)
     .join("\n");
 
+  const maxRecs = Math.min(Math.max(failurePatterns.length, 3), 5);
   const evidenceExcerpts = buildEvidenceExcerpts(failurePatterns, results);
-  const prompt = buildRecommendationsPrompt(patternSummary, policySummary, evidenceExcerpts);
+  const prompt = buildRecommendationsPrompt(patternSummary, policySummary, evidenceExcerpts, maxRecs);
   const response = await llm.call(prompt, {
     temperature: 0.3,
-    maxTokens: 1024,
+    maxTokens: 4096,
   });
 
   const parsed = parseJsonResponse(response.content) as Record<
@@ -133,7 +139,7 @@ export async function generateRecommendations(
     Record<string, unknown>
   >;
 
-  return recs.slice(0, 3).map((rec) => ({
+  return recs.slice(0, maxRecs).map((rec) => ({
     title: String(rec.title ?? ""),
     description: String(rec.description ?? ""),
     targetFailureTypes: Array.isArray(rec.targetFailureTypes)

@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { z } from "zod";
 import type { NormalizedConversation, Message } from "./types.js";
+import { normalizeRole } from "./normalize-role.js";
 
 /**
  * Read conversations from a local JSON file.
@@ -50,6 +51,7 @@ const FlexibleMessageSchema = z.object({
   text: z.string().optional(),
   message: z.string().optional(),
   timestamp: z.string().optional(),
+  name: z.string().optional(),
   tool_calls: z.any().optional(),
   toolCalls: z.any().optional(),
   tool_call_id: z.string().optional(),
@@ -123,30 +125,15 @@ function normalizeMessage(raw: unknown): Message {
   const content = parsed.content ?? parsed.text ?? parsed.message ?? "";
   const toolCalls = parsed.toolCalls ?? parsed.tool_calls ?? undefined;
   const toolCallId = parsed.toolCallId ?? parsed.tool_call_id ?? undefined;
+  const agent = parsed.name ?? undefined;
 
   return {
     role,
     content,
     timestamp: parsed.timestamp,
+    ...(agent ? { agent } : {}),
     ...(toolCalls ? { toolCalls } : {}),
     ...(toolCallId ? { toolCallId } : {}),
   };
 }
 
-function normalizeRole(
-  role: string,
-): "user" | "assistant" | "system" | "tool" {
-  const lower = role.toLowerCase();
-  if (lower === "user" || lower === "human" || lower === "customer")
-    return "user";
-  if (
-    lower === "assistant" ||
-    lower === "ai" ||
-    lower === "bot" ||
-    lower === "agent"
-  )
-    return "assistant";
-  if (lower === "system") return "system";
-  if (lower === "tool" || lower === "function") return "tool";
-  return "user";
-}
