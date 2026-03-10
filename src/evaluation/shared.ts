@@ -6,8 +6,13 @@ export function formatTranscript(conversation: Pick<NormalizedConversation, "mes
     .join("\n\n");
 }
 
+/** Excluded from average: binary flags that skew quality scores. */
+const EXCLUDED_FROM_AVERAGE = new Set(["truncationScore"]);
+
 export function averageMetrics(metrics: Record<string, number>): number {
-  const values = Object.values(metrics);
+  const values = Object.entries(metrics)
+    .filter(([k]) => !EXCLUDED_FROM_AVERAGE.has(k))
+    .map(([, v]) => v);
   if (values.length === 0) return 0;
   return values.reduce((sum, v) => sum + v, 0) / values.length;
 }

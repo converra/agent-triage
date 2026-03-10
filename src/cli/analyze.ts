@@ -115,6 +115,12 @@ export async function analyzeCommand(options: AnalyzeOptions): Promise<void> {
   }
 
   const limited = filtered.slice(0, maxConvs);
+
+  if (limited.length === 0) {
+    console.error("Error: No conversations found after applying filters.");
+    process.exit(1);
+  }
+
   log.log(`\nLoaded ${limited.length} conversations.`);
 
   // Cache normalized conversations so subsequent runs can use --traces instead of re-fetching

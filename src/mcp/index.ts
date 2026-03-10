@@ -6,9 +6,16 @@ import { fileURLToPath } from "node:url";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { registerTools } from "./server.js";
-import { setLogger, consoleLogger } from "../logger.js";
+import { setLogger } from "../logger.js";
+import type { Logger } from "../logger.js";
 
-setLogger(consoleLogger);
+// MCP uses stdout for JSON-RPC — route all logging to stderr to avoid corrupting the protocol
+const stderrLogger: Logger = {
+  log: (msg: string) => console.error(msg),
+  warn: (msg: string) => console.error(msg),
+  error: (msg: string) => console.error(msg),
+};
+setLogger(stderrLogger);
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(resolve(__dirname, "../../package.json"), "utf-8")) as { version: string };

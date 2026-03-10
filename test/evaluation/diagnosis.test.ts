@@ -27,7 +27,13 @@ const diagnosisResponse = JSON.stringify({
 describe("generateDiagnoses", () => {
   it("generates diagnosis for conversations with policy failures", async () => {
     const llm = createMockLlm(() => diagnosisResponse);
-    const conversations = [makeConversation("conv-1")];
+    const conversations = [makeConversation("conv-1", {
+      messages: [
+        { role: "user", content: "I need help with my order" },
+        { role: "assistant", content: "I'd be happy to help with your order." },
+        { role: "assistant", content: "Your refund is covered under our 90-day policy." },
+      ],
+    })];
     const results: ConversationResult[] = [
       makeResult("conv-1", {
         metrics: { ...VALID_METRICS, successScore: 20 },

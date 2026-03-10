@@ -35,6 +35,7 @@ export function registerReadTools(server: McpServer): void {
         .optional()
         .describe("Directory containing report.json (default: current directory)"),
     },
+    annotations: { readOnlyHint: true },
   }, async ({ report_dir }) => {
     try {
     const reportDir = safePath(report_dir ?? ".");
@@ -226,6 +227,7 @@ export function registerReadTools(server: McpServer): void {
         .optional()
         .describe("Path to policies.json (default: ./policies.json)"),
     },
+    annotations: { readOnlyHint: true },
   }, async ({ policies_path }) => {
     try {
       const policies = loadPoliciesFromFile(policies_path);
@@ -257,6 +259,7 @@ export function registerReadTools(server: McpServer): void {
       before_path: z.string().describe("Path to the before report.json"),
       after_path: z.string().describe("Path to the after report.json"),
     },
+    annotations: { readOnlyHint: true },
   }, async ({ before_path, after_path }) => {
     try {
       const beforeRaw = await readFile(safePath(before_path), "utf-8");
@@ -291,6 +294,7 @@ export function registerReadTools(server: McpServer): void {
         .optional()
         .describe("Return only the last N entries"),
     },
+    annotations: { readOnlyHint: true },
   }, async ({ report_dir, last }) => {
     try {
       const { readHistory } = await import("../history.js");
