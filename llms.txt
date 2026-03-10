@@ -57,6 +57,7 @@ import { readJsonTraces, extractPolicies, createLlmClient, evaluateAll, buildHtm
 
 ## Links
 
+- Sample report: https://demo-report-sigma.vercel.app
 - Docs: https://github.com/converra/agent-triage#readme
 - Full LLM context: https://github.com/converra/agent-triage/blob/main/llms-full.txt
 - npm: https://www.npmjs.com/package/agent-triage

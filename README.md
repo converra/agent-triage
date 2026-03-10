@@ -44,6 +44,8 @@ npx agent-triage analyze --traces conversations.json --prompt system-prompt.txt
 
 **Privacy:** Traces stay on your machine. Only LLM API calls leave — no telemetry, nothing sent to us.
 
+**[See a sample report →](https://demo-report-sigma.vercel.app)**
+
 ## How it works
 
 ```

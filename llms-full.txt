@@ -355,6 +355,7 @@ MIT
 
 ## Links
 
+- Sample report: https://demo-report-sigma.vercel.app
 - Repository: https://github.com/converra/agent-triage
 - npm: https://www.npmjs.com/package/agent-triage
 - Issues: https://github.com/converra/agent-triage/issues
