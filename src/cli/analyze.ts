@@ -182,7 +182,7 @@ export async function analyzeCommand(options: AnalyzeOptions): Promise<void> {
       }));
     } else {
       const mode = options.quick ? "quick (policy checks only)" : "full (metrics + policies + diagnosis + fixes)";
-      const modelLabel = options.model ?? options.provider ?? "gpt-4o-mini";
+      const modelLabel = options.model ?? (options.provider === "openai" ? "gpt-4o-mini" : "claude-sonnet-4-6");
       const cost = (limited.length * (options.quick ? 0.006 : 0.012) + (options.quick ? 0 : 0.15)).toFixed(2);
       console.log(`\n--- Dry Run ---\nConversations: ${limited.length}\nPolicies: ${policies.length}\nMode: ${mode}\nEstimated LLM calls: ~${totalCalls}\nEstimated cost with ${modelLabel}: ~$${cost}\n\nRun without --dry-run to proceed.`);
     }

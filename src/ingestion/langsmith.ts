@@ -861,7 +861,7 @@ export function resolveAgentName(
 }
 
 /**
- * Strip per-customer suffixes like " for Allred and Associates" from agent names.
+ * Strip per-customer suffixes like " for Acme Corp" from agent names.
  * Many multi-agent systems create dynamic agent variants per customer/company —
  * these are the same base agent with custom instructions, not separate agents.
  */

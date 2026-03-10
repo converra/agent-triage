@@ -31,4 +31,5 @@ The following are out of scope:
 
 | Version | Supported |
 |---------|-----------|
+| 0.2.x   | Yes       |
 | 0.1.x   | Yes       |

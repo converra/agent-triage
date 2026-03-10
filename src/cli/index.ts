@@ -173,3 +173,8 @@ program
   .action(wrapAction(diffCommand));
 
 program.parse();
+
+if (!process.argv.slice(2).length) {
+  program.outputHelp();
+  console.log("\n  Try `agent-triage demo` to get started.\n");
+}

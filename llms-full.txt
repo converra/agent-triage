@@ -10,7 +10,7 @@ agent-triage is a CLI tool, MCP server, and Node.js library for debugging AI age
 2. **Evaluating production traces** against those policies using an LLM judge
 3. **Generating a diagnostic report** with step-level root cause analysis, failure cascades, blast-radius warnings, and ranked fix recommendations
 
-It supports three trace sources (JSON, LangSmith, OpenTelemetry) and works with OpenAI or Anthropic as the evaluator LLM.
+It supports five trace sources (JSON, LangSmith, OpenTelemetry, Langfuse, Axiom) and works with OpenAI or Anthropic as the evaluator LLM.
 
 ## Installation
 
@@ -56,7 +56,7 @@ Options:
 - `--dry-run` — show estimated cost without calling the LLM
 - `--max-conversations <n>` — limit to N traces
 - `--format json` — output JSON to stdout
-- `--model <model>` — evaluator model (default: gpt-4o-mini)
+- `--model <model>` — evaluator model (default: claude-sonnet-4-6)
 - `--provider <provider>` — openai, anthropic, or openai-compatible
 - `--include-prompt` — include system prompt in report JSON
 - `--summary-only` — omit trace transcripts from report
@@ -295,8 +295,8 @@ interface Report {
 
 ```yaml
 llm:
-  provider: openai          # openai | anthropic | openai-compatible
-  model: gpt-4o-mini
+  provider: anthropic       # openai | anthropic | openai-compatible
+  model: claude-sonnet-4-6  # any model supported by the provider
   maxConcurrency: 5
 
 prompt:
