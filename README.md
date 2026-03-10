@@ -18,7 +18,7 @@ Then it aggregates root causes across all conversations — "24 out of 51 failur
 
 **[See a sample report →](https://demo-report-sigma.vercel.app)**
 
-![agent-triage demo — extract policies, evaluate traces, generate diagnostic report](assets/demo.gif)
+![agent-triage report — root cause breakdown and step-by-step diagnosis](assets/agent-triage-report.png)
 
 ## What it shows you
 
