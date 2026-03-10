@@ -34,7 +34,7 @@ export function estimateCost(
   inputTokens: number,
   outputTokens: number,
 ): number {
-  const rates = COST_PER_1K_TOKENS[model] ?? COST_PER_1K_TOKENS["claude-sonnet-4-6"] ?? COST_PER_1K_TOKENS["gpt-4o-mini"]!;
+  const rates = COST_PER_1K_TOKENS[model] ?? COST_PER_1K_TOKENS["claude-sonnet-4-6"]!;
   return (inputTokens / 1000) * rates.input + (outputTokens / 1000) * rates.output;
 }
 

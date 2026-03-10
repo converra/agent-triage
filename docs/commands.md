@@ -80,7 +80,14 @@ agent-triage check --traces conversations.json --threshold 90  # CI gate
 ```
 
 Options:
-- `--traces <path>` / `--langsmith <project>` / `--otel <path>` / `--langfuse` / `--axiom <dataset>` — trace source
+- `--traces <path>` — path to JSON traces file
+- `--langsmith <project>` — LangSmith project name
+- `--langsmith-api-key <key>` — LangSmith API key
+- `--otel <path>` — OpenTelemetry export
+- `--langfuse` — read from Langfuse
+- `--langfuse-public-key <key>` / `--langfuse-secret-key <key>` / `--langfuse-host <url>`
+- `--axiom <dataset>` — Axiom dataset
+- `--axiom-api-key <key>` / `--axiom-org-id <id>`
 - `--policies <path>` — path to policies.json (default: `policies.json`)
 - `--policy <id>` — check specific policy (repeatable)
 - `-p, --prompt <path>` — system prompt file
@@ -90,7 +97,6 @@ Options:
 - `--max-conversations <n>` — limit traces to check
 - `--threshold <n>` — exit with code 1 if compliance below this % (for CI)
 - `--format <format>` — `terminal` (default) or `json`
-- Inline API key flags for each connector (same as `analyze`)
 
 ## `init`
 
@@ -144,6 +150,10 @@ Compare two reports to see what changed after prompt edits.
 agent-triage diff before/report.json after/report.json
 agent-triage diff before/report.json after/report.json -o ./results
 ```
+
+Arguments:
+- `<before>` — path to the before report.json
+- `<after>` — path to the after report.json
 
 Options:
 - `-o, --output <dir>` — output directory for diff.json (default: `.`)

@@ -37,6 +37,18 @@ import { appendHistory } from "../history.js";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(resolve(__dirname, "../../package.json"), "utf-8")) as { version: string };
 
+// Estimated tokens per conversation based on production runs (~94K input + ~41K output for 10 convos)
+const EST_INPUT_PER_CONV = 6000;
+const EST_OUTPUT_PER_CONV = 2500;
+const EST_DIAGNOSIS_INPUT = 35000;
+const EST_DIAGNOSIS_OUTPUT = 16000;
+
+function dryRunEstimateCost(numConversations: number, model: string, quick: boolean): number {
+  const inputTokens = numConversations * EST_INPUT_PER_CONV + (quick ? 0 : EST_DIAGNOSIS_INPUT);
+  const outputTokens = numConversations * EST_OUTPUT_PER_CONV + (quick ? 0 : EST_DIAGNOSIS_OUTPUT);
+  return estimateCost(model, inputTokens, outputTokens);
+}
+
 export interface AnalyzeOptions {
   traces?: string;
   langsmith?: string;
@@ -177,13 +189,13 @@ export async function analyzeCommand(options: AnalyzeOptions): Promise<void> {
         conversations: limited.length,
         policies: policies.length,
         estimatedCalls: totalCalls,
-        estimatedCost: limited.length * (options.quick ? 0.006 : 0.012) + (options.quick ? 0 : 0.15),
+        estimatedCost: dryRunEstimateCost(limited.length, options.model ?? getDefaultModel(options.provider), options.quick ?? false),
         quick: options.quick ?? false,
       }));
     } else {
       const mode = options.quick ? "quick (policy checks only)" : "full (metrics + policies + diagnosis + fixes)";
       const modelLabel = options.model ?? getDefaultModel(options.provider);
-      const cost = (limited.length * (options.quick ? 0.006 : 0.012) + (options.quick ? 0 : 0.15)).toFixed(2);
+      const cost = dryRunEstimateCost(limited.length, modelLabel, options.quick ?? false).toFixed(2);
       console.log(`\n--- Dry Run ---\nConversations: ${limited.length}\nPolicies: ${policies.length}\nMode: ${mode}\nEstimated LLM calls: ~${totalCalls}\nEstimated cost with ${modelLabel}: ~$${cost}\n\nRun without --dry-run to proceed.`);
     }
     return;

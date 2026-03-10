@@ -4,7 +4,9 @@
 
 # agent-triage
 
-**Diagnose your AI agents in production.** Extract testable policies from your agent's system prompt, evaluate real traces against them, and generate a diagnostic report showing what's failing, which agent caused it, and what to fix. Supports multi-agent architectures — identifies the responsible agent in the chain.
+**Diagnose your AI agents in production.** Extract testable policies from your agent's system prompt, evaluate real traces against them, and generate a diagnostic report showing what's failing, which agent caused it, and what to fix.
+
+Supports multi-agent architectures — identifies the responsible agent in the chain.
 
 > Your agent's system prompt says "never fabricate pricing." Is it actually following that rule in production?
 
@@ -19,17 +21,14 @@ export OPENAI_API_KEY=sk-...
 ```
 
 ```bash
-# Preview cost without spending anything
+# 1. Preview cost without spending anything
 npx agent-triage analyze --traces conversations.json --prompt system-prompt.txt --dry-run
 
-# Try the demo (~3 minutes, see cost table below)
+# 2. Try the demo (~3 minutes, see cost table below)
 npx agent-triage demo
 
-# Or use it on your own agent
+# 3. Or use it on your own agent
 npx agent-triage analyze --traces conversations.json --prompt system-prompt.txt
-
-# Auto-discovers agents and policies from LangSmith (requires LANGSMITH_API_KEY)
-npx agent-triage analyze --langsmith my-project
 ```
 
 **Cost per 10 conversations** (use `--dry-run` to preview before running):
@@ -55,6 +54,19 @@ For example, given a system prompt containing "Always confirm the user's issue b
 Policy: "Confirm user's issue before acting"
 conv_002 Turn 3: FAIL — agent said "I understand your concern" without
                   restating the specific issue ($150 charge vs $89 order)
+```
+
+After running `agent-triage analyze`, you get a terminal summary like this:
+
+```
+  Conversations: 10 | Policies: 18 | Compliance: 37% | Failures: 62
+
+  Top Failing Policies:
+  ✗ "Escalate high-value billing disputes" — 0% (2/2 failing)
+  ✗ "Follow standard troubleshooting flow" — 0% (4/4 failing)
+  ✗ "Complete promised agent transfers" — 0% (4/4 failing)
+
+  HTML report: ./report.html
 ```
 
 ## What you get
@@ -83,7 +95,7 @@ npm install agent-triage
 
 ## Commands
 
-| Command | What it does | Cost (10 convos, default model) |
+| Command | What it does | Cost (10 convos, `claude-sonnet-4-6`) |
 |---------|-------------|----------|
 | `analyze` | Evaluate traces against policies, generate report | ~$0.90 |
 | `check` | Targeted policy compliance (no metrics/diagnosis) | ~$0.35 |
@@ -137,13 +149,13 @@ AI assistants (Claude, Cursor, etc.) can debug your agents via MCP:
 
 `agent-triage-mcp` is a binary included in the `agent-triage` npm package — no separate install needed.
 
-Exposes 9 tools: `triage_status`, `triage_sample`, `triage_list_policies`, `triage_history`, `triage_diff` (all zero-cost), plus `triage_check`, `triage_explain`, `triage_init`, and `triage_analyze`.
+Exposes 11 tools: `triage_status`, `triage_sample`, `triage_list_policies`, `triage_history`, `triage_diff`, `triage_view` (all zero-cost), plus `triage_check`, `triage_explain`, `triage_init`, `triage_analyze`, and `triage_demo`.
 
 ## How It Compares
 
 | Feature | agent-triage | DeepEval | Promptfoo |
 |---------|:-:|:-:|:-:|
-| Production trace analysis | Yes | Partial | Partial |
+| Production trace analysis | Yes | Via integration | Via integration |
 | Policy extraction from prompts | Yes | No | No |
 | Multi-connector (5 sources) | Yes | Custom | Custom |
 | Step-level root cause + cascade | Yes | No | No |
