@@ -10,6 +10,8 @@ Supports multi-agent architectures — identifies the responsible agent in the c
 
 > Your agent's system prompt says "never fabricate pricing." Is it actually following that rule in production?
 
+![agent-triage demo — extract policies, evaluate traces, generate diagnostic report](assets/demo.gif)
+
 ## Quick Start
 
 **Prerequisite:** an [Anthropic](https://console.anthropic.com/) or [OpenAI](https://platform.openai.com/api-keys) API key set as an environment variable (or in a `.env` file):
