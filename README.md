@@ -4,11 +4,13 @@
 
 # agent-triage
 
-**Debug the production flow of your AI agent system — find the exact step where it started failing, and how to fix it.**
+**Stop staring at logs trying to figure out why your agent keeps failing.**
 
-Point agent-triage at your production traces and system prompt. It reconstructs the conversation flow across agents, routers, handoffs, and retrieval steps — identifies the root cause moment, attributes the failure to the responsible agent or subsystem, aggregates recurring issues across conversations, and generates copy-paste fixes.
+Point agent-triage at your production traces. It extracts behavioral rules directly from system prompts, replays each conversation step-by-step using an LLM-as-judge, and flags exactly which turn broke things, which agent caused it, and how failures cascade across routing, handoffs, and retrieval.
 
-**Works for both single-agent and multi-agent systems.**
+Then it aggregates root causes across all conversations — "24 out of 51 failures are missing escalations" — so you know exactly what to fix first.
+
+**Works for both single-agent and multi-agent systems.** Runs locally. Only LLM API calls leave your machine.
 
 - **Pinpoint the break** — See the exact step, turn, and agent where the conversation first went off track
 - **See patterns across production** — Aggregate recurring failures across conversations by prompt, routing, handoff, or retrieval issue
@@ -125,7 +127,7 @@ npx agent-triage analyze --traces conversations.json --prompt system-prompt.txt 
 | `gpt-4o` | OpenAI | ~$0.65 | `--provider openai` |
 | `claude-sonnet-4-6` | Anthropic | ~$0.90 | default |
 
-**Privacy:** Traces stay on your machine. Only LLM API calls leave — no telemetry, nothing sent to us.
+**Privacy:** No telemetry, nothing sent to us — only LLM API calls leave your machine.
 
 ## How it works
 
