@@ -4,6 +4,7 @@ import { readFile, writeFile, mkdir, cp } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { getLogger } from "../logger.js";
 
 import {
   extractPolicies,
@@ -209,10 +210,10 @@ export function registerEvalTools(server: McpServer): void {
       }
 
       // Not in report — need a trace source
-      if (!params.langsmith && !params.traces && !params.otel) {
+      if (!params.langsmith && !params.traces && !params.otel && !params.axiom && !params.langfuse) {
         return errorResult(
           `Conversation "${params.conversation_id}" not found in report.json. ` +
-            "Provide a trace source (traces, langsmith, or otel) to fetch and evaluate it.",
+            "Provide a trace source (traces, langsmith, otel, axiom, or langfuse) to fetch and evaluate it.",
         );
       }
 
@@ -369,6 +370,7 @@ export function registerEvalTools(server: McpServer): void {
         });
       }
 
+      let skippedCount = 0;
       for (const conv of limited) {
         const sp = conv.systemPrompt ?? systemPrompt;
         try {
@@ -384,8 +386,9 @@ export function registerEvalTools(server: McpServer): void {
               entry.failures.push({ conversationId: conv.id, evidence: pr.evidence });
             }
           }
-        } catch {
-          // Skip conversations that fail evaluation
+        } catch (error) {
+          getLogger().warn(`  Warning: Policy check failed for conversation ${conv.id}: ${error instanceof Error ? error.message : String(error)}`);
+          skippedCount++;
         }
       }
 
@@ -411,6 +414,7 @@ export function registerEvalTools(server: McpServer): void {
         policies: results.map((r) => ({ ...r, failures: r.failures.slice(0, 5) })),
         summary: {
           checked: limited.length,
+          skipped: skippedCount,
           overallCompliance: Math.round(overallCompliance),
           threshold: params.threshold ?? null,
           passed,
@@ -547,7 +551,9 @@ export function registerEvalTools(server: McpServer): void {
         fixes = await generateFixes(llm, policies, results, failurePatterns);
         try {
           recommendations = await generateRecommendations(llm, failurePatterns, policies, results);
-        } catch { /* non-fatal */ }
+        } catch (error) {
+          getLogger().warn(`  Warning: Could not generate recommendations: ${error instanceof Error ? error.message : String(error)}`);
+        }
       }
 
       // Step 6: Build report
@@ -707,7 +713,9 @@ export function registerEvalTools(server: McpServer): void {
       let recommendations: Report["failurePatterns"]["topRecommendations"] = [];
       try {
         recommendations = await generateRecommendations(llm, failurePatterns, policies, results);
-      } catch { /* non-fatal */ }
+      } catch (error) {
+        getLogger().warn(`  Warning: Could not generate recommendations: ${error instanceof Error ? error.message : String(error)}`);
+      }
 
       // Build report
       const aggregated = aggregatePolicies(policies, results);

@@ -665,7 +665,7 @@ export function renderReproducibility(report: Report): string {
     <div class="repro-desc">Run this CLI command to re-run the same analysis on your machine.</div>
     <div class="repro-body">
       <code class="repro-cmd">${cmd}</code>
-      <button class="repro-copy" onclick="copyText(this, '${cmd}')">${ICONS.refresh} Copy command</button>
+      <button class="repro-copy" onclick="copyText(this, '${escJs(cmd)}')">${ICONS.refresh} Copy command</button>
     </div>
     <div class="repro-meta">agent-triage v${report.agentTriageVersion} · ${report.totalConversations} conversations · ${report.policies.length} behavioral rules</div>
   </div>`;

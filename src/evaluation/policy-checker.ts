@@ -97,7 +97,7 @@ async function individualCheck(
           ? result.failingTurns.map(Number)
           : undefined,
         failureType: result.failureType
-          ? (String(result.failureType) as PolicyResult["failureType"])
+          ? validateEnum(result.failureType, FAILURE_TYPES, "prompt_issue") as PolicyResult["failureType"]
           : null,
         failureSubtype: result.failureSubtype
           ? String(result.failureSubtype)

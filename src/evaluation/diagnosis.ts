@@ -160,8 +160,11 @@ async function diagnoseSingle(
 
   const parsed = parseJsonResponse(response.content) as Record<string, unknown>;
 
+  const rawRootTurn = Number(parsed.rootCauseTurn ?? 1);
+  const clampedRootTurn = Math.max(1, Math.min(rawRootTurn, conversation.messages.length));
+
   const diagnosis: Diagnosis = {
-    rootCauseTurn: Number(parsed.rootCauseTurn ?? 1),
+    rootCauseTurn: clampedRootTurn,
     rootCauseAgent: parsed.rootCauseAgent
       ? String(parsed.rootCauseAgent)
       : null,

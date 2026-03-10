@@ -257,8 +257,11 @@ export async function generateDiagnosisForResult(
     const response = await llm.call(prompt, { temperature: 0.3, maxTokens: 2048 });
     const parsed = parseJsonResponse(response.content) as Record<string, unknown>;
 
+    const rawRootTurn = Number(parsed.rootCauseTurn ?? 1);
+    const clampedRootTurn = Math.max(1, Math.min(rawRootTurn, result.messages.length || 1));
+
     return {
-      rootCauseTurn: Number(parsed.rootCauseTurn ?? 1),
+      rootCauseTurn: clampedRootTurn,
       rootCauseAgent: parsed.rootCauseAgent ? String(parsed.rootCauseAgent) : null,
       shortSummary: String(parsed.shortSummary ?? ""),
       summary: String(parsed.summary ?? ""),
