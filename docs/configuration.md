@@ -100,19 +100,6 @@ const conversations = await readJsonTraces("./conversations.json");
 
 See [src/index.ts](https://github.com/converra/agent-triage/blob/main/src/index.ts) for all available exports.
 
-## 12 Quality Metrics
+---
 
-| Metric | What It Measures |
-|--------|-----------------|
-| Success Score | Did the agent achieve the user's goal? |
-| AI Relevancy | Were responses on-topic and useful? |
-| Sentiment | How did the user feel during the conversation? |
-| Hallucination | Did the agent make claims not in the system prompt? |
-| Repetition | Did the agent repeat itself unnecessarily? |
-| Consistency | Were responses consistent with each other? |
-| Natural Language | Did the agent sound natural and human? |
-| Context Retention | Did the agent remember earlier context? |
-| Verbosity | Were responses appropriately concise? |
-| Task Completion | Were all user requests addressed? |
-| Clarity | Were responses clear and easy to understand? |
-| Truncation | Were responses cut off mid-sentence? |
+See also: [CLI Commands](commands.md) | [Debugging Workflow & Report Details](debugging-workflow.md)

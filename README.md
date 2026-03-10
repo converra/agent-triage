@@ -4,20 +4,31 @@
 
 # agent-triage
 
-**Diagnose your AI agents in production.** Extract testable policies from your agent's system prompt, evaluate real traces against them, and generate a diagnostic report showing what's failing, which agent caused it, and what to fix.
+**Diagnose your AI agents in production.** Extract testable policies from your agent's system prompt, evaluate real traces against them, and generate a diagnostic report showing what's failing, which agent caused it, and what to fix. Supports multi-agent architectures — identifies the responsible agent in the chain.
 
 > Your agent's system prompt says "never fabricate pricing." Is it actually following that rule in production?
 
 ## Quick Start
 
+**Prerequisite:** an [Anthropic](https://console.anthropic.com/) or [OpenAI](https://platform.openai.com/api-keys) API key set as an environment variable (or in a `.env` file):
+
 ```bash
+export ANTHROPIC_API_KEY=sk-ant-...  # default provider
+# or
+export OPENAI_API_KEY=sk-...
+```
+
+```bash
+# Preview cost without spending anything
+npx agent-triage analyze --traces conversations.json --prompt system-prompt.txt --dry-run
+
 # Try the demo (~3 minutes, see cost table below)
 npx agent-triage demo
 
 # Or use it on your own agent
 npx agent-triage analyze --traces conversations.json --prompt system-prompt.txt
 
-# Zero-config with LangSmith — auto-discovers agents and policies
+# Auto-discovers agents and policies from LangSmith (requires LANGSMITH_API_KEY)
 npx agent-triage analyze --langsmith my-project
 ```
 
@@ -25,9 +36,9 @@ npx agent-triage analyze --langsmith my-project
 
 | Model | Provider | Cost | Flag |
 |-------|----------|------|------|
-| `gpt-4o-mini` | OpenAI | ~$0.02 | `--provider openai --model gpt-4o-mini` |
-| `claude-haiku-4-5` | Anthropic | ~$0.08 | `--model claude-haiku-4-5-20251001` |
-| `gpt-4o` | OpenAI | ~$0.40 | `--provider openai` |
+| `gpt-4o-mini` | OpenAI | ~$0.04 | `--provider openai --model gpt-4o-mini` |
+| `claude-haiku-4-5` | Anthropic | ~$0.25 | `--model claude-haiku-4-5-20251001` |
+| `gpt-4o` | OpenAI | ~$0.65 | `--provider openai` |
 | `claude-sonnet-4-6` | Anthropic | ~$0.90 | default |
 
 **Privacy:** Traces stay on your machine. Only LLM API calls leave — no telemetry, nothing sent to us.
@@ -50,11 +61,11 @@ conv_002 Turn 3: FAIL — agent said "I understand your concern" without
 
 Root cause breakdown with failure categories, severity scores, and fix recommendations:
 
-![agent-triage report showing failure categories, severity scores, and fix recommendations](assets/report-overview.png)
+![Screenshot of agent-triage report showing color-coded failure categories, severity scores, and ranked fix recommendations](assets/report-overview.png)
 
 Step-by-step conversation replay showing exactly where things went wrong and which agent caused it:
 
-![agent-triage step analysis showing conversation timeline with policy violations](assets/report-step-analysis.png)
+![Screenshot of agent-triage step analysis showing color-coded conversation timeline with policy violation badges on offending steps](assets/report-step-analysis.png)
 
 See [Debugging Workflow](docs/debugging-workflow.md) for a detailed walkthrough of the report output and the diagnose-fix-verify loop.
 
@@ -68,28 +79,20 @@ npx agent-triage demo
 npm install agent-triage
 ```
 
-**Requirements:** Node.js >= 18 and an LLM API key — [Anthropic](https://console.anthropic.com/) (default) or [OpenAI](https://platform.openai.com/api-keys).
-
-```bash
-export ANTHROPIC_API_KEY=sk-ant-...
-# or
-export OPENAI_API_KEY=sk-...
-```
-
-A `.env` file in your project root is auto-loaded.
+**Requirements:** Node.js >= 18 and an LLM API key.
 
 ## Commands
 
-| Command | What it does | LLM Cost |
+| Command | What it does | Cost (10 convos, default model) |
 |---------|-------------|----------|
-| `analyze` | Evaluate traces against policies, generate report | ~$0.90/10 convos |
-| `check` | Targeted policy compliance (no metrics/diagnosis) | Lower |
-| `explain` | Deep-dive a single conversation | Moderate |
-| `init` | Extract policies from a system prompt | Moderate |
-| `status` | Health check from last report | Zero |
-| `history` | Compliance trends across runs | Zero |
-| `diff` | Compare two reports | Zero |
-| `view` | Open HTML report in browser | Zero |
+| `analyze` | Evaluate traces against policies, generate report | ~$0.90 |
+| `check` | Targeted policy compliance (no metrics/diagnosis) | ~$0.35 |
+| `explain` | Deep-dive a single conversation | ~$0.10 |
+| `init` | Extract policies from a system prompt | ~$0.05 |
+| `status` | Health check from last report | Free |
+| `history` | Compliance trends across runs | Free |
+| `diff` | Compare two reports | Free |
+| `view` | Open HTML report in browser | Free |
 | `demo` | Run with built-in example data | ~$0.90 |
 
 ```bash
@@ -101,7 +104,7 @@ agent-triage check --traces data.json --threshold 90  # CI gate
 agent-triage diff before/report.json after/report.json
 ```
 
-See [full command reference](docs/commands.md) for all options.
+See [full command reference](docs/commands.md) for all options. Traces can be a JSON file — see [trace format](docs/configuration.md#json-recommended) for the expected structure.
 
 ## Trace Sources
 
@@ -138,19 +141,22 @@ Exposes 9 tools: `triage_status`, `triage_sample`, `triage_list_policies`, `tria
 
 ## How It Compares
 
-| Feature | agent-triage | IntellAgent | DeepEval | Promptfoo |
-|---------|:-:|:-:|:-:|:-:|
-| Production trace analysis | Yes | No | Partial | Partial |
-| Policy extraction from prompts | Yes | No | No | No |
-| Multi-connector (5 sources) | Yes | LangGraph only | Custom | Custom |
-| Self-contained HTML report | Yes | No | **Dashboard UI** | No |
-| Step-level root cause + cascade | Yes | No | No | No |
-| Blast-radius warnings | Yes | No | No | No |
-| MCP server for AI assistants | Yes | No | No | No |
-| CI compliance gates | Yes | No | Yes | Yes |
-| **Large community / ecosystem** | No | No | Yes | **Yes** |
+| Feature | agent-triage | DeepEval | Promptfoo |
+|---------|:-:|:-:|:-:|
+| Production trace analysis | Yes | Partial | Partial |
+| Policy extraction from prompts | Yes | No | No |
+| Multi-connector (5 sources) | Yes | Custom | Custom |
+| Step-level root cause + cascade | Yes | No | No |
+| Self-contained HTML report | Yes | **Dashboard UI** | No |
+| MCP server for AI assistants | Yes | No | No |
+| Cross-run diff | Yes | No | Yes |
+| CI compliance gates | Yes | Yes | Yes |
+| Custom metric definitions | No | **Yes** | **Yes** |
+| Synthetic data generation | No | **Yes** | **Yes** |
+| Dataset management UI | No | **Yes** | No |
+| **Large community / ecosystem** | No | **Yes** | **Yes** |
 
-> Comparison accurate as of March 2026. [Open an issue](https://github.com/converra/agent-triage/issues) if any entry needs updating. DeepEval and Promptfoo are mature projects with large communities — agent-triage focuses specifically on production diagnosis from system prompt policies.
+> Comparison accurate as of March 2026. [Open an issue](https://github.com/converra/agent-triage/issues) if any entry needs updating. DeepEval and Promptfoo are mature, full-featured platforms — agent-triage focuses specifically on production diagnosis from system prompt policies.
 
 ## Limitations
 
@@ -158,12 +164,6 @@ Exposes 9 tools: `triage_status`, `triage_sample`, `triage_list_policies`, `tria
 - **LLM-as-judge can disagree with you.** The evaluator LLM interprets policies — its judgment may not always match yours. Use `policies.json` to refine definitions.
 - **Non-deterministic.** Running the same evaluation twice may produce slightly different scores due to LLM variability.
 - **Cost scales with conversations.** See the cost table above for per-model pricing. Use `--quick` (~60% cheaper) or a smaller model for larger batches.
-
-## agent-triage vs. Converra
-
-agent-triage is a standalone diagnostic tool. It gives you a complete picture of what's failing and why.
-
-[Converra](https://converra.ai) is an optional next step that automates the fix cycle — prompt optimization, simulation testing, regression gating, continuous monitoring, and team collaboration.
 
 ## License
 
@@ -178,6 +178,6 @@ git clone https://github.com/converra/agent-triage
 cd agent-triage && npm install && npm run build && npm test
 ```
 
----
+## Converra
 
-Built by [Converra](https://converra.ai)
+agent-triage is a standalone open-source tool built by [Converra](https://converra.ai). Converra offers a hosted platform that adds agent optimization, simulation testing, regression gating, continuous monitoring, and team collaboration.

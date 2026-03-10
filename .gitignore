@@ -32,3 +32,7 @@ fresh-report/
 
 # Claude Code local settings (may contain API keys)
 .claude/settings.local.json
+
+# AI assistant config files
+.cursorrules
+AGENTS.md
