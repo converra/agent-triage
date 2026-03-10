@@ -4,13 +4,96 @@
 
 # agent-triage
 
-**Diagnose your AI agents in production.** Extract testable policies from your agent's system prompt, evaluate real traces against them, and generate a diagnostic report showing what's failing, which agent caused it, and what to fix.
+**Debug the production flow of your AI agent system — find the exact step where it started failing, and how to fix it.**
 
-Supports multi-agent architectures — identifies the responsible agent in the chain.
+Point agent-triage at your production traces and system prompt. It reconstructs the conversation flow across agents, routers, handoffs, and retrieval steps — identifies the root cause moment, attributes the failure to the responsible agent or subsystem, aggregates recurring issues across conversations, and generates copy-paste fixes.
 
-> Your agent's system prompt says "never fabricate pricing." Is it actually following that rule in production?
+**Works for both single-agent and multi-agent systems.**
+
+- **Pinpoint the break** — See the exact step, turn, and agent where the conversation first went off track
+- **See patterns across production** — Aggregate recurring failures across conversations by prompt, routing, handoff, or retrieval issue
+- **Fix the right thing** — Get root-cause explanations, blast radius, and copy-paste fixes for your prompt or code
+
+**[See a sample report →](https://demo-report-sigma.vercel.app)**
 
 ![agent-triage demo — extract policies, evaluate traces, generate diagnostic report](assets/demo.gif)
+
+## What it shows you
+
+### The execution flow — and where it broke
+
+For each conversation, agent-triage reconstructs the runtime path through your system: which agent responded at each step, when a router or handoff sent the user down the wrong path, whether retrieval supplied the wrong context, and where the first root-cause failure occurred. Later failures are traced as downstream consequences, not separate problems.
+
+```
+Step 1  User       "My Acme Smart TV keeps restarting every few minutes."
+Step 2  Front-end  Acknowledges frustration, promises Tech Support transfer ✓
+Step 3  Router     ✗ ROOT CAUSE — Misclassifies device issue as FAQ, routes
+                   to FAQ Agent instead of Tech Support
+Step 4  FAQ Agent  ✗ Delivers generic tips user already tried
+Step 5  User       "The agent said I'd be talking to tech support, not FAQ tips."
+Step 6  Front-end  Promises transfer again — same misroute will repeat
+```
+
+For single-agent systems, this shows where the agent began drifting from policy or context. For multi-agent systems, it shows which agent, router, or handoff introduced the failure into the chain.
+
+### Recurring patterns across conversations
+
+agent-triage aggregates failures across all conversations into root cause categories — so you know whether to fix your prompt, your routing logic, or your retrieval pipeline, and which issues to prioritize.
+
+```
+62 failures across 3 root cause categories
+
+Prompt Issues         51 failures
+  Missing Escalation    47%  (24)
+  Hallucination         35%  (18)
+  Tone Violation        14%   (7)
+
+Orchestration Issues   7 failures
+  Missing Handoff       57%   (4)
+  Wrong Routing         43%   (3)
+
+RAG Issues             4 failures
+  Wrong Retrieval       75%   (3)
+  Stale Data            25%   (1)
+```
+
+### Cascade impact and copy-paste fixes
+
+Each failure includes blast radius (which other rules it affects), a diagnosis explaining why it happened, and a concrete fix you can copy directly into Claude Code, Cursor, or your coding agent.
+
+```
+Diagnosis:  Router misclassified troubleshooting as FAQ → repeated
+            misdirection → abandonment
+Blast radius: correct-specialist-routing, complete-promised-transfers,
+              standard-troubleshooting-flow, confirm-user-issue (6 rules)
+Fix:        Edit routing logic for Rule 17 — map "device troubleshooting"
+            to Tech Support Agent (high confidence)
+```
+
+### Behavioral rules graded from your own system prompt
+
+Every rule in your system prompt becomes a testable policy, graded across all conversations:
+
+```
+✗ "Escalate high-value billing disputes"     0%  (2/2 failing)
+✗ "Follow standard troubleshooting flow"     0%  (4/4 failing)
+✗ "Complete promised agent transfers"        0%  (4/4 failing)
+✗ "Confirm user's issue"                    20%  (8/10 failing)
+✗ "Acknowledge user frustration"            29%  (5/7 failing)
+✓ "Verify user identity for order lookup"   83%  (1/6 failing)
+```
+
+## What you get
+
+Root cause breakdown with failure categories, severity scores, and fix recommendations:
+
+![Screenshot of agent-triage report showing color-coded failure categories, severity scores, and ranked fix recommendations](assets/report-overview.png)
+
+Step-by-step conversation replay showing exactly where things went wrong and which agent caused it:
+
+![Screenshot of agent-triage step analysis showing color-coded conversation timeline with policy violation badges on offending steps](assets/report-step-analysis.png)
+
+See [Debugging Workflow](docs/debugging-workflow.md) for a detailed walkthrough of the diagnose-fix-verify loop.
 
 ## Quick Start
 
@@ -23,14 +106,14 @@ export OPENAI_API_KEY=sk-...
 ```
 
 ```bash
-# 1. Preview cost without spending anything
-npx agent-triage analyze --traces conversations.json --prompt system-prompt.txt --dry-run
-
-# 2. Try the demo (~3 minutes, see cost table below)
+# 1. Try the demo (~3 minutes, see cost table below)
 npx agent-triage demo
 
-# 3. Or use it on your own agent
+# 2. Or use it on your own agent
 npx agent-triage analyze --traces conversations.json --prompt system-prompt.txt
+
+# 3. Preview cost without spending anything
+npx agent-triage analyze --traces conversations.json --prompt system-prompt.txt --dry-run
 ```
 
 **Cost per 10 conversations** (use `--dry-run` to preview before running):
@@ -44,46 +127,18 @@ npx agent-triage analyze --traces conversations.json --prompt system-prompt.txt
 
 **Privacy:** Traces stay on your machine. Only LLM API calls leave — no telemetry, nothing sent to us.
 
-**[See a sample report →](https://demo-report-sigma.vercel.app)**
-
 ## How it works
 
 ```
-System prompt → Extracted policies → Evaluate traces → Diagnostic report
+Production traces + System prompt
+  → Reconstruct conversation flow (agents, routers, handoffs, retrieval)
+  → Extract testable behavioral rules from system prompt
+  → Evaluate every step for compliance, quality, and failure attribution
+  → Aggregate root causes across conversations
+  → Generate diagnostic report with fixes
 ```
 
-For example, given a system prompt containing "Always confirm the user's issue before taking action", agent-triage extracts a testable policy, then checks every conversation for compliance:
-
-```
-Policy: "Confirm user's issue before acting"
-conv_002 Turn 3: FAIL — agent said "I understand your concern" without
-                  restating the specific issue ($150 charge vs $89 order)
-```
-
-After running `agent-triage analyze`, you get a terminal summary like this:
-
-```
-  Conversations: 10 | Policies: 18 | Compliance: 37% | Failures: 62
-
-  Top Failing Policies:
-  ✗ "Escalate high-value billing disputes" — 0% (2/2 failing)
-  ✗ "Follow standard troubleshooting flow" — 0% (4/4 failing)
-  ✗ "Complete promised agent transfers" — 0% (4/4 failing)
-
-  HTML report: ./report.html
-```
-
-## What you get
-
-Root cause breakdown with failure categories, severity scores, and fix recommendations:
-
-![Screenshot of agent-triage report showing color-coded failure categories, severity scores, and ranked fix recommendations](assets/report-overview.png)
-
-Step-by-step conversation replay showing exactly where things went wrong and which agent caused it:
-
-![Screenshot of agent-triage step analysis showing color-coded conversation timeline with policy violation badges on offending steps](assets/report-step-analysis.png)
-
-See [Debugging Workflow](docs/debugging-workflow.md) for a detailed walkthrough of the report output and the diagnose-fix-verify loop.
+agent-triage reads your system prompt, extracts every behavioral rule as a testable policy, then replays each conversation step-by-step — labeling which agent acted at each turn. It scores six quality metrics (success, relevancy, sentiment, hallucination, context, clarity), checks policy compliance, identifies the root cause turn and responsible agent, traces cascading downstream failures, and aggregates patterns across all conversations into a single report.
 
 ## Installation
 
@@ -161,9 +216,11 @@ Exposes 11 tools: `triage_status`, `triage_sample`, `triage_list_policies`, `tri
 |---------|:-:|:-:|:-:|
 | Production trace analysis | Yes | Via integration | Via integration |
 | Policy extraction from prompts | Yes | No | No |
+| Multi-agent root cause (which agent failed) | Yes | No | No |
+| Step-level cascade analysis | Yes | No | No |
 | Multi-connector (5 sources) | Yes | Custom | Custom |
-| Step-level root cause + cascade | Yes | No | No |
 | Self-contained HTML report | Yes | **Dashboard UI** | No |
+| Copy-paste fixes for coding agents | Yes | No | No |
 | MCP server for AI assistants | Yes | No | No |
 | Cross-run diff | Yes | No | Yes |
 | CI compliance gates | Yes | Yes | Yes |
