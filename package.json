@@ -1,7 +1,7 @@
 {
   "name": "agent-triage",
   "version": "0.2.1",
-  "description": "Diagnose your AI agents in production — extract behavioral policies from prompts, evaluate traces against them, and generate diagnostic reports.",
+  "description": "Diagnose your AI agents in production \u2014 extract behavioral policies from prompts, evaluate traces against them, and generate diagnostic reports.",
   "type": "module",
   "bin": {
     "agent-triage": "./dist/cli/index.js",
@@ -74,7 +74,7 @@
     "access": "public"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=18.14.1"
   },
   "files": [
     "dist",
@@ -89,6 +89,7 @@
   ],
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
+    "@hono/node-server": "1.19.17",
     "@modelcontextprotocol/sdk": "1.32.1",
     "commander": "^13.1.0",
     "openai": "^4.82.0",

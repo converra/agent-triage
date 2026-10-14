@@ -12,6 +12,10 @@
 - Include linked command/configuration/workflow docs, README screenshots, and
   the changelog in the npm package. Build fresh output before packing.
 - Update vulnerable dependencies within existing runtime major versions.
+- Declare patched `@hono/node-server` 1.19.17 directly so downstream MCP SDK
+  resolution retains Node 18 support; enforce strict engines during packed CI
+  installation. Package engines now state the adapter's existing Node 18.14.1
+  minimum explicitly.
 
 ### Release tooling
 - Add zero-cost MCP `--help`/`-h`.

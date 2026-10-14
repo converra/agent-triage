@@ -59,7 +59,7 @@ jobs:
       - name: Install the packed production runtime
         run: |
           mkdir -p "${{ runner.temp }}/triage-smoke"
-          npm install --prefix "${{ runner.temp }}/triage-smoke" --ignore-scripts --omit=dev --no-audit --no-fund ./package-artifact/agent-triage-*.tgz
+          npm install --prefix "${{ runner.temp }}/triage-smoke" --engine-strict --ignore-scripts --omit=dev --no-audit --no-fund ./package-artifact/agent-triage-*.tgz
       - name: Smoke-test runtime exports and command help
         working-directory: ${{ runner.temp }}/triage-smoke
         run: |

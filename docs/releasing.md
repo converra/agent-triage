@@ -38,5 +38,11 @@ For a release:
 5. Verify the workflow result, npm version/dist-tag, package provenance, and a
    fresh registry install. A prepared tarball or merged PR is not a published release.
 
-Runtime support remains Node 18+. The development test runner requires Node
+Runtime support starts at Node 18.14.1 (the adapter's existing minimum). The package directly depends on the patched
+`@hono/node-server` 1.19.17 adapter so clean downstream installations reuse its
+Node 18-compatible branch of the MCP SDK's `^1.19.9 || ^2.0.5` range. This is a
+published dependency constraint, not a root-only override. The packed runtime
+install in CI uses `--engine-strict` to reject incompatible transitive engines.
+
+The development test runner requires Node
 20.19+; CI separately installs the packed runtime under Node 18.
