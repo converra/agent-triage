@@ -36,3 +36,6 @@ fresh-report/
 # AI assistant config files
 .cursorrules
 AGENTS.md
+
+# npm release artifacts
+agent-triage-*.tgz

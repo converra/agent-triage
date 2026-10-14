@@ -20,6 +20,19 @@ setLogger(stderrLogger);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(resolve(__dirname, "../../package.json"), "utf-8")) as { version: string };
 
+if (process.argv.includes("--help") || process.argv.includes("-h")) {
+  console.log(`agent-triage-mcp v${pkg.version}
+
+Usage: agent-triage-mcp
+
+Start the agent-triage MCP server over stdin/stdout.
+Configure this command in your MCP client; diagnostics are written to stderr.
+
+Options:
+  -h, --help  Show this help without starting the server`);
+  process.exit(0);
+}
+
 const server = new McpServer(
   {
     name: "agent-triage",

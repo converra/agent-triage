@@ -12,7 +12,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [18, 20, 22]
+        node-version: ["20.19", 22, 24]
 
     steps:
       - uses: actions/checkout@v4
@@ -23,7 +23,7 @@ jobs:
           node-version: ${{ matrix.node-version }}
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Type check
         run: npm run lint
@@ -32,4 +32,37 @@ jobs:
         run: npm run build
 
       - name: Test
-        run: npm test
+        run: npm run test:unit
+
+      - name: Pack runtime for the Node 18 compatibility check
+        if: matrix.node-version == 24
+        run: npm pack --ignore-scripts
+
+      - uses: actions/upload-artifact@v4
+        if: matrix.node-version == 24
+        with:
+          name: agent-triage-runtime
+          path: agent-triage-*.tgz
+          retention-days: 7
+
+  runtime-node18:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - uses: actions/download-artifact@v4
+        with:
+          name: agent-triage-runtime
+          path: package-artifact
+      - name: Install the packed production runtime
+        run: |
+          mkdir -p "${{ runner.temp }}/triage-smoke"
+          npm install --prefix "${{ runner.temp }}/triage-smoke" --ignore-scripts --omit=dev --no-audit --no-fund ./package-artifact/agent-triage-*.tgz
+      - name: Smoke-test runtime exports and command help
+        working-directory: ${{ runner.temp }}/triage-smoke
+        run: |
+          node --input-type=module -e 'const sdk = await import("agent-triage"); if (typeof sdk.readJsonTraces !== "function") throw new Error("Missing public export")'
+          ./node_modules/.bin/agent-triage --help
+          ./node_modules/.bin/agent-triage-mcp --help

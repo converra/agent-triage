@@ -1,0 +1,43 @@
+name: Publish npm package
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: npm-agent-triage-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Require a version tag on main
+        run: |
+          node -e 'if (process.env.GITHUB_REF_NAME !== "v" + require("./package.json").version) throw new Error("Tag does not match package version")'
+          git merge-base --is-ancestor HEAD origin/main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Ensure an OIDC-capable npm CLI
+        run: npm install --global npm@11
+      - run: npm ci --ignore-scripts
+      - run: npm run lint
+      - run: npm run test:unit
+      - run: npm audit --omit=dev
+      - name: Build and pack the release
+        run: npm pack
+      - name: Publish through npm trusted publishing
+        # Packing above already rebuilt and validated dist. Directory publishing
+        # preserves npm's gitHead metadata; skip duplicate lifecycle checks.
+        run: npm publish --ignore-scripts --access public --provenance

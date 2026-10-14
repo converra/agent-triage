@@ -3,23 +3,23 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // Mock OpenAI SDK
 const mockOpenAICreate = vi.fn();
 vi.mock("openai", () => ({
-  default: vi.fn().mockImplementation(() => ({
+  default: vi.fn().mockImplementation(function () { return {
     chat: {
       completions: {
         create: mockOpenAICreate,
       },
     },
-  })),
+  }; }),
 }));
 
 // Mock Anthropic SDK
 const mockAnthropicCreate = vi.fn();
 vi.mock("@anthropic-ai/sdk", () => ({
-  default: vi.fn().mockImplementation(() => ({
+  default: vi.fn().mockImplementation(function () { return {
     messages: {
       create: mockAnthropicCreate,
     },
-  })),
+  }; }),
 }));
 
 import OpenAI from "openai";
