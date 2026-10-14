@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.2.1] - 2026-10-14
+
+### Fixed
+- Ship the post-0.2.0 CLI, MCP, evaluation, and report fixes: provider-aware
+  dry-run costs, empty filtered-input errors, bounded diagnosis turns, validated
+  policy failure types, quality averages excluding truncation flags, and safely
+  escaped report copy commands.
+- Keep MCP diagnostics on stderr, accept all supported trace sources for explain,
+  report skipped policy checks, and annotate read-only tools.
+- Include linked command/configuration/workflow docs, README screenshots, and
+  the changelog in the npm package. Build fresh output before packing.
+- Update vulnerable dependencies within existing runtime major versions.
+- Declare patched `@hono/node-server` 1.19.17 directly so downstream MCP SDK
+  resolution retains Node 18 support; enforce strict engines during packed CI
+  installation. Package engines now state the adapter's existing Node 18.14.1
+  minimum explicitly.
+
+### Release tooling
+- Add zero-cost MCP `--help`/`-h`.
+- Upgrade the development-only Vitest runner to 4.1.11 or later. Full tests run
+  on Node 20.19+, 22, and 24; packed runtime smoke checks retain Node 18 support.
+- Add tag-driven npm trusted publishing with OIDC, provenance, and explicit
+  version/main ancestry checks. Publisher registration remains a maintainer step.
+
 ## [0.2.0] - 2026-03-09
 
 ### CLI

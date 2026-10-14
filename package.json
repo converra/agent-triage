@@ -1,7 +1,7 @@
 {
   "name": "agent-triage",
-  "version": "0.2.0",
-  "description": "Diagnose your AI agents in production — extract behavioral policies from prompts, evaluate traces against them, and generate diagnostic reports.",
+  "version": "0.2.1",
+  "description": "Diagnose your AI agents in production \u2014 extract behavioral policies from prompts, evaluate traces against them, and generate diagnostic reports.",
   "type": "module",
   "bin": {
     "agent-triage": "./dist/cli/index.js",
@@ -22,7 +22,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "tsc --noEmit",
-    "prepublishOnly": "npm run clean && npm run build && npm test"
+    "prepublishOnly": "npm run lint && npm run test:unit",
+    "test:unit": "vitest run --exclude \"**/*.integration.test.ts\"",
+    "prepack": "npm run clean && npm run build"
   },
   "keywords": [
     "ai",
@@ -72,7 +74,7 @@
     "access": "public"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=18.14.1"
   },
   "files": [
     "dist",
@@ -80,20 +82,29 @@
     "LICENSE",
     "README.md",
     "llms.txt",
-    "llms-full.txt"
+    "llms-full.txt",
+    "docs",
+    "assets/*.png",
+    "CHANGELOG.md"
   ],
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
-    "@modelcontextprotocol/sdk": "1.27.1",
+    "@hono/node-server": "1.19.17",
+    "@modelcontextprotocol/sdk": "1.32.1",
     "commander": "^13.1.0",
     "openai": "^4.82.0",
-    "yaml": "^2.7.0",
+    "yaml": "2.9.1",
     "zod": "^3.24.0"
   },
   "devDependencies": {
     "@types/node": "^22.12.0",
-    "tsx": "^4.19.0",
+    "tsx": "4.23.15",
     "typescript": "^5.7.0",
-    "vitest": "^3.0.0"
+    "vitest": "4.1.11"
+  },
+  "overrides": {
+    "vite": {
+      "esbuild": "0.28.1"
+    }
   }
 }
